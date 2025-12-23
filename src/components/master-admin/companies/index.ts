@@ -7,3 +7,5 @@ export { EditCompanyModal } from "./edit-company-modal";
 export { CompanyOverview } from "./company-overview";
 export { CompanyUsers } from "./company-users";
 export { CompanySubscription } from "./company-subscription";
+export { CompanyAgents } from "./company-agents";
+export { CompanyActivity } from "./company-activity";

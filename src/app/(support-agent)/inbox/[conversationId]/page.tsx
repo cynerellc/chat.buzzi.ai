@@ -8,8 +8,6 @@ import {
   StarOff,
   MoreVertical,
   Send,
-  Paperclip,
-  Smile,
   MessageSquare as MessageSquareIcon,
   Bot,
   User,
@@ -25,6 +23,11 @@ import {
   Mail,
   Globe,
   Calendar,
+  Sparkles,
+  Zap,
+  Paperclip,
+  Smile,
+  Keyboard,
 } from "lucide-react";
 
 import {
@@ -45,6 +48,19 @@ import {
   ScrollShadow,
 } from "@/components/ui";
 import type { DropdownMenuItem } from "@/components/ui";
+import {
+  CannedResponsesPicker,
+  EmojiPicker,
+  FileAttachmentUpload,
+  TransferModal,
+  TypingIndicator,
+  TypingBubble,
+  useTypingStatus,
+  AISummaryPanel,
+  QuickActionsPanel,
+  useKeyboardShortcuts,
+  KeyboardShortcutsHelp,
+} from "@/components/support-agent";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -157,9 +173,19 @@ export default function LiveChatPage() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [closingMessage, setClosingMessage] = useState("");
+  const [showCannedResponses, setShowCannedResponses] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showAiSummary, setShowAiSummary] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [isCustomerTyping, setIsCustomerTyping] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Typing status hook
+  const { startTyping, stopTyping } = useTypingStatus(conversationId);
 
   // Fetch conversation data
   const fetchConversation = useCallback(async () => {
@@ -326,7 +352,60 @@ export default function LiveChatPage() {
     }
   };
 
-  // Handle keyboard shortcuts
+  // Handle file attachments
+  const handleFilesSelected = (files: File[]) => {
+    setPendingAttachments((prev) => [...prev, ...files]);
+  };
+
+  const removePendingAttachment = (index: number) => {
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle canned response selection
+  const handleCannedResponse = (response: { content: string }) => {
+    setMessageInput((prev) => prev + response.content);
+    setShowCannedResponses(false);
+    inputRef.current?.focus();
+  };
+
+  // Handle emoji selection
+  const handleEmojiSelect = (emoji: string) => {
+    setMessageInput((prev) => prev + emoji);
+    inputRef.current?.focus();
+  };
+
+  // Handle quick actions
+  const handleQuickAction = async (action: string) => {
+    switch (action) {
+      case "resolve":
+        setShowResolveModal(true);
+        break;
+      case "star":
+        toggleStar();
+        break;
+      case "transfer":
+        setShowTransferModal(true);
+        break;
+      case "returnToAi":
+        returnToAi();
+        break;
+      default:
+        console.log("Quick action:", action);
+    }
+  };
+
+  // Keyboard shortcuts configuration
+  const { shortcuts } = useKeyboardShortcuts({
+    enabled: !showResolveModal && !showNoteModal && !showTransferModal && !showCannedResponses,
+    onResolve: () => setShowResolveModal(true),
+    onStar: toggleStar,
+    onTransfer: () => setShowTransferModal(true),
+    onReturnToAi: returnToAi,
+    onCannedResponses: () => setShowCannedResponses(true),
+    onFocusInput: () => inputRef.current?.focus(),
+  });
+
+  // Handle text input keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -531,23 +610,69 @@ export default function LiveChatPage() {
           <div ref={messagesEndRef} />
         </ScrollShadow>
 
+        {/* Typing Indicator */}
+        {isCustomerTyping && (
+          <div className="px-4 pb-2">
+            <TypingBubble name={conversation.endUser?.name ?? "Customer"} />
+          </div>
+        )}
+
         {/* Input Area */}
         {!isResolved && (
           <div className="border-t border-divider p-4 bg-content1">
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" className="flex-shrink-0">
-                <Paperclip size={20} />
-              </Button>
-              <Button variant="ghost" size="sm" className="flex-shrink-0">
-                <Smile size={20} />
+            {/* Pending Attachments */}
+            {pendingAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3 p-2 bg-default-100 rounded-lg">
+                {pendingAttachments.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-content1 px-2 py-1 rounded text-sm"
+                  >
+                    <Paperclip size={14} />
+                    <span className="truncate max-w-[150px]">{file.name}</span>
+                    <button
+                      onClick={() => removePendingAttachment(index)}
+                      className="text-default-400 hover:text-danger"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 items-end">
+              <FileAttachmentUpload
+                onFilesSelected={handleFilesSelected}
+                maxFiles={5}
+                maxSizeMB={10}
+              />
+
+              <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex-shrink-0"
+                onClick={() => setShowCannedResponses(true)}
+              >
+                <MessageSquareIcon size={20} />
               </Button>
 
               <Textarea
                 ref={inputRef}
-                placeholder="Type a message..."
+                placeholder="Type a message... (Cmd+K for canned responses)"
                 value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
+                onChange={(e) => {
+                  setMessageInput(e.target.value);
+                  if (e.target.value) {
+                    startTyping();
+                  } else {
+                    stopTyping();
+                  }
+                }}
                 onKeyDown={handleKeyDown}
+                onBlur={stopTyping}
                 minRows={1}
                 maxRows={4}
                 className="flex-1"
@@ -558,7 +683,7 @@ export default function LiveChatPage() {
                 size="sm"
                 onClick={sendMessage}
                 isLoading={sending}
-                isDisabled={!messageInput.trim()}
+                isDisabled={!messageInput.trim() && pendingAttachments.length === 0}
                 className="flex-shrink-0"
               >
                 <Send size={20} />
@@ -585,16 +710,32 @@ export default function LiveChatPage() {
                   <FileText size={16} />
                   Add Note
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowTransferModal(true)}
+                >
+                  Transfer
+                </Button>
               </div>
 
-              <Button
-                color="success"
-                size="sm"
-                onClick={() => setShowResolveModal(true)}
-              >
-                <Check size={16} />
-                Resolve
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowShortcutsHelp(true)}
+                >
+                  <Keyboard size={16} />
+                </Button>
+                <Button
+                  color="success"
+                  size="sm"
+                  onClick={() => setShowResolveModal(true)}
+                >
+                  <Check size={16} />
+                  Resolve
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -739,6 +880,54 @@ export default function LiveChatPage() {
                 </div>
               </>
             )}
+
+            <Divider className="my-4" />
+
+            {/* Quick Actions Panel */}
+            <QuickActionsPanel
+              conversationId={conversationId}
+              isStarred={conversation.isStarred}
+              tags={conversation.tags as string[]}
+              onAction={handleQuickAction}
+              onAddTag={(tag) => {
+                // TODO: Implement tag API
+                setData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        conversation: {
+                          ...prev.conversation,
+                          tags: [...(prev.conversation.tags as string[]), tag],
+                        },
+                      }
+                    : null
+                );
+              }}
+              onRemoveTag={(tag) => {
+                setData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        conversation: {
+                          ...prev.conversation,
+                          tags: (prev.conversation.tags as string[]).filter((t) => t !== tag),
+                        },
+                      }
+                    : null
+                );
+              }}
+            />
+
+            <Divider className="my-4" />
+
+            {/* AI Summary Panel */}
+            <AISummaryPanel
+              conversationId={conversationId}
+              onSuggestedResponse={(response) => {
+                setMessageInput(response);
+                inputRef.current?.focus();
+              }}
+            />
           </div>
         </div>
       )}
@@ -796,6 +985,31 @@ export default function LiveChatPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Canned Responses Picker */}
+      <CannedResponsesPicker
+        isOpen={showCannedResponses}
+        onClose={() => setShowCannedResponses(false)}
+        onSelect={handleCannedResponse}
+      />
+
+      {/* Transfer Modal */}
+      <TransferModal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        conversationId={conversationId}
+        onTransferComplete={() => {
+          setShowTransferModal(false);
+          router.push("/inbox");
+        }}
+      />
+
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp
+        isOpen={showShortcutsHelp}
+        onClose={() => setShowShortcutsHelp(false)}
+        shortcuts={shortcuts}
+      />
     </div>
   );
 }

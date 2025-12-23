@@ -12,3 +12,5 @@ export * from "./telegram";
 export * from "./slack";
 export * from "./messenger";
 export * from "./instagram";
+export * from "./teams";
+export * from "./custom";

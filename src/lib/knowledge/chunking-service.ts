@@ -7,6 +7,7 @@
  * - Sentence-based
  * - Paragraph-based
  * - Semantic (heading-based)
+ * - Semantic NLP (topic boundary detection)
  */
 
 // Types
@@ -18,13 +19,16 @@ export interface ChunkingOptions {
   maxChunkSize?: number; // Maximum chunk size (split larger chunks)
   preserveSentences?: boolean; // Try not to split mid-sentence
   preserveParagraphs?: boolean; // Try not to split mid-paragraph
+  semanticThreshold?: number; // Threshold for semantic boundary detection (0-1)
+  includeParentContext?: boolean; // Include parent chunk reference for hierarchical retrieval
 }
 
 export type ChunkingStrategy =
   | "fixed"
   | "sentence"
   | "paragraph"
-  | "semantic";
+  | "semantic"
+  | "semantic_nlp"; // Topic-based chunking using NLP heuristics
 
 export interface TextChunk {
   content: string;
@@ -39,6 +43,11 @@ export interface ChunkMetadata {
   sectionTitle?: string;
   pageNumber?: number;
   paragraphIndex?: number;
+  parentChunkId?: string; // Reference to parent chunk for hierarchical retrieval
+  siblingChunkIds?: string[]; // References to adjacent chunks
+  topicKeywords?: string[]; // Key terms extracted from chunk
+  semanticScore?: number; // Semantic coherence score
+  [key: string]: unknown; // Index signature for compatibility
 }
 
 // Default options
@@ -50,6 +59,8 @@ const DEFAULT_OPTIONS: ChunkingOptions = {
   maxChunkSize: 2000,
   preserveSentences: true,
   preserveParagraphs: true,
+  semanticThreshold: 0.5,
+  includeParentContext: true,
 };
 
 // Paragraph boundary regex
@@ -82,6 +93,8 @@ export class ChunkingService {
         return this.chunkByParagraph(normalizedText);
       case "semantic":
         return this.chunkSemantic(normalizedText);
+      case "semantic_nlp":
+        return this.chunkSemanticNlp(normalizedText);
       case "fixed":
       default:
         return this.chunkFixed(normalizedText);
@@ -382,6 +395,265 @@ export class ChunkingService {
   }
 
   /**
+   * Semantic NLP-based chunking
+   * Uses topic coherence and transition detection to find natural breakpoints
+   */
+  private chunkSemanticNlp(text: string): TextChunk[] {
+    const sentences = this.splitIntoSentences(text);
+    if (sentences.length === 0) return [];
+
+    const chunks: TextChunk[] = [];
+    let currentChunk: string[] = [];
+    let currentTopicKeywords = new Set<string>();
+    let chunkIndex = 0;
+    let charPosition = 0;
+    let chunkStart = 0;
+
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      if (!sentence) continue;
+
+      const sentenceKeywords = this.extractKeywords(sentence);
+      const overlap = this.calculateKeywordOverlap(
+        currentTopicKeywords,
+        sentenceKeywords
+      );
+
+      // Determine if we should start a new chunk
+      const shouldSplit =
+        currentChunk.length > 0 &&
+        (currentChunk.join(" ").length >= this.options.chunkSize ||
+          (overlap < (this.options.semanticThreshold ?? 0.5) &&
+            currentChunk.join(" ").length >= (this.options.minChunkSize ?? 100)) ||
+          this.detectTopicTransition(currentChunk, sentence));
+
+      if (shouldSplit) {
+        const chunkContent = currentChunk.join(" ").trim();
+        if (chunkContent.length >= (this.options.minChunkSize ?? 100)) {
+          const topicKeywords = this.getTopKeywords(currentTopicKeywords, 5);
+          chunks.push({
+            content: chunkContent,
+            index: chunkIndex++,
+            startChar: chunkStart,
+            endChar: charPosition,
+            tokenEstimate: this.estimateTokens(chunkContent),
+            metadata: {
+              topicKeywords,
+              semanticScore: this.calculateSemanticCoherence(currentChunk),
+            },
+          });
+        }
+
+        // Start new chunk with overlap
+        const overlapSentences = this.getOverlapSentences(
+          currentChunk,
+          this.options.chunkOverlap
+        );
+        currentChunk = [...overlapSentences];
+        currentTopicKeywords = new Set<string>();
+        for (const s of overlapSentences) {
+          for (const k of this.extractKeywords(s)) {
+            currentTopicKeywords.add(k);
+          }
+        }
+        chunkStart = charPosition - overlapSentences.join(" ").length;
+      }
+
+      // Add sentence to current chunk
+      currentChunk.push(sentence);
+      for (const k of sentenceKeywords) {
+        currentTopicKeywords.add(k);
+      }
+      charPosition += sentence.length + 1;
+    }
+
+    // Add final chunk
+    if (currentChunk.length > 0) {
+      const chunkContent = currentChunk.join(" ").trim();
+      if (chunkContent.length >= (this.options.minChunkSize ?? 0)) {
+        const topicKeywords = this.getTopKeywords(currentTopicKeywords, 5);
+        chunks.push({
+          content: chunkContent,
+          index: chunkIndex,
+          startChar: chunkStart,
+          endChar: charPosition,
+          tokenEstimate: this.estimateTokens(chunkContent),
+          metadata: {
+            topicKeywords,
+            semanticScore: this.calculateSemanticCoherence(currentChunk),
+          },
+        });
+      }
+    }
+
+    // Add sibling references if enabled
+    if (this.options.includeParentContext) {
+      this.addSiblingReferences(chunks);
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Extract keywords from text using basic NLP heuristics
+   */
+  private extractKeywords(text: string): Set<string> {
+    const stopWords = new Set([
+      "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+      "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
+      "be", "have", "has", "had", "do", "does", "did", "will", "would", "could",
+      "should", "may", "might", "must", "shall", "can", "need", "dare", "ought",
+      "used", "this", "that", "these", "those", "i", "you", "he", "she", "it",
+      "we", "they", "what", "which", "who", "whom", "whose", "where", "when",
+      "why", "how", "all", "each", "every", "both", "few", "more", "most",
+      "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so",
+      "than", "too", "very", "just", "also", "now", "here", "there", "then",
+    ]);
+
+    const words = text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stopWords.has(w));
+
+    return new Set(words);
+  }
+
+  /**
+   * Calculate overlap between two keyword sets
+   */
+  private calculateKeywordOverlap(
+    set1: Set<string>,
+    set2: Set<string>
+  ): number {
+    if (set1.size === 0 || set2.size === 0) return 0;
+
+    let intersection = 0;
+    for (const keyword of set2) {
+      if (set1.has(keyword)) {
+        intersection++;
+      }
+    }
+
+    return intersection / Math.min(set1.size, set2.size);
+  }
+
+  /**
+   * Detect topic transition between chunk and new sentence
+   */
+  private detectTopicTransition(
+    currentChunk: string[],
+    newSentence: string
+  ): boolean {
+    // Check for explicit transition markers
+    const transitionMarkers = [
+      /^(however|nevertheless|on the other hand|in contrast|alternatively)/i,
+      /^(furthermore|moreover|additionally|in addition|also)/i,
+      /^(firstly|secondly|thirdly|finally|lastly|next)/i,
+      /^(for example|for instance|such as|specifically)/i,
+      /^(in conclusion|to summarize|in summary|overall)/i,
+      /^(meanwhile|subsequently|consequently|therefore|thus)/i,
+    ];
+
+    for (const marker of transitionMarkers) {
+      if (marker.test(newSentence.trim())) {
+        return true;
+      }
+    }
+
+    // Check for significant topic shift using keyword overlap
+    const lastSentences = currentChunk.slice(-3);
+    const recentKeywords = new Set<string>();
+    for (const s of lastSentences) {
+      for (const k of this.extractKeywords(s)) {
+        recentKeywords.add(k);
+      }
+    }
+
+    const newKeywords = this.extractKeywords(newSentence);
+    const overlap = this.calculateKeywordOverlap(recentKeywords, newKeywords);
+
+    // Low overlap with recent content suggests topic shift
+    return overlap < 0.1 && newKeywords.size > 3;
+  }
+
+  /**
+   * Get sentences for overlap
+   */
+  private getOverlapSentences(
+    sentences: string[],
+    targetOverlapChars: number
+  ): string[] {
+    const result: string[] = [];
+    let totalChars = 0;
+
+    for (let i = sentences.length - 1; i >= 0 && totalChars < targetOverlapChars; i--) {
+      const sentence = sentences[i];
+      if (!sentence) continue;
+      result.unshift(sentence);
+      totalChars += sentence.length + 1;
+    }
+
+    return result;
+  }
+
+  /**
+   * Calculate semantic coherence score for a chunk
+   */
+  private calculateSemanticCoherence(sentences: string[]): number {
+    if (sentences.length < 2) return 1;
+
+    let totalOverlap = 0;
+    let comparisons = 0;
+
+    for (let i = 1; i < sentences.length; i++) {
+      const prev = sentences[i - 1];
+      const curr = sentences[i];
+      if (!prev || !curr) continue;
+
+      const prevKeywords = this.extractKeywords(prev);
+      const currKeywords = this.extractKeywords(curr);
+      totalOverlap += this.calculateKeywordOverlap(prevKeywords, currKeywords);
+      comparisons++;
+    }
+
+    return comparisons > 0 ? totalOverlap / comparisons : 1;
+  }
+
+  /**
+   * Get top N keywords from a set
+   */
+  private getTopKeywords(keywords: Set<string>, n: number): string[] {
+    // In a real implementation, this would rank by frequency/importance
+    // For now, just return first N
+    return Array.from(keywords).slice(0, n);
+  }
+
+  /**
+   * Add sibling chunk references to metadata
+   */
+  private addSiblingReferences(chunks: TextChunk[]): void {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (!chunk) continue;
+
+      const siblingIds: string[] = [];
+
+      if (i > 0) {
+        siblingIds.push(`chunk_${i - 1}`);
+      }
+      if (i < chunks.length - 1) {
+        siblingIds.push(`chunk_${i + 1}`);
+      }
+
+      if (!chunk.metadata) {
+        chunk.metadata = {};
+      }
+      chunk.metadata.siblingChunkIds = siblingIds;
+    }
+  }
+
+  /**
    * Split text into sentences
    */
   private splitIntoSentences(text: string): string[] {
@@ -529,5 +801,17 @@ export const CHUNKING_PRESETS = {
     chunkOverlap: 300,
     minChunkSize: 200,
     maxChunkSize: 3000,
+  },
+
+  semantic_nlp: {
+    ...DEFAULT_OPTIONS,
+    strategy: "semantic_nlp" as ChunkingStrategy,
+    chunkSize: 1000,
+    chunkOverlap: 200,
+    minChunkSize: 150,
+    maxChunkSize: 2000,
+    semanticThreshold: 0.4,
+    includeParentContext: true,
+    preserveSentences: true,
   },
 } as const;

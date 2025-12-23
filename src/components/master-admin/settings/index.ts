@@ -4,3 +4,7 @@ export { AISettings } from "./ai-settings";
 export { SecuritySettings } from "./security-settings";
 export { IntegrationsSettings } from "./integrations-settings";
 export { MaintenanceSettings } from "./maintenance-settings";
+export { BrandingSettings, type BrandingSettingsData } from "./branding-settings";
+export { AuthenticationSettings, type AuthenticationSettingsData } from "./authentication-settings";
+export { LimitsSettings, type LimitsSettingsData } from "./limits-settings";
+export { NotificationsSettings, type NotificationsSettingsData } from "./notifications-settings";

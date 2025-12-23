@@ -40,3 +40,15 @@ export {
   type AvailableAgent,
   type RoutingResult,
 } from "./routing";
+
+// Sentiment Analysis
+export {
+  SentimentAnalyzer,
+  getSentimentAnalyzer,
+  analyzeSentiment,
+  analyzeConversationSentiment,
+  needsEscalation,
+  type SentimentResult,
+  type SentimentLabel,
+  type SentimentDetails,
+} from "./sentiment-analyzer";

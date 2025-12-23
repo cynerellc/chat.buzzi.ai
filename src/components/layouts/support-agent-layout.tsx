@@ -7,12 +7,14 @@ import {
   CheckCircle,
   MessageSquare,
   Settings,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode } from "react";
 
 import { MainLayout } from "./main-layout";
 import { type SidebarSection } from "./sidebar";
+import { StatusSelector, CapacityIndicator } from "@/components/support-agent";
 
 // Navigation configuration for support agent
 const supportAgentSections: SidebarSection[] = [
@@ -37,6 +39,7 @@ const supportAgentSections: SidebarSection[] = [
     title: "Tools",
     items: [
       { key: "responses", label: "Canned Responses", href: "/responses", icon: MessageSquare },
+      { key: "customers", label: "Customers", href: "/customers", icon: Users },
       { key: "settings", label: "My Settings", href: "/agent-settings", icon: Settings },
     ],
   },
@@ -69,13 +72,12 @@ function AgentLogoCollapsed() {
   );
 }
 
-// Agent status selector component
-function AgentStatusSelector() {
-  // TODO: Implement status selector dropdown
+// Agent status and capacity footer
+function AgentStatusFooter() {
   return (
-    <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-success/10 text-success text-sm">
-      <div className="w-2 h-2 rounded-full bg-success" />
-      <span>Online</span>
+    <div className="space-y-3">
+      <CapacityIndicator showDetails size="sm" />
+      <StatusSelector size="sm" />
     </div>
   );
 }
@@ -92,7 +94,7 @@ export function SupportAgentLayout({ children, companyName }: SupportAgentLayout
         logo: <AgentLogo companyName={companyName} />,
         logoCollapsed: <AgentLogoCollapsed />,
         sections: supportAgentSections,
-        footer: <AgentStatusSelector />,
+        footer: <AgentStatusFooter />,
       }}
       headerProps={{
         title: "Support Inbox",

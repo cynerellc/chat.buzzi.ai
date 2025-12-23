@@ -216,6 +216,57 @@ export const faqItemsRelations = relations(faqItems, ({ one }) => ({
   }),
 }));
 
+// Company Files Table (for managing uploaded files)
+export const companyFiles = pgTable(
+  "chatapp_company_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Company Reference
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+
+    // File Info
+    name: varchar("name", { length: 500 }).notNull(),
+    mimeType: varchar("mime_type", { length: 255 }).notNull(),
+    size: integer("size").notNull(), // Size in bytes
+    url: varchar("url", { length: 1000 }).notNull(),
+
+    // Categorization
+    category: varchar("category", { length: 100 }).default("general").notNull(),
+
+    // Optional link to knowledge source
+    knowledgeSourceId: uuid("knowledge_source_id").references(() => knowledgeSources.id, { onDelete: "set null" }),
+
+    // Uploader
+    uploadedById: uuid("uploaded_by_id").notNull(),
+
+    // Metadata
+    metadata: jsonb("metadata").default({}),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("company_files_company_idx").on(table.companyId),
+    index("company_files_category_idx").on(table.category),
+    index("company_files_uploader_idx").on(table.uploadedById),
+  ]
+);
+
+export const companyFilesRelations = relations(companyFiles, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyFiles.companyId],
+    references: [companies.id],
+  }),
+  knowledgeSource: one(knowledgeSources, {
+    fields: [companyFiles.knowledgeSourceId],
+    references: [knowledgeSources.id],
+  }),
+}));
+
 // Types
 export type KnowledgeCategory = typeof knowledgeCategories.$inferSelect;
 export type NewKnowledgeCategory = typeof knowledgeCategories.$inferInsert;
@@ -225,3 +276,5 @@ export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect;
 export type NewKnowledgeChunk = typeof knowledgeChunks.$inferInsert;
 export type FaqItem = typeof faqItems.$inferSelect;
 export type NewFaqItem = typeof faqItems.$inferInsert;
+export type CompanyFile = typeof companyFiles.$inferSelect;
+export type NewCompanyFile = typeof companyFiles.$inferInsert;

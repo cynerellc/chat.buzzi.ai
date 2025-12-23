@@ -5,22 +5,35 @@
  * 1. Extract text from documents
  * 2. Split into chunks
  * 3. Generate embeddings
- * 4. Store in database with vector embeddings
+ * 4. Store vectors in Qdrant and metadata in PostgreSQL
  */
 
 import { db } from "@/lib/db";
 import { knowledgeSources, knowledgeChunks, faqItems } from "@/lib/db/schema/knowledge";
 import { eq, sql } from "drizzle-orm";
+import { v4 as uuidv4 } from "uuid";
 
 import { processDocument } from "./document-processor";
-import { chunkText, CHUNKING_PRESETS } from "./chunking-service";
+import { chunkText, CHUNKING_PRESETS, type TextChunk } from "./chunking-service";
 import { getEmbeddingService } from "./embedding-service";
+import {
+  getQdrantService,
+  storeChunks,
+  storeFaq,
+  deleteChunksBySource,
+  deleteFaq,
+  COLLECTIONS,
+  type VectorPayload,
+  type FaqPayload,
+} from "./qdrant-client";
 
 // Types
 export interface ProcessingOptions {
   chunkingPreset?: keyof typeof CHUNKING_PRESETS;
   embedBatchSize?: number;
   onProgress?: (progress: ProcessingProgress) => void;
+  useQdrant?: boolean; // Toggle between Qdrant and pgvector
+  storeInPostgres?: boolean; // Also store in PostgreSQL for backup
 }
 
 export interface ProcessingProgress {
@@ -46,6 +59,7 @@ export interface ProcessingResult {
   totalTokens: number;
   processingTimeMs: number;
   error?: string;
+  vectorStore?: "qdrant" | "pgvector";
 }
 
 // Default configuration
@@ -196,7 +210,24 @@ export class ProcessingPipeline {
     options: ProcessingOptions,
     startTime: number
   ): Promise<ProcessingResult> {
-    const { onProgress, chunkingPreset = "qa", embedBatchSize = DEFAULT_EMBED_BATCH_SIZE } = options;
+    const {
+      onProgress,
+      chunkingPreset = "qa",
+      embedBatchSize = DEFAULT_EMBED_BATCH_SIZE,
+      useQdrant = true, // Default to Qdrant
+      storeInPostgres = false,
+    } = options;
+
+    // Get source info for companyId
+    const [source] = await db
+      .select({ companyId: knowledgeSources.companyId })
+      .from(knowledgeSources)
+      .where(eq(knowledgeSources.id, sourceId))
+      .limit(1);
+
+    if (!source) {
+      throw new Error("Source not found");
+    }
 
     // 2. Chunk the content
     onProgress?.({ stage: "chunking", progress: 0, message: "Splitting into chunks" });
@@ -235,9 +266,134 @@ export class ProcessingPipeline {
       });
     }
 
-    // 4. Store chunks with embeddings
-    onProgress?.({ stage: "storing", progress: 0, message: "Storing chunks in database" });
+    // 4. Store chunks in vector store
+    onProgress?.({ stage: "storing", progress: 0, message: "Storing chunks in vector store" });
 
+    let vectorStore: "qdrant" | "pgvector" = "qdrant";
+
+    if (useQdrant) {
+      // Store in Qdrant
+      await this.storeChunksInQdrant(
+        sourceId,
+        source.companyId,
+        chunks,
+        embeddings,
+        onProgress
+      );
+    } else {
+      // Store in PostgreSQL (pgvector)
+      vectorStore = "pgvector";
+      await this.storeChunksInPostgres(
+        sourceId,
+        chunks,
+        embeddings,
+        onProgress
+      );
+    }
+
+    // Optionally also store in PostgreSQL for backup
+    if (useQdrant && storeInPostgres) {
+      await this.storeChunksInPostgres(sourceId, chunks, embeddings);
+    }
+
+    // 5. Update source status
+    await db
+      .update(knowledgeSources)
+      .set({
+        status: "indexed",
+        chunkCount: chunks.length,
+        tokenCount: totalTokens,
+        lastProcessedAt: new Date(),
+        processingError: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(knowledgeSources.id, sourceId));
+
+    onProgress?.({ stage: "complete", progress: 100, message: "Processing complete" });
+
+    return {
+      success: true,
+      sourceId,
+      chunksCreated: chunks.length,
+      totalTokens,
+      processingTimeMs: performance.now() - startTime,
+      vectorStore,
+    };
+  }
+
+  /**
+   * Store chunks in Qdrant vector database
+   */
+  private async storeChunksInQdrant(
+    sourceId: string,
+    companyId: string,
+    chunks: TextChunk[],
+    embeddings: number[][],
+    onProgress?: (progress: ProcessingProgress) => void
+  ): Promise<void> {
+    // Delete existing chunks for this source
+    await deleteChunksBySource(sourceId);
+
+    // Prepare chunks for Qdrant
+    const qdrantChunks: Array<{
+      id: string;
+      vector: number[];
+      payload: VectorPayload;
+    }> = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const embedding = embeddings[i];
+      if (!chunk || !embedding) continue;
+
+      const chunkId = uuidv4();
+
+      qdrantChunks.push({
+        id: chunkId,
+        vector: embedding,
+        payload: {
+          sourceId,
+          companyId,
+          content: chunk.content,
+          chunkIndex: chunk.index,
+          tokenCount: chunk.tokenEstimate,
+          metadata: chunk.metadata,
+        },
+      });
+
+      if (i % 20 === 0 || i === chunks.length - 1) {
+        const progress = Math.round(((i + 1) / chunks.length) * 100);
+        onProgress?.({
+          stage: "storing",
+          progress,
+          message: `Preparing chunks: ${i + 1}/${chunks.length}`,
+          chunksProcessed: i + 1,
+          totalChunks: chunks.length,
+        });
+      }
+    }
+
+    // Store in Qdrant (batched internally)
+    await storeChunks(qdrantChunks);
+
+    onProgress?.({
+      stage: "storing",
+      progress: 100,
+      message: `Stored ${chunks.length} chunks in Qdrant`,
+      chunksProcessed: chunks.length,
+      totalChunks: chunks.length,
+    });
+  }
+
+  /**
+   * Store chunks in PostgreSQL with pgvector
+   */
+  private async storeChunksInPostgres(
+    sourceId: string,
+    chunks: TextChunk[],
+    embeddings: number[][],
+    onProgress?: (progress: ProcessingProgress) => void
+  ): Promise<void> {
     // Delete existing chunks for this source
     await db
       .delete(knowledgeChunks)
@@ -269,35 +425,17 @@ export class ProcessingPipeline {
         });
       }
     }
-
-    // 5. Update source status
-    await db
-      .update(knowledgeSources)
-      .set({
-        status: "indexed",
-        chunkCount: chunks.length,
-        tokenCount: totalTokens,
-        lastProcessedAt: new Date(),
-        processingError: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(knowledgeSources.id, sourceId));
-
-    onProgress?.({ stage: "complete", progress: 100, message: "Processing complete" });
-
-    return {
-      success: true,
-      sourceId,
-      chunksCreated: chunks.length,
-      totalTokens,
-      processingTimeMs: performance.now() - startTime,
-    };
   }
 
   /**
    * Process a single FAQ item (add embedding)
    */
-  async processFaq(faqId: string): Promise<{ success: boolean; error?: string }> {
+  async processFaq(
+    faqId: string,
+    options: { useQdrant?: boolean } = {}
+  ): Promise<{ success: boolean; error?: string }> {
+    const { useQdrant = true } = options;
+
     try {
       // Get FAQ
       const [faq] = await db
@@ -313,9 +451,21 @@ export class ProcessingPipeline {
       // Generate embedding for question + answer
       const text = `${faq.question}\n${faq.answer}`;
       const result = await this.embeddingService.embed(text);
-      const embeddingStr = `[${result.embedding.join(",")}]`;
 
-      // Update FAQ with embedding
+      if (useQdrant) {
+        // Store in Qdrant
+        const payload: FaqPayload = {
+          companyId: faq.companyId,
+          question: faq.question,
+          answer: faq.answer,
+          category: faq.category,
+        };
+
+        await storeFaq(faqId, result.embedding, payload);
+      }
+
+      // Also update PostgreSQL for backup
+      const embeddingStr = `[${result.embedding.join(",")}]`;
       await db.execute(sql`
         UPDATE chatapp_faq_items SET embedding = ${embeddingStr}::vector, updated_at = NOW() WHERE id = ${faqId}
       `);
@@ -330,11 +480,28 @@ export class ProcessingPipeline {
   }
 
   /**
+   * Delete FAQ from both Qdrant and PostgreSQL
+   */
+  async deleteFaqEmbedding(faqId: string): Promise<void> {
+    try {
+      await deleteFaq(faqId);
+    } catch {
+      // Qdrant deletion failed, continue
+    }
+
+    // Remove embedding from PostgreSQL
+    await db.execute(sql`
+      UPDATE chatapp_faq_items SET embedding = NULL, updated_at = NOW() WHERE id = ${faqId}
+    `);
+  }
+
+  /**
    * Reprocess all FAQs for a company
    */
   async reprocessFaqs(
     companyId: string,
-    onProgress?: (progress: number, message: string) => void
+    onProgress?: (progress: number, message: string) => void,
+    options: { useQdrant?: boolean } = {}
   ): Promise<{ processed: number; failed: number }> {
     const faqs = await db
       .select({ id: faqItems.id })
@@ -348,7 +515,7 @@ export class ProcessingPipeline {
       const faq = faqs[i];
       if (!faq) continue;
 
-      const result = await this.processFaq(faq.id);
+      const result = await this.processFaq(faq.id, options);
       if (result.success) {
         processed++;
       } else {
@@ -362,6 +529,100 @@ export class ProcessingPipeline {
     }
 
     return { processed, failed };
+  }
+
+  /**
+   * Delete all chunks for a source from both stores
+   */
+  async deleteSourceChunks(sourceId: string): Promise<void> {
+    // Delete from Qdrant
+    try {
+      await deleteChunksBySource(sourceId);
+    } catch {
+      // Qdrant deletion failed, continue with PostgreSQL
+    }
+
+    // Delete from PostgreSQL
+    await db
+      .delete(knowledgeChunks)
+      .where(eq(knowledgeChunks.sourceId, sourceId));
+  }
+
+  /**
+   * Migrate chunks from PostgreSQL to Qdrant
+   */
+  async migrateToQdrant(
+    sourceId: string,
+    companyId: string,
+    onProgress?: (progress: number, message: string) => void
+  ): Promise<{ migrated: number; errors: number }> {
+    let migrated = 0;
+    let errors = 0;
+
+    // Get all chunks from PostgreSQL
+    const pgChunks = await db.execute<{
+      id: string;
+      content: string;
+      chunk_index: number;
+      token_count: number;
+      metadata: Record<string, unknown>;
+      embedding: number[];
+    }>(sql`
+      SELECT id, content, chunk_index, token_count, metadata, embedding::text
+      FROM chatapp_knowledge_chunks
+      WHERE source_id = ${sourceId}
+      ORDER BY chunk_index
+    `);
+
+    const qdrantChunks: Array<{
+      id: string;
+      vector: number[];
+      payload: VectorPayload;
+    }> = [];
+
+    for (let i = 0; i < pgChunks.length; i++) {
+      const chunk = pgChunks[i];
+      if (!chunk) continue;
+
+      try {
+        // Parse embedding from PostgreSQL format
+        const embeddingStr = String(chunk.embedding);
+        const embedding = JSON.parse(
+          embeddingStr.replace(/^\[/, "[").replace(/\]$/, "]")
+        ) as number[];
+
+        qdrantChunks.push({
+          id: chunk.id,
+          vector: embedding,
+          payload: {
+            sourceId,
+            companyId,
+            content: chunk.content,
+            chunkIndex: chunk.chunk_index,
+            tokenCount: chunk.token_count,
+            metadata: chunk.metadata,
+          },
+        });
+
+        migrated++;
+      } catch {
+        errors++;
+      }
+
+      if (i % 20 === 0 || i === pgChunks.length - 1) {
+        onProgress?.(
+          Math.round(((i + 1) / pgChunks.length) * 100),
+          `Migrating ${i + 1}/${pgChunks.length} chunks`
+        );
+      }
+    }
+
+    // Store in Qdrant
+    if (qdrantChunks.length > 0) {
+      await storeChunks(qdrantChunks);
+    }
+
+    return { migrated, errors };
   }
 
   /**
@@ -434,4 +695,13 @@ export async function processKnowledgeText(
 ): Promise<ProcessingResult> {
   const pipeline = getProcessingPipeline();
   return pipeline.processText(sourceId, content, options);
+}
+
+export async function migrateSourceToQdrant(
+  sourceId: string,
+  companyId: string,
+  onProgress?: (progress: number, message: string) => void
+): Promise<{ migrated: number; errors: number }> {
+  const pipeline = getProcessingPipeline();
+  return pipeline.migrateToQdrant(sourceId, companyId, onProgress);
 }

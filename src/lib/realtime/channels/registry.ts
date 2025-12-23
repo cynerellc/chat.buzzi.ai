@@ -12,6 +12,8 @@ import { telegramAdapter } from "./telegram";
 import { slackAdapter } from "./slack";
 import { messengerAdapter } from "./messenger";
 import { instagramAdapter } from "./instagram";
+import { teamsAdapter } from "./teams";
+import { customWebhookAdapter } from "./custom";
 
 // ============================================================================
 // Registry
@@ -23,7 +25,8 @@ const adapters: Record<string, ChannelAdapter> = {
   slack: slackAdapter,
   messenger: messengerAdapter,
   instagram: instagramAdapter,
-  // Custom adapters can be registered at runtime
+  teams: teamsAdapter,
+  custom: customWebhookAdapter,
 };
 
 /**
@@ -70,4 +73,6 @@ export { telegramAdapter } from "./telegram";
 export { slackAdapter } from "./slack";
 export { messengerAdapter } from "./messenger";
 export { instagramAdapter } from "./instagram";
+export { teamsAdapter } from "./teams";
+export { customWebhookAdapter } from "./custom";
 export type { ChannelAdapter } from "./adapter";

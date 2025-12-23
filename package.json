@@ -13,6 +13,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:run": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -21,9 +24,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@sentry/nextjs": "^9.17.0",
     "@auth/drizzle-adapter": "^1.11.1",
     "@heroui/react": "^2.8.7",
     "@hookform/resolvers": "^5.2.2",
+    "@qdrant/js-client-rest": "^1.16.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "ai": "^6.0.0",
@@ -54,6 +59,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
