@@ -1,9 +1,9 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
-import { Search, UserPlus, AlertCircle, Check } from "lucide-react";
-import { Button, Input, Avatar, Spinner, Textarea, Badge, ScrollShadow } from "@/components/ui";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
+import { Search, UserPlus, AlertCircle, Check, ArrowRight, Users, Circle } from "lucide-react";
+import { Button, Input, Avatar, Spinner, Textarea, Badge, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 interface Agent {
@@ -112,10 +112,18 @@ export function TransferModal({
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case "company_admin":
-        return <Badge variant="info">Admin</Badge>;
-      case "support_agent":
-        return <Badge variant="default">Agent</Badge>;
+      case "chatapp.company_admin":
+        return (
+          <Badge variant="info" className="text-[10px] px-1.5 py-0 h-5">
+            Admin
+          </Badge>
+        );
+      case "chatapp.support_agent":
+        return (
+          <Badge variant="default" className="text-[10px] px-1.5 py-0 h-5">
+            Agent
+          </Badge>
+        );
       default:
         return null;
     }
@@ -124,94 +132,153 @@ export function TransferModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
       <ModalContent>
-        <ModalHeader className="flex items-center gap-2">
-          <UserPlus size={20} className="text-primary" />
-          Transfer Conversation
+        <ModalHeader className="flex items-center gap-3 border-b border-border/50 pb-4 bg-gradient-to-r from-blue-500/5 via-transparent to-transparent">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/15 to-blue-600/5">
+            <UserPlus size={18} className="text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold">Transfer Conversation</h2>
+            <p className="text-xs text-muted-foreground">Hand off to another team member</p>
+          </div>
         </ModalHeader>
 
         <ModalBody className="pb-0">
-          {error && (
-            <div className="mb-4 p-3 bg-danger/10 text-danger rounded-lg flex items-center gap-2 text-sm">
-              <AlertCircle size={16} />
-              {error}
-            </div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mb-4 p-3 bg-destructive/10 text-destructive rounded-xl flex items-center gap-2 text-sm"
+              >
+                <AlertCircle size={16} />
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Search */}
-          <Input
-            placeholder="Search agents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            startContent={<Search size={16} className="text-default-400" />}
-            size="sm"
-            className="mb-4"
-          />
+          <div className="mb-4">
+            <Input
+              placeholder="Search agents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              startContent={<Search size={16} className="text-muted-foreground" />}
+              size="sm"
+            />
+          </div>
 
           {/* Agent List */}
-          <div className="border border-divider rounded-lg overflow-hidden mb-4">
-            <ScrollShadow className="max-h-[200px]">
+          <div className="border border-border/50 rounded-xl overflow-hidden mb-4">
+            <ScrollShadow className="max-h-[220px]">
               {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Spinner size="md" />
+                <div className="p-3 space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3 p-2">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : filteredAgents.length === 0 ? (
-                <div className="py-8 text-center text-default-500">
-                  {searchQuery ? "No agents found" : "No available agents"}
-                </div>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="py-10 text-center"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                    <Users size={24} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {searchQuery ? "No agents found" : "No available agents"}
+                  </p>
+                </motion.div>
               ) : (
-                <div className="divide-y divide-divider">
-                  {filteredAgents.map((agent) => (
-                    <button
-                      key={agent.id}
-                      onClick={() => setSelectedAgent(agent)}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-3 text-left hover:bg-content2 transition-colors",
-                        selectedAgent?.id === agent.id && "bg-primary/10"
-                      )}
-                    >
-                      <Avatar
-                        name={agent.name ?? agent.email}
-                        src={agent.avatarUrl ?? undefined}
-                        size="sm"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">
-                            {agent.name ?? "Unnamed Agent"}
-                          </span>
-                          {getRoleBadge(agent.role)}
+                <div className="p-1">
+                  {filteredAgents.map((agent, index) => {
+                    const isSelected = selectedAgent?.id === agent.id;
+                    return (
+                      <motion.button
+                        key={agent.id}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        whileHover={{ x: 2 }}
+                        onClick={() => setSelectedAgent(agent)}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-200",
+                          "border border-transparent",
+                          isSelected
+                            ? "bg-primary/10 border-primary/20"
+                            : "hover:bg-muted/50"
+                        )}
+                      >
+                        <div className="relative">
+                          <Avatar
+                            name={agent.name ?? agent.email}
+                            src={agent.avatarUrl ?? undefined}
+                            size="sm"
+                          />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-success border-2 border-background" />
                         </div>
-                        <p className="text-xs text-default-500 truncate">
-                          {agent.email}
-                        </p>
-                      </div>
-                      {selectedAgent?.id === agent.id && (
-                        <Check size={18} className="text-primary flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate text-sm">
+                              {agent.name ?? "Unnamed Agent"}
+                            </span>
+                            {getRoleBadge(agent.role)}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {agent.email}
+                          </p>
+                        </div>
+                        <AnimatePresence>
+                          {isSelected && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0 }}
+                              className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                            >
+                              <Check size={12} />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.button>
+                    );
+                  })}
                 </div>
               )}
             </ScrollShadow>
           </div>
 
           {/* Transfer Reason */}
-          <Textarea
-            label="Transfer Reason (optional)"
-            placeholder="Why are you transferring this conversation?"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            minRows={2}
-            maxRows={4}
-            className="mb-2"
-          />
+          <div className="space-y-1.5 mb-4">
+            <label className="text-sm font-medium text-foreground">
+              Transfer Reason <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <Textarea
+              placeholder="Why are you transferring this conversation?"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              minRows={2}
+              maxRows={4}
+              className="resize-none"
+            />
+          </div>
 
-          <p className="text-xs text-default-400 mb-4">
-            The selected agent will receive a notification about this transfer.
-          </p>
+          <div className="p-3 rounded-xl bg-muted/30 border border-border/50 mb-4">
+            <p className="text-xs text-muted-foreground flex items-center gap-2">
+              <Circle size={8} className="text-primary fill-primary animate-pulse" />
+              The selected agent will receive a notification about this transfer.
+            </p>
+          </div>
         </ModalBody>
 
-        <ModalFooter>
+        <ModalFooter className="border-t border-border/50 pt-4">
           <Button variant="ghost" onClick={onClose} isDisabled={transferring}>
             Cancel
           </Button>
@@ -220,8 +287,10 @@ export function TransferModal({
             onClick={handleTransfer}
             isLoading={transferring}
             isDisabled={!selectedAgent}
+            className="group"
           >
             Transfer to {selectedAgent?.name ?? "Agent"}
+            <ArrowRight size={14} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
           </Button>
         </ModalFooter>
       </ModalContent>

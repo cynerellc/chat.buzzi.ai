@@ -1,9 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Input, Link } from "@heroui/react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowLeft, CheckCircle2, Mail } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Mail, Send } from "lucide-react";
+
+import { Button, Input } from "@/components/ui";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod/v4";
@@ -62,31 +64,38 @@ export function ForgotPasswordForm() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
         className="w-full max-w-md text-center"
       >
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-6">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-6"
+        >
           <CheckCircle2 className="w-8 h-8 text-success" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2">Check Your Email</h1>
-        <p className="text-default-500 mb-6">
-          We&apos;ve sent a password reset link to{" "}
-          <span className="font-medium text-foreground">{getValues("email")}</span>
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight mb-2">Check Your Email</h1>
+        <p className="text-muted-foreground mb-2">
+          We&apos;ve sent a password reset link to
         </p>
-        <p className="text-sm text-default-400 mb-6">
+        <p className="font-medium text-foreground bg-muted px-3 py-1.5 rounded-md inline-block mb-4">
+          {getValues("email")}
+        </p>
+        <p className="text-sm text-muted-foreground mb-6">
           Didn&apos;t receive the email? Check your spam folder or try again.
         </p>
         <div className="space-y-3">
           <Button
-            variant="bordered"
-            className="w-full"
+            variant="outline"
+            className="w-full font-medium"
             onClick={() => setIsSuccess(false)}
           >
             Try another email
           </Button>
           <Link
             href="/login"
-            className="inline-flex items-center gap-1 text-sm text-default-500 hover:text-primary"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             <ArrowLeft size={16} />
             Back to login
@@ -100,31 +109,36 @@ export function ForgotPasswordForm() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className="w-full max-w-md"
     >
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+          className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4"
+        >
           <Mail className="w-6 h-6 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold">Forgot Password?</h1>
-        <p className="text-default-500 mt-2">
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight">Forgot Password?</h1>
+        <p className="text-muted-foreground mt-2">
           Enter your email and we&apos;ll send you a reset link
         </p>
       </div>
 
       {error && (
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="mb-4 p-3 rounded-lg bg-danger-50 border border-danger-200 flex items-center gap-2 text-danger"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-destructive"
         >
           <AlertCircle size={18} />
           <span className="text-sm">{error}</span>
         </motion.div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input
           {...register("email")}
           type="email"
@@ -139,10 +153,11 @@ export function ForgotPasswordForm() {
         <Button
           type="submit"
           color="primary"
-          className="w-full"
+          className="w-full font-medium gap-2"
           isLoading={isLoading}
           size="lg"
         >
+          <Send size={18} />
           Send Reset Link
         </Button>
       </form>
@@ -150,7 +165,7 @@ export function ForgotPasswordForm() {
       <div className="text-center mt-6">
         <Link
           href="/login"
-          className="inline-flex items-center gap-1 text-sm text-default-500 hover:text-primary"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
         >
           <ArrowLeft size={16} />
           Back to login

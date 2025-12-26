@@ -1,6 +1,5 @@
 "use client";
 
-import { Input } from "@heroui/react";
 import { Search, X, Loader2 } from "lucide-react";
 import { forwardRef } from "react";
 
@@ -37,43 +36,40 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     };
 
     return (
-      <Input
-        ref={ref}
-        type="search"
-        value={value}
-        onValueChange={onChange}
-        placeholder={placeholder}
-        autoFocus={autoFocus}
-        className={cn(className)}
-        classNames={{
-          inputWrapper: "h-10",
-        }}
-        startContent={
-          isLoading ? (
-            <Loader2 size={18} className="text-default-400 animate-spin" />
+      <div className={cn("relative", className)}>
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+          {isLoading ? (
+            <Loader2 size={18} className="animate-spin" />
           ) : (
-            <Search size={18} className="text-default-400" />
-          )
-        }
-        endContent={
-          <div className="flex items-center gap-1">
-            {value && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="p-1 rounded hover:bg-default-100"
-              >
-                <X size={14} className="text-default-400" />
-              </button>
-            )}
-            {shortcutHint && !value && (
-              <kbd className="hidden sm:block px-1.5 py-0.5 text-xs bg-default-100 rounded text-default-500">
-                {shortcutHint}
-              </kbd>
-            )}
-          </div>
-        }
-      />
+            <Search size={18} />
+          )}
+        </div>
+        <input
+          ref={ref}
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-10 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {value && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="p-1 rounded hover:bg-muted"
+            >
+              <X size={14} className="text-muted-foreground" />
+            </button>
+          )}
+          {shortcutHint && !value && (
+            <kbd className="hidden sm:block px-1.5 py-0.5 text-xs bg-muted rounded text-muted-foreground">
+              {shortcutHint}
+            </kbd>
+          )}
+        </div>
+      </div>
     );
   }
 );

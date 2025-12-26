@@ -5,7 +5,6 @@ import {
   integer,
   jsonb,
   numeric,
-  pgTable,
   timestamp,
   uuid,
   varchar,
@@ -13,10 +12,11 @@ import {
 
 import { agents } from "./agents";
 import { companies } from "./companies";
+import { chatappSchema } from "./enums";
 
 // Daily Analytics Table (aggregated per day)
-export const dailyAnalytics = pgTable(
-  "chatapp_daily_analytics",
+export const dailyAnalytics = chatappSchema.table(
+  "daily_analytics",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -85,8 +85,8 @@ export const dailyAnalytics = pgTable(
 );
 
 // Hourly Analytics Table (for real-time dashboards)
-export const hourlyAnalytics = pgTable(
-  "chatapp_hourly_analytics",
+export const hourlyAnalytics = chatappSchema.table(
+  "hourly_analytics",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -117,8 +117,8 @@ export const hourlyAnalytics = pgTable(
 );
 
 // Topic Analytics Table (what users are asking about)
-export const topicAnalytics = pgTable(
-  "chatapp_topic_analytics",
+export const topicAnalytics = chatappSchema.table(
+  "topic_analytics",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -159,8 +159,8 @@ export const topicAnalytics = pgTable(
 );
 
 // Platform Analytics Table (Master Admin - aggregated across all companies)
-export const platformAnalytics = pgTable(
-  "chatapp_platform_analytics",
+export const platformAnalytics = chatappSchema.table(
+  "platform_analytics",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 

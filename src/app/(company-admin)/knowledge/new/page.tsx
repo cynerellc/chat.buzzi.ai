@@ -9,8 +9,6 @@ import {
   FileType,
   Upload,
 } from "lucide-react";
-import { Textarea, RadioGroup, Radio } from "@heroui/react";
-import { addToast } from "@heroui/react";
 
 import {
   Button,
@@ -19,6 +17,10 @@ import {
   CardHeader,
   CardBody,
   Chip,
+  Textarea,
+  RadioGroup,
+  Radio,
+  addToast,
 } from "@/components/ui";
 import { useCreateKnowledgeSource, useCreateFaq, useFaq, useUpdateFaq } from "@/hooks/company";
 
@@ -149,7 +151,7 @@ function KnowledgeNewPageContent() {
     if (isEditMode && isLoadingFaq) {
       return (
         <div className="flex items-center justify-center h-64">
-          <div className="text-default-500">Loading FAQ...</div>
+          <div className="text-muted-foreground">Loading FAQ...</div>
         </div>
       );
     }
@@ -159,15 +161,15 @@ function KnowledgeNewPageContent() {
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button
-            variant="light"
-            isIconOnly
+            variant="ghost"
+            size="icon"
             onPress={() => router.push("/knowledge")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{isEditMode ? "Edit FAQ" : "Add FAQ"}</h1>
-            <p className="text-default-500">
+            <p className="text-muted-foreground">
               {isEditMode
                 ? "Update this frequently asked question"
                 : "Create a frequently asked question for quick responses"}
@@ -211,7 +213,6 @@ function KnowledgeNewPageContent() {
                 {tags.map((tag) => (
                   <Chip
                     key={tag}
-                    variant="flat"
                     onClose={() => handleRemoveTag(tag)}
                   >
                     {tag}
@@ -226,7 +227,7 @@ function KnowledgeNewPageContent() {
                   onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
                   className="flex-1"
                 />
-                <Button variant="bordered" onPress={handleAddTag}>
+                <Button variant="outline" onPress={handleAddTag}>
                   Add
                 </Button>
               </div>
@@ -244,7 +245,7 @@ function KnowledgeNewPageContent() {
         </Card>
 
         <div className="flex justify-end gap-2">
-          <Button variant="bordered" onPress={() => router.push("/knowledge")}>
+          <Button variant="outline" onPress={() => router.push("/knowledge")}>
             Cancel
           </Button>
           <Button
@@ -264,15 +265,15 @@ function KnowledgeNewPageContent() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button
-          variant="light"
-          isIconOnly
+          variant="ghost"
+          size="icon"
           onPress={() => router.push("/knowledge")}
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Add Knowledge Source</h1>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             Add documents, URLs, or text to train your AI agents
           </p>
         </div>
@@ -301,7 +302,7 @@ function KnowledgeNewPageContent() {
                 URL / Website
               </div>
             </Radio>
-            <Radio value="file" isDisabled>
+            <Radio value="file" disabled>
               <div className="flex items-center gap-2 opacity-50">
                 <FileText className="h-4 w-4" />
                 File Upload (Coming Soon)
@@ -359,14 +360,14 @@ function KnowledgeNewPageContent() {
 
           {sourceType === "file" && (
             <div className="border-2 border-dashed border-divider rounded-lg p-8 text-center">
-              <Upload className="h-12 w-12 mx-auto text-default-300 mb-4" />
-              <p className="text-default-500 mb-2">
+              <Upload className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground mb-2">
                 Drag and drop files here, or click to browse
               </p>
-              <p className="text-default-400 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Supported formats: PDF, DOCX, TXT, MD (max 10MB)
               </p>
-              <Button variant="bordered" className="mt-4" isDisabled>
+              <Button variant="outline" className="mt-4" disabled>
                 Browse Files
               </Button>
             </div>
@@ -376,14 +377,14 @@ function KnowledgeNewPageContent() {
 
       {/* Actions */}
       <div className="flex justify-end gap-2">
-        <Button variant="bordered" onPress={() => router.push("/knowledge")}>
+        <Button variant="outline" onPress={() => router.push("/knowledge")}>
           Cancel
         </Button>
         <Button
           color="primary"
           onPress={handleSubmitSource}
           isLoading={isCreating}
-          isDisabled={sourceType === "file"}
+          disabled={sourceType === "file"}
         >
           Create Source
         </Button>

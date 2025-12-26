@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, count, eq, gte, isNull, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { agents, conversations } from "@/lib/db/schema";
 
@@ -28,13 +27,8 @@ export interface AgentAnalytics {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { agentId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     // Verify agent belongs to company
     const [agent] = await db

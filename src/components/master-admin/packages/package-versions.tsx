@@ -23,7 +23,7 @@ import {
   Button,
   Card,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
   Skeleton,
   type BadgeVariant,
 } from "@/components/ui";
@@ -95,8 +95,8 @@ export function PackageVersions({
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   };
 
-  const getVersionDropdownItems = (version: PackageVersion): DropdownMenuItem[] => {
-    const items: DropdownMenuItem[] = [];
+  const getVersionDropdownItems = (version: PackageVersion): DropdownMenuItemData[] => {
+    const items: DropdownMenuItemData[] = [];
     if (!version.isCurrent) {
       items.push({
         key: "set-current",
@@ -170,7 +170,7 @@ export function PackageVersions({
         <div className="text-center py-8">
           <FileCode size={40} className="mx-auto mb-3 text-default-300" />
           <p className="text-default-500 mb-3">No versions uploaded yet</p>
-          <Button variant="flat" startContent={<Plus size={16} />} onPress={onUploadNew}>
+          <Button variant="secondary" startContent={<Plus size={16} />} onPress={onUploadNew}>
             Upload First Version
           </Button>
         </div>
@@ -240,9 +240,8 @@ export function PackageVersions({
                 <Dropdown
                   trigger={
                     <Button
-                      isIconOnly
-                      variant="flat"
-                      size="sm"
+                      size="icon"
+                      variant="outline"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical size={16} />

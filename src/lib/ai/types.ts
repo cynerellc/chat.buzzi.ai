@@ -105,6 +105,93 @@ export interface CustomerMetadata {
 
 export type ChannelType = "web" | "whatsapp" | "telegram" | "messenger" | "instagram" | "slack" | "teams" | "custom";
 
+// ============================================================================
+// Package Variable Context Types
+// ============================================================================
+
+/**
+ * Interface for accessing package variables at runtime
+ * Used to get configuration values defined per-agent
+ */
+export interface VariableAccessor {
+  /**
+   * Get a variable value by name
+   * @param name - The variable name (e.g., "EMAIL_HOST", "API_KEY")
+   * @returns The variable value or undefined if not found
+   */
+  get(name: string): string | undefined;
+
+  /**
+   * Check if a variable exists
+   * @param name - The variable name
+   * @returns true if the variable exists
+   */
+  has(name: string): boolean;
+
+  /**
+   * Get all variable names
+   * @returns Array of variable names
+   */
+  keys(): string[];
+}
+
+/**
+ * Variable context that provides access to package variables
+ * Available to tools via context.variables and context.securedVariables
+ */
+export interface VariableContext {
+  /**
+   * Access regular (non-sensitive) variables
+   * Example: context.variables.get("EMAIL_HOST")
+   */
+  variables: VariableAccessor;
+
+  /**
+   * Access secured (sensitive) variables
+   * Example: context.securedVariables.get("API_KEY")
+   */
+  securedVariables: VariableAccessor;
+}
+
+/**
+ * Raw variable data loaded from database
+ */
+export interface VariableValue {
+  name: string;
+  value: string | null;
+  variableType: "variable" | "secured_variable";
+  dataType: "string" | "number" | "boolean" | "json";
+}
+
+/**
+ * Create a VariableContext from an array of variable values
+ */
+export function createVariableContext(variableValues: VariableValue[]): VariableContext {
+  const regularVars = new Map<string, string>();
+  const securedVars = new Map<string, string>();
+
+  for (const v of variableValues) {
+    if (v.value !== null) {
+      if (v.variableType === "variable") {
+        regularVars.set(v.name, v.value);
+      } else {
+        securedVars.set(v.name, v.value);
+      }
+    }
+  }
+
+  const createAccessor = (map: Map<string, string>): VariableAccessor => ({
+    get: (name: string) => map.get(name),
+    has: (name: string) => map.has(name),
+    keys: () => Array.from(map.keys()),
+  });
+
+  return {
+    variables: createAccessor(regularVars),
+    securedVariables: createAccessor(securedVars),
+  };
+}
+
 export interface AgentContext {
   // Identifiers
   conversationId: string;
@@ -132,6 +219,10 @@ export interface AgentContext {
 
   // Injected context (for custom logic)
   systemPromptAddition?: string;
+
+  // Package variables context (for accessing package configuration)
+  variables: VariableAccessor;
+  securedVariables: VariableAccessor;
 
   // Request metadata
   timestamp: Date;

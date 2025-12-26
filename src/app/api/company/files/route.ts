@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, ilike, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { companyFiles, users } from "@/lib/db/schema";
 
@@ -24,12 +23,7 @@ export interface CompanyFile {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
@@ -149,12 +143,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireCompanyAdmin();
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -223,12 +212,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const fileId = searchParams.get("id");

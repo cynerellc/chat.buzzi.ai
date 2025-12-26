@@ -1,9 +1,8 @@
 "use client";
 
 import { Search, Filter, X } from "lucide-react";
-import { Input as HeroInput } from "@heroui/react";
 
-import { Button, Select, Badge } from "@/components/ui";
+import { Button, Select, Badge, Input } from "@/components/ui";
 
 interface AgentsFiltersProps {
   searchValue: string;
@@ -54,13 +53,11 @@ export function AgentsFilters({
       {/* Search and Filters Row */}
       <div className="flex flex-wrap gap-4">
         <div className="flex-1 min-w-[200px]">
-          <HeroInput
+          <Input
             placeholder="Search agents by name..."
             value={searchValue}
             onValueChange={onSearchChange}
-            startContent={<Search className="h-4 w-4 text-default-400" />}
-            isClearable
-            onClear={() => onSearchChange("")}
+            startContent={<Search className="h-4 w-4 text-muted-foreground" />}
           />
         </div>
 
@@ -86,7 +83,7 @@ export function AgentsFilters({
 
         {hasActiveFilters && (
           <Button
-            variant="bordered"
+            variant="outline"
             leftIcon={X}
             onPress={onClearFilters}
           >

@@ -5,7 +5,6 @@ import {
   integer,
   jsonb,
   numeric,
-  pgTable,
   text,
   timestamp,
   uuid,
@@ -13,11 +12,11 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { companies } from "./companies";
-import { billingCycleEnum, subscriptionStatusEnum } from "./enums";
+import { billingCycleEnum, chatappSchema, subscriptionStatusEnum } from "./enums";
 
 // Subscription Plans Table (Master Admin managed)
-export const subscriptionPlans = pgTable(
-  "chatapp_subscription_plans",
+export const subscriptionPlans = chatappSchema.table(
+  "subscription_plans",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -55,6 +54,9 @@ export const subscriptionPlans = pgTable(
     // Trial
     trialDays: integer("trial_days").default(14).notNull(),
 
+    // Setup Fee (one-time fee when subscribing)
+    setupFee: numeric("setup_fee", { precision: 10, scale: 2 }).default("0.00"),
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -66,8 +68,8 @@ export const subscriptionPlans = pgTable(
 );
 
 // Company Subscriptions Table
-export const companySubscriptions = pgTable(
-  "chatapp_company_subscriptions",
+export const companySubscriptions = chatappSchema.table(
+  "company_subscriptions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -95,6 +97,10 @@ export const companySubscriptions = pgTable(
     cancelledAt: timestamp("cancelled_at"),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
 
+    // Grace Period
+    gracePeriodDays: integer("grace_period_days").default(7),
+    gracePeriodEndsAt: timestamp("grace_period_ends_at"),
+
     // Payment Provider
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
@@ -115,8 +121,8 @@ export const companySubscriptions = pgTable(
 );
 
 // Payment History Table
-export const paymentHistory = pgTable(
-  "chatapp_payment_history",
+export const paymentHistory = chatappSchema.table(
+  "payment_history",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 

@@ -25,8 +25,8 @@ interface AuthenticationSettingsProps {
 }
 
 const roleOptions = [
-  { value: "support_agent", label: "Support Agent" },
-  { value: "company_admin", label: "Company Admin" },
+  { value: "chatapp.support_agent", label: "Support Agent" },
+  { value: "chatapp.company_admin", label: "Company Admin" },
 ];
 
 export function AuthenticationSettings({

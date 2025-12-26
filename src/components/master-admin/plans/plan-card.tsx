@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import {
   Check,
   Crown,
@@ -9,8 +10,11 @@ import {
   Users,
   X,
   Zap,
+  Building2,
+  Sparkles,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import type { PlanListItem } from "@/hooks/master-admin";
 import { Badge, Button, Card, type BadgeVariant } from "@/components/ui";
 
@@ -24,97 +28,118 @@ export function PlanCard({ plan, onEdit, isPopular }: PlanCardProps) {
   const statusVariant: BadgeVariant = plan.isActive ? "success" : "default";
 
   return (
-    <Card className="p-6 relative flex flex-col h-full">
-      {isPopular && (
-        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-          <Badge variant="warning" size="sm" className="flex items-center gap-1">
-            <Crown size={12} />
-            Popular
-          </Badge>
-        </div>
-      )}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className={cn(
+        "group p-6 relative flex flex-col h-full transition-all duration-300",
+        "hover:shadow-xl hover:shadow-primary/5",
+        isPopular && "border-primary/50 shadow-lg shadow-primary/10"
+      )}>
+        {isPopular && (
+          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
+            <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-medium shadow-lg">
+              <Crown size={12} />
+              Most Popular
+            </div>
+          </div>
+        )}
 
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold">{plan.name}</h3>
-          {plan.description && (
-            <p className="text-sm text-default-500 mt-1">{plan.description}</p>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{plan.name}</h3>
+            {plan.description && (
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{plan.description}</p>
+            )}
+          </div>
+          <div className={cn(
+            "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium",
+            plan.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+          )}>
+            <span className={cn("h-1.5 w-1.5 rounded-full", plan.isActive ? "bg-success animate-pulse" : "bg-muted-foreground")} />
+            {plan.isActive ? "Active" : "Inactive"}
+          </div>
+        </div>
+
+        <div className="mb-6 p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10">
+          <div className="flex items-baseline gap-1">
+            <span className="text-4xl font-bold tracking-tight">
+              ${parseFloat(plan.basePrice).toFixed(0)}
+            </span>
+            <span className="text-muted-foreground">/month</span>
+          </div>
+          {plan.trialDays > 0 && (
+            <p className="text-xs text-primary mt-2 flex items-center gap-1">
+              <Sparkles size={12} />
+              {plan.trialDays} day free trial included
+            </p>
           )}
         </div>
-        <Badge variant={statusVariant} size="sm">
-          {plan.isActive ? "Active" : "Inactive"}
-        </Badge>
-      </div>
 
-      <div className="mb-6">
-        <div className="flex items-baseline gap-1">
-          <span className="text-3xl font-bold">
-            ${parseFloat(plan.basePrice).toFixed(0)}
-          </span>
-          <span className="text-default-500">/month</span>
-        </div>
-        {plan.trialDays > 0 && (
-          <p className="text-xs text-default-400 mt-1">
-            {plan.trialDays} day free trial
-          </p>
-        )}
-      </div>
+        <div className="space-y-3 flex-1">
+          <LimitItem icon={Zap} value={plan.maxAgents} label="Agents" />
+          <LimitItem icon={MessageSquare} value={plan.maxConversationsPerMonth.toLocaleString()} label="Messages/mo" />
+          <LimitItem icon={Users} value={plan.maxTeamMembers} label="Team Members" />
+          <LimitItem icon={Database} value={`${plan.maxStorageGb} GB`} label="Storage" />
 
-      <div className="space-y-3 flex-1">
-        <div className="flex items-center gap-2 text-sm">
-          <Zap size={16} className="text-primary" />
-          <span>{plan.maxAgents} Agents</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <MessageSquare size={16} className="text-primary" />
-          <span>{plan.maxConversationsPerMonth.toLocaleString()} Messages/mo</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Users size={16} className="text-primary" />
-          <span>{plan.maxTeamMembers} Team Members</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Database size={16} className="text-primary" />
-          <span>{plan.maxStorageGb} GB Storage</span>
+          <div className="pt-4 mt-4 border-t border-border/50 space-y-2.5">
+            <FeatureItem enabled={plan.customBranding} label="Custom Branding" />
+            <FeatureItem enabled={plan.prioritySupport} label="Priority Support" />
+            <FeatureItem enabled={plan.apiAccess} label="API Access" />
+            <FeatureItem enabled={plan.advancedAnalytics} label="Advanced Analytics" />
+            <FeatureItem enabled={plan.customIntegrations} label="Custom Integrations" />
+          </div>
         </div>
 
-        <div className="pt-3 border-t border-divider space-y-2">
-          <FeatureItem enabled={plan.customBranding} label="Custom Branding" />
-          <FeatureItem enabled={plan.prioritySupport} label="Priority Support" />
-          <FeatureItem enabled={plan.apiAccess} label="API Access" />
-          <FeatureItem enabled={plan.advancedAnalytics} label="Advanced Analytics" />
-          <FeatureItem enabled={plan.customIntegrations} label="Custom Integrations" />
+        <div className="mt-6 pt-4 border-t border-border/50">
+          <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+            <Building2 size={14} />
+            <span>
+              {plan.companiesCount} {plan.companiesCount === 1 ? "company" : "companies"} subscribed
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors"
+            onPress={() => onEdit(plan)}
+          >
+            <Pencil size={14} />
+            Edit Plan
+          </Button>
         </div>
-      </div>
+      </Card>
+    </motion.div>
+  );
+}
 
-      <div className="mt-6 pt-4 border-t border-divider">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-default-500">
-            {plan.companiesCount} {plan.companiesCount === 1 ? "company" : "companies"}
-          </span>
-        </div>
-        <Button
-          variant="flat"
-          className="w-full"
-          startContent={<Pencil size={16} />}
-          onPress={() => onEdit(plan)}
-        >
-          Edit Plan
-        </Button>
+function LimitItem({ icon: Icon, value, label }: { icon: React.ElementType; value: string | number; label: string }) {
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <div className="p-1.5 rounded-lg bg-primary/10">
+        <Icon size={14} className="text-primary" />
       </div>
-    </Card>
+      <span className="font-medium">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+    </div>
   );
 }
 
 function FeatureItem({ enabled, label }: { enabled: boolean; label: string }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      {enabled ? (
-        <Check size={14} className="text-success" />
-      ) : (
-        <X size={14} className="text-default-300" />
-      )}
-      <span className={enabled ? "" : "text-default-400"}>{label}</span>
+    <div className="flex items-center gap-2.5 text-sm">
+      <div className={cn(
+        "p-0.5 rounded-full",
+        enabled ? "bg-success/10" : "bg-muted"
+      )}>
+        {enabled ? (
+          <Check size={12} className="text-success" />
+        ) : (
+          <X size={12} className="text-muted-foreground" />
+        )}
+      </div>
+      <span className={cn(enabled ? "text-foreground" : "text-muted-foreground")}>{label}</span>
     </div>
   );
 }

@@ -1,10 +1,18 @@
-import { pgEnum } from "drizzle-orm/pg-core";
+import { pgEnum, pgSchema } from "drizzle-orm/pg-core";
 
-// User/Role Enums
+// Create the chatapp schema for all tables
+export const chatappSchema = pgSchema("chatapp");
+
+// User/Role Enums - Only master_admin and user at the user level
 export const userRoleEnum = pgEnum("user_role", [
-  "master_admin",
-  "company_admin",
-  "support_agent",
+  "chatapp.master_admin",
+  "chatapp.user",
+]);
+
+// Company Permission Roles - Applied per-company via company_permissions table
+export const companyPermissionRoleEnum = pgEnum("company_permission_role", [
+  "chatapp.company_admin",
+  "chatapp.support_agent",
 ]);
 
 export const userStatusEnum = pgEnum("user_status", [
@@ -151,4 +159,28 @@ export const resolutionTypeEnum = pgEnum("resolution_type", [
   "human",
   "abandoned",
   "escalated",
+]);
+
+// Agent Package Enums
+export const packageTypeEnum = pgEnum("package_type", [
+  "single_agent",
+  "multi_agent",
+]);
+
+export const packageAgentTypeEnum = pgEnum("package_agent_type", [
+  "worker",
+  "supervisor",
+]);
+
+// Package Variable Enums
+export const variableTypeEnum = pgEnum("variable_type", [
+  "variable",
+  "secured_variable",
+]);
+
+export const variableDataTypeEnum = pgEnum("variable_data_type", [
+  "string",
+  "number",
+  "boolean",
+  "json",
 ]);

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { companySubscriptions, subscriptionPlans } from "@/lib/db/schema";
 
@@ -13,12 +12,7 @@ interface UpgradeRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body: UpgradeRequest = await request.json();
 
@@ -179,12 +173,7 @@ export async function POST(request: NextRequest) {
 // Handle subscription cancellation
 export async function DELETE(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const immediate = searchParams.get("immediate") === "true";

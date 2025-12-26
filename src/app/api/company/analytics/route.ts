@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { dailyAnalytics, hourlyAnalytics, topicAnalytics, conversations, messages } from "@/lib/db/schema";
 
@@ -50,12 +49,7 @@ export interface AnalyticsResponse {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     // Get date range from query params (default: last 30 days)
     const { searchParams } = new URL(request.url);

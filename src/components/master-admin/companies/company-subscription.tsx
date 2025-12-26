@@ -97,7 +97,7 @@ export function CompanySubscription({ companyId }: CompanySubscriptionProps) {
             <h3 className="font-semibold">Current Plan</h3>
             <Button
               size="sm"
-              variant="flat"
+              variant="secondary"
               startContent={<RefreshCw size={16} />}
               onPress={() => setIsChangePlanOpen(true)}
             >
@@ -256,7 +256,7 @@ export function CompanySubscription({ companyId }: CompanySubscriptionProps) {
           </ModalBody>
           <ModalFooter>
             <Button
-              variant="flat"
+              variant="secondary"
               onPress={() => setIsChangePlanOpen(false)}
               isDisabled={isSubmitting}
             >

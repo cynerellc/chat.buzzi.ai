@@ -69,7 +69,7 @@ export default function CompanyDetailsPage({ params }: CompanyDetailsPageProps) 
       <div className="p-6">
         <Card className="p-12 text-center">
           <h2 className="text-xl font-semibold mb-2">Company Not Found</h2>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             The company you&apos;re looking for doesn&apos;t exist or has been deleted.
           </p>
         </Card>
@@ -90,9 +90,9 @@ export default function CompanyDetailsPage({ params }: CompanyDetailsPageProps) 
         actions={
           <div className="flex items-center gap-2">
             <Button
-              variant="flat"
+              variant="secondary"
               startContent={<Pencil size={16} />}
-              onPress={() => setIsEditModalOpen(true)}
+              onClick={() => setIsEditModalOpen(true)}
             >
               Edit
             </Button>
@@ -118,7 +118,7 @@ export default function CompanyDetailsPage({ params }: CompanyDetailsPageProps) 
               {company.status.replace("_", " ")}
             </Badge>
           </div>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             {company.domain ?? company.slug} &bull; Created{" "}
             {format(new Date(company.createdAt), "MMMM d, yyyy")}
           </p>
@@ -145,9 +145,9 @@ export default function CompanyDetailsPage({ params }: CompanyDetailsPageProps) 
       {activeTab === "agents" && (
         <Card className="p-6">
           <div className="text-center py-8">
-            <Bot size={48} className="mx-auto mb-4 text-default-300" />
+            <Bot size={48} className="mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="font-semibold mb-2">Agents</h3>
-            <p className="text-default-500">
+            <p className="text-muted-foreground">
               Agent management will be available in a future update.
             </p>
           </div>
@@ -157,9 +157,9 @@ export default function CompanyDetailsPage({ params }: CompanyDetailsPageProps) 
       {activeTab === "settings" && (
         <Card className="p-6">
           <div className="text-center py-8">
-            <Settings size={48} className="mx-auto mb-4 text-default-300" />
+            <Settings size={48} className="mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="font-semibold mb-2">Settings</h3>
-            <p className="text-default-500">
+            <p className="text-muted-foreground">
               Company settings will be available in a future update.
             </p>
           </div>

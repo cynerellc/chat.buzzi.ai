@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { conversations, messages, users } from "@/lib/db/schema";
 
@@ -33,13 +32,8 @@ export async function GET(
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { conversationId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -139,13 +133,8 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
-    const user = await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { user, company } = await requireCompanyAdmin();
     const { conversationId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     const body: SendMessageRequest = await request.json();
 

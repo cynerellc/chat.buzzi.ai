@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Bot, Upload } from "lucide-react";
-import { Textarea, RadioGroup, Radio } from "@heroui/react";
 
 import {
   Button,
@@ -11,6 +10,9 @@ import {
   Card,
   CardHeader,
   CardBody,
+  Textarea,
+  RadioGroup,
+  Radio,
 } from "@/components/ui";
 
 import type { AgentDetail } from "@/hooks/company/useAgents";
@@ -89,7 +91,7 @@ export function GeneralTab({ agent, onSave, isSaving }: GeneralTabProps) {
                 )}
               </div>
               <div className="flex gap-2">
-                <Button variant="bordered" size="sm" isDisabled leftIcon={Upload}>
+                <Button variant="outline" size="sm" isDisabled leftIcon={Upload}>
                   Upload Image
                 </Button>
               </div>
@@ -139,13 +141,13 @@ export function GeneralTab({ agent, onSave, isSaving }: GeneralTabProps) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Status</label>
             <RadioGroup value={status} onValueChange={setStatus}>
-              <Radio value="active">
+              <Radio value="active" id="active">
                 Active - Agent is live and handling conversations
               </Radio>
-              <Radio value="paused">
+              <Radio value="paused" id="paused">
                 Paused - Agent is temporarily disabled
               </Radio>
-              <Radio value="draft">
+              <Radio value="draft" id="draft">
                 Draft - Agent is not yet deployed
               </Radio>
             </RadioGroup>

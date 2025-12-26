@@ -210,7 +210,7 @@ export function PackageUploadModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="2xl">
+    <Modal isOpen={isOpen} onClose={handleClose} size="xl">
       <ModalContent>
         <ModalHeader>
           {isNewPackage ? "Upload New Package" : "Upload New Version"}
@@ -240,10 +240,9 @@ export function PackageUploadModal({
                     </p>
                   </div>
                   <Button
-                    isIconOnly
-                    variant="flat"
-                    size="sm"
-                    onPress={() => {
+                    size="icon"
+                    variant="outline"
+                    onClick={() => {
                       setFile(null);
                       setValidationResults(null);
                     }}
@@ -268,8 +267,8 @@ export function PackageUploadModal({
                     onChange={handleFileChange}
                     className="hidden"
                   />
-                  <Button as="span" variant="flat" className="cursor-pointer">
-                    Choose File
+                  <Button asChild variant="secondary">
+                    <span className="cursor-pointer">Choose File</span>
                   </Button>
                 </label>
               </>
@@ -394,7 +393,7 @@ export function PackageUploadModal({
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="flat" onPress={handleClose}>
+          <Button variant="secondary" onPress={handleClose}>
             Cancel
           </Button>
           <Button

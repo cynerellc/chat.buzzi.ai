@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Plus, Bot, List, LayoutGrid } from "lucide-react";
-import { ButtonGroup } from "@heroui/react";
 
 import {
   Button,
@@ -61,24 +60,26 @@ export function AgentsGrid({
     <div className="space-y-4">
       {/* View Mode Toggle */}
       <div className="flex justify-end">
-        <ButtonGroup size="sm" variant="bordered">
+        <div className="flex">
           <Button
-            isIconOnly
-            variant={viewMode === "grid" ? "solid" : "bordered"}
+            size="icon"
+            variant={viewMode === "grid" ? "default" : "outline"}
             onPress={() => onViewModeChange("grid")}
             aria-label="Grid view"
+            className="rounded-r-none"
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>
           <Button
-            isIconOnly
-            variant={viewMode === "list" ? "solid" : "bordered"}
+            size="icon"
+            variant={viewMode === "list" ? "default" : "outline"}
             onPress={() => onViewModeChange("list")}
             aria-label="List view"
+            className="rounded-l-none border-l-0"
           >
             <List className="h-4 w-4" />
           </Button>
-        </ButtonGroup>
+        </div>
       </div>
 
       {/* Grid/List View */}
@@ -86,13 +87,13 @@ export function AgentsGrid({
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {/* Create New Agent Card */}
           <Link href="/agents/new">
-            <Card className="flex h-full min-h-[200px] cursor-pointer items-center justify-center border-dashed border-2 transition-colors hover:border-primary hover:bg-default-100">
+            <Card className="flex h-full min-h-[200px] cursor-pointer items-center justify-center border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
               <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                   <Plus className="h-6 w-6 text-primary" />
                 </div>
                 <span className="font-medium">Create Agent</span>
-                <span className="text-sm text-default-500">
+                <span className="text-sm text-muted-foreground">
                   Add a new AI agent
                 </span>
               </CardBody>
@@ -114,10 +115,10 @@ export function AgentsGrid({
           {agents.length === 0 && (
             <Card className="col-span-full flex min-h-[200px] items-center justify-center">
               <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
-                <Bot className="h-12 w-12 text-default-400" />
-                <p className="text-default-500">No agents found</p>
-                <Button as={Link} href="/agents/new" variant="bordered" size="sm">
-                  Create your first agent
+                <Bot className="h-12 w-12 text-muted-foreground" />
+                <p className="text-muted-foreground">No agents found</p>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/agents/new">Create your first agent</Link>
                 </Button>
               </CardBody>
             </Card>
@@ -127,14 +128,14 @@ export function AgentsGrid({
         <div className="space-y-2">
           {/* Create New Agent Row */}
           <Link href="/agents/new">
-            <Card className="cursor-pointer border-dashed border-2 transition-colors hover:border-primary hover:bg-default-100">
+            <Card className="cursor-pointer border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
               <CardBody className="flex items-center gap-4 p-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                   <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <span className="font-medium">Create Agent</span>
-                  <p className="text-sm text-default-500">
+                  <p className="text-sm text-muted-foreground">
                     Add a new AI agent
                   </p>
                 </div>
@@ -157,8 +158,8 @@ export function AgentsGrid({
           {agents.length === 0 && (
             <Card className="flex min-h-[100px] items-center justify-center">
               <CardBody className="flex items-center gap-4 p-6">
-                <Bot className="h-8 w-8 text-default-400" />
-                <p className="text-default-500">No agents found</p>
+                <Bot className="h-8 w-8 text-muted-foreground" />
+                <p className="text-muted-foreground">No agents found</p>
               </CardBody>
             </Card>
           )}
@@ -180,7 +181,7 @@ function AgentListRow({
   const statusColors = {
     active: "bg-success",
     paused: "bg-warning",
-    draft: "bg-default-400",
+    draft: "bg-muted-foreground",
   };
 
   return (
@@ -208,7 +209,7 @@ function AgentListRow({
                 }`}
               />
             </div>
-            <p className="text-sm text-default-500">
+            <p className="text-sm text-muted-foreground">
               {agent.type} &bull; {agent.weeklyConversations} convos this week
             </p>
           </div>
@@ -216,10 +217,10 @@ function AgentListRow({
         <div className="flex items-center gap-4">
           <div className="text-right">
             <p className="font-medium">{agent.aiResolutionRate}%</p>
-            <p className="text-sm text-default-500">AI resolved</p>
+            <p className="text-sm text-muted-foreground">AI resolved</p>
           </div>
-          <Button as={Link} href={`/agents/${agent.id}`} variant="bordered" size="sm">
-            Edit
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/agents/${agent.id}`}>Edit</Link>
           </Button>
         </div>
       </CardBody>

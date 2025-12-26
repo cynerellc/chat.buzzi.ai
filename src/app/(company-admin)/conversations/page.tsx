@@ -12,7 +12,6 @@ import {
   User as UserIcon,
   Bot,
 } from "lucide-react";
-import { Input as HeroInput } from "@heroui/react";
 
 import {
   Button,
@@ -20,6 +19,7 @@ import {
   CardBody,
   Select,
   Badge,
+  Input,
 } from "@/components/ui";
 import { useConversations, useAgents } from "@/hooks/company";
 import type { ConversationFilters } from "@/hooks/company/useConversations";
@@ -124,7 +124,7 @@ export default function ConversationsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Conversations</h1>
-        <p className="text-default-500">
+        <p className="text-muted-foreground">
           View and manage customer conversations across all channels
         </p>
       </div>
@@ -141,14 +141,13 @@ export default function ConversationsPage() {
           return (
             <Button
               key={status.value}
-              variant={isActive ? "solid" : "bordered"}
-              color={isActive ? "primary" : "default"}
+              variant={isActive ? "default" : "outline"}
               size="sm"
-              onPress={() => handleFilterChange("status", status.value)}
+              onClick={() => handleFilterChange("status", status.value)}
             >
               {status.label}
               {count > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-default-200">
+                <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-muted">
                   {count}
                 </span>
               )}
@@ -162,12 +161,12 @@ export default function ConversationsPage() {
         <CardBody>
           <div className="flex flex-wrap gap-4">
             <div className="flex-1 min-w-[200px]">
-              <HeroInput
+              <Input
                 placeholder="Search by name, email, or message..."
                 value={searchValue}
                 onValueChange={setSearchValue}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                startContent={<Search className="h-4 w-4 text-default-400" />}
+                startContent={<Search className="h-4 w-4 text-muted-foreground" />}
                 isClearable
                 onClear={() => {
                   setSearchValue("");
@@ -197,7 +196,7 @@ export default function ConversationsPage() {
               className="w-[150px]"
             />
 
-            <Button variant="bordered" leftIcon={Filter} isDisabled>
+            <Button variant="outline" leftIcon={Filter} disabled>
               More Filters
             </Button>
           </div>
@@ -209,13 +208,13 @@ export default function ConversationsPage() {
         <CardBody className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-default-500">Loading conversations...</div>
+              <div className="text-muted-foreground">Loading conversations...</div>
             </div>
           ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <MessageSquare className="h-12 w-12 text-default-300 mb-4" />
-              <p className="text-default-500 font-medium">No conversations found</p>
-              <p className="text-default-400 text-sm">
+              <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground font-medium">No conversations found</p>
+              <p className="text-muted-foreground text-sm">
                 Conversations will appear here when customers start chatting
               </p>
             </div>
@@ -229,7 +228,7 @@ export default function ConversationsPage() {
                   <button
                     key={conversation.id}
                     onClick={() => handleConversationClick(conversation.id)}
-                    className="w-full p-4 text-left hover:bg-default-50 transition-colors focus:outline-none focus:bg-default-100"
+                    className="w-full p-4 text-left hover:bg-muted/50 transition-colors focus:outline-none focus:bg-muted"
                   >
                     <div className="flex items-start gap-4">
                       {/* Avatar */}
@@ -259,7 +258,7 @@ export default function ConversationsPage() {
                               {status.label}
                             </Badge>
                           </div>
-                          <span className="text-xs text-default-400 shrink-0">
+                          <span className="text-xs text-muted-foreground shrink-0">
                             {conversation.lastMessageAt
                               ? formatTimeAgo(conversation.lastMessageAt)
                               : formatTimeAgo(conversation.createdAt)}
@@ -268,7 +267,7 @@ export default function ConversationsPage() {
 
                         {/* Last Message */}
                         {conversation.lastMessage && (
-                          <p className="text-sm text-default-500 mt-1 truncate">
+                          <p className="text-sm text-muted-foreground mt-1 truncate">
                             {conversation.lastMessage.role === "assistant" && (
                               <Bot className="inline h-3 w-3 mr-1" />
                             )}
@@ -280,7 +279,7 @@ export default function ConversationsPage() {
                         )}
 
                         {/* Meta */}
-                        <div className="flex items-center gap-4 mt-2 text-xs text-default-400">
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Bot className="h-3 w-3" />
                             {conversation.agent.name}
@@ -301,24 +300,24 @@ export default function ConversationsPage() {
       {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
             {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
             {pagination.total} conversations
           </p>
           <div className="flex gap-2">
             <Button
-              variant="bordered"
+              variant="outline"
               size="sm"
-              isDisabled={pagination.page <= 1}
+              disabled={pagination.page <= 1}
               onPress={() => handlePageChange(pagination.page - 1)}
             >
               Previous
             </Button>
             <Button
-              variant="bordered"
+              variant="outline"
               size="sm"
-              isDisabled={pagination.page >= pagination.totalPages}
+              disabled={pagination.page >= pagination.totalPages}
               onPress={() => handlePageChange(pagination.page + 1)}
             >
               Next

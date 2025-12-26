@@ -12,10 +12,12 @@ if (!connectionString) {
 
 // Create postgres client
 // For query purposes (connection pooling)
+// Using prepare: false for Supabase connection pooler compatibility
 const queryClient = postgres(connectionString, {
   max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
+  prepare: false,
 });
 
 // Create drizzle instance with schema

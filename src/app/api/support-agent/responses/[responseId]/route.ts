@@ -9,8 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cannedResponses } from "@/lib/db/schema/conversations";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, or } from "drizzle-orm";
 import { z } from "zod/v4";
 
@@ -30,17 +29,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { responseId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Get response - user can see shared responses or their own personal ones
     const [response] = await db
@@ -53,7 +42,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           or(
             eq(cannedResponses.isShared, true),
             and(
-              eq(cannedResponses.userId, session.user.id),
+              eq(cannedResponses.userId, user.id),
               eq(cannedResponses.isShared, false)
             )
           )
@@ -79,17 +68,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { responseId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Check if response exists
     const [existing] = await db
@@ -109,7 +88,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Check permissions - users can only edit their own personal responses
     // Shared responses can be edited by anyone (for now - could add admin check)
-    if (!existing.isShared && existing.userId !== session.user.id) {
+    if (!existing.isShared && existing.userId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -169,17 +148,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { responseId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Check if response exists
     const [existing] = await db
@@ -198,7 +167,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check permissions - users can only delete their own personal responses
-    if (!existing.isShared && existing.userId !== session.user.id) {
+    if (!existing.isShared && existing.userId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -18,13 +18,13 @@ export function PackagesGrid({ packages, isLoading, onConfigure }: PackagesGridP
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
           <Card key={i} className="p-6">
-            <Skeleton className="h-12 w-12 rounded-xl mb-4" />
-            <Skeleton className="h-6 w-24 mb-2" />
-            <Skeleton className="h-5 w-16 mb-3" />
+            <Skeleton className="h-12 w-12 rounded-none mb-4" />
+            <Skeleton className="h-6 w-24 mb-2 rounded-none" />
+            <Skeleton className="h-5 w-16 mb-3 rounded-none" />
             <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-full rounded-none" />
+              <Skeleton className="h-4 w-full rounded-none" />
+              <Skeleton className="h-4 w-3/4 rounded-none" />
             </div>
           </Card>
         ))}

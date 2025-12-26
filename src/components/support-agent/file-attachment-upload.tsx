@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useCallback } from "react";
 import {
   Paperclip,
@@ -10,10 +11,11 @@ import {
   Upload,
   Loader2,
   Image as ImageIcon,
+  Check,
+  Cloud,
   type LucideIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui";
-import { Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
+import { Button, PopoverRoot, PopoverTrigger, PopoverContent } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 interface UploadedFile {
@@ -229,56 +231,75 @@ export function FileAttachmentUpload({
   };
 
   return (
-    <Popover
-      isOpen={isOpen}
+    <PopoverRoot
+      open={isOpen}
       onOpenChange={setIsOpen}
-      placement="top-start"
-      offset={10}
     >
-      <PopoverTrigger>
-        <Button
-          variant="ghost"
-          size="sm"
-          isIconOnly
-          className={cn("relative", className)}
-        >
-          <Paperclip size={20} />
-          {uploads.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-medium rounded-full flex items-center justify-center">
-              {uploads.length}
-            </span>
-          )}
-        </Button>
+      <PopoverTrigger asChild>
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("relative", className)}
+          >
+            <Paperclip size={20} />
+            <AnimatePresence>
+              {uploads.length > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-medium rounded-full flex items-center justify-center"
+                >
+                  {uploads.length}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Button>
+        </motion.div>
       </PopoverTrigger>
 
-      <PopoverContent className="w-72 p-0">
+      <PopoverContent side="top" align="start" sideOffset={10} className="w-80 p-0">
         {/* Header */}
-        <div className="p-3 border-b border-divider">
-          <h4 className="font-medium text-sm">Attach Files</h4>
-          <p className="text-xs text-default-500">Max {maxSizeMB}MB per file</p>
+        <div className="flex items-center gap-3 p-4 border-b border-border/50 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-primary/5">
+            <Cloud size={14} className="text-primary" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-sm">Attach Files</h4>
+            <p className="text-xs text-muted-foreground">Max {maxSizeMB}MB per file</p>
+          </div>
         </div>
 
         {/* Drop Zone */}
-        <div
+        <motion.div
           className={cn(
-            "m-3 p-4 border-2 border-dashed rounded-lg text-center transition-colors cursor-pointer",
+            "m-4 p-6 border-2 border-dashed rounded-xl text-center transition-all duration-200 cursor-pointer",
             isDragging
-              ? "border-primary bg-primary/10"
-              : "border-default-300 hover:border-primary/50"
+              ? "border-primary bg-primary/10 scale-[1.02]"
+              : "border-border/50 hover:border-primary/50 hover:bg-muted/30"
           )}
           onClick={() => fileInputRef.current?.click()}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
+          whileHover={{ scale: 1.01 }}
         >
-          <Upload size={24} className="mx-auto mb-2 text-default-400" />
-          <p className="text-sm">
-            {isDragging ? "Drop files here" : "Click or drag files"}
-          </p>
-          <p className="text-xs text-default-400 mt-1">
-            Images, documents, videos
-          </p>
-        </div>
+          <motion.div
+            animate={isDragging ? { y: -5 } : { y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
+              <Upload size={20} className={cn("text-muted-foreground", isDragging && "text-primary")} />
+            </div>
+            <p className="text-sm font-medium">
+              {isDragging ? "Drop files here" : "Click or drag files"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Images, documents, videos
+            </p>
+          </motion.div>
+        </motion.div>
 
         <input
           ref={fileInputRef}
@@ -290,52 +311,82 @@ export function FileAttachmentUpload({
         />
 
         {/* Upload Progress */}
-        {uploads.length > 0 && (
-          <div className="px-3 pb-3 space-y-2">
-            {uploads.map((upload) => {
-              const Icon = FILE_TYPE_ICONS.file as LucideIcon;
-              return (
-                <div
-                  key={upload.id}
-                  className={cn(
-                    "flex items-center gap-2 p-2 rounded-lg text-sm",
-                    upload.status === "error" ? "bg-danger/10" : "bg-default-100"
-                  )}
-                >
-                  {upload.status === "uploading" ? (
-                    <Loader2 size={16} className="animate-spin text-primary" />
-                  ) : upload.status === "error" ? (
-                    <X size={16} className="text-danger" />
-                  ) : (
-                    <Icon size={16} className="text-success" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">{upload.name}</p>
-                    {upload.status === "uploading" && (
-                      <div className="h-1 bg-default-200 rounded-full mt-1 overflow-hidden">
-                        <div
-                          className="h-full bg-primary transition-all"
-                          style={{ width: `${upload.progress}%` }}
-                        />
-                      </div>
+        <AnimatePresence>
+          {uploads.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="px-4 pb-4 space-y-2"
+            >
+              {uploads.map((upload) => {
+                const Icon = FILE_TYPE_ICONS.file as LucideIcon;
+                return (
+                  <motion.div
+                    key={upload.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl text-sm transition-colors",
+                      upload.status === "error"
+                        ? "bg-destructive/10 border border-destructive/20"
+                        : upload.status === "completed"
+                        ? "bg-success/10 border border-success/20"
+                        : "bg-muted border border-border/50"
                     )}
-                    {upload.status === "error" && (
-                      <p className="text-xs text-danger truncate">{upload.error}</p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => removeUpload(upload.id)}
-                    className="text-default-400 hover:text-default-600"
                   >
-                    <X size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    <div className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                      upload.status === "error"
+                        ? "bg-destructive/20"
+                        : upload.status === "completed"
+                        ? "bg-success/20"
+                        : "bg-primary/20"
+                    )}>
+                      {upload.status === "uploading" ? (
+                        <Loader2 size={14} className="animate-spin text-primary" />
+                      ) : upload.status === "error" ? (
+                        <X size={14} className="text-destructive" />
+                      ) : (
+                        <Check size={14} className="text-success" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate font-medium text-sm">{upload.name}</p>
+                      {upload.status === "uploading" && (
+                        <div className="h-1.5 bg-muted rounded-full mt-1.5 overflow-hidden">
+                          <motion.div
+                            className="h-full bg-primary rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${upload.progress}%` }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                      )}
+                      {upload.status === "error" && (
+                        <p className="text-xs text-destructive truncate mt-0.5">{upload.error}</p>
+                      )}
+                      {upload.status === "completed" && (
+                        <p className="text-xs text-success mt-0.5">Upload complete</p>
+                      )}
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => removeUpload(upload.id)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X size={14} />
+                    </motion.button>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </PopoverContent>
-    </Popover>
+    </PopoverRoot>
   );
 }
 

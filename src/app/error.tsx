@@ -26,18 +26,18 @@ export default function GlobalError({
         </div>
 
         <h1 className="text-3xl font-bold mb-3">Something went wrong</h1>
-        <p className="text-default-500 mb-6">
+        <p className="text-muted-foreground mb-6">
           An unexpected error occurred. We apologize for the inconvenience.
           Please try again or return to the home page.
         </p>
 
         {process.env.NODE_ENV === "development" && (
-          <div className="mb-6 p-4 bg-default-100 rounded-lg text-left">
+          <div className="mb-6 p-4 bg-muted rounded-lg text-left">
             <p className="text-xs font-mono text-danger break-all">
               {error.message}
             </p>
             {error.digest && (
-              <p className="text-xs text-default-400 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 Error ID: {error.digest}
               </p>
             )}
@@ -45,16 +45,14 @@ export default function GlobalError({
         )}
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button leftIcon={RefreshCw} onPress={reset}>
+          <Button startContent={<RefreshCw size={16} />} onClick={reset}>
             Try Again
           </Button>
-          <Button
-            as={Link}
-            href="/"
-            variant="bordered"
-            leftIcon={Home}
-          >
-            Go Home
+          <Button variant="outline" asChild>
+            <Link href="/">
+              <Home size={16} />
+              Go Home
+            </Link>
           </Button>
         </div>
       </div>

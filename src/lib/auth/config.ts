@@ -1,5 +1,7 @@
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
+import type { Adapter } from "next-auth/adapters";
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
@@ -7,7 +9,7 @@ import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { accounts, sessions, users, verificationTokens } from "@/lib/db/schema";
 
 import { authConfig, type UserRole } from "./auth.config";
 
@@ -20,6 +22,14 @@ export type { UserRole } from "./auth.config";
  */
 export const fullAuthConfig: NextAuthConfig = {
   ...authConfig,
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  adapter: DrizzleAdapter(db as any, {
+    usersTable: users as any,
+    accountsTable: accounts as any,
+    sessionsTable: sessions as any,
+    verificationTokensTable: verificationTokens as any,
+  }) as Adapter,
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
@@ -43,7 +53,10 @@ export const fullAuthConfig: NextAuthConfig = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        console.log("[Auth] authorize called with:", { email: credentials?.email });
+
         if (!credentials?.email || !credentials?.password) {
+          console.log("[Auth] Missing email or password");
           return null;
         }
 
@@ -51,34 +64,54 @@ export const fullAuthConfig: NextAuthConfig = {
         const password = credentials.password as string;
 
         // Find user by email
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, email),
-        });
+        console.log("[Auth] Finding user by email:", email);
+        try {
+          const user = await db.query.users.findFirst({
+            where: eq(users.email, email),
+          });
 
-        if (!user || !user.hashedPassword) {
+          console.log("[Auth] User query result:", user ? {
+            id: user.id,
+            email: user.email,
+            hasPassword: !!user.hashedPassword,
+            status: user.status,
+            isActive: user.isActive,
+          } : "not found");
+
+          if (!user || !user.hashedPassword) {
+            console.log("[Auth] User not found or no password");
+            return null;
+          }
+
+          // Verify password
+          console.log("[Auth] Password received length:", password.length, "chars");
+          console.log("[Auth] Password first 3 chars:", password.substring(0, 3));
+          const passwordMatch = await bcrypt.compare(password, user.hashedPassword);
+          console.log("[Auth] Password match:", passwordMatch);
+
+          if (!passwordMatch) {
+            console.log("[Auth] Password mismatch");
+            return null;
+          }
+
+          // Check if user is active
+          if (!user.isActive || user.status !== "active") {
+            console.log("[Auth] User not active:", { isActive: user.isActive, status: user.status });
+            return null;
+          }
+
+          console.log("[Auth] Login successful for:", email);
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.avatarUrl,
+            role: user.role as UserRole,
+          };
+        } catch (error) {
+          console.error("[Auth] Error during authorize:", error);
           return null;
         }
-
-        // Verify password
-        const passwordMatch = await bcrypt.compare(password, user.hashedPassword);
-
-        if (!passwordMatch) {
-          return null;
-        }
-
-        // Check if user is active
-        if (!user.isActive || user.status !== "active") {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.avatarUrl,
-          role: user.role as UserRole,
-          companyId: user.companyId,
-        };
       },
     }),
   ],
@@ -106,7 +139,6 @@ export const fullAuthConfig: NextAuthConfig = {
           // Attach user data
           user.id = existingUser.id;
           user.role = existingUser.role as UserRole;
-          user.companyId = existingUser.companyId;
         } else {
           // For new OAuth users, we could create them here
           // For now, return false to prevent sign-in (they need to be invited)

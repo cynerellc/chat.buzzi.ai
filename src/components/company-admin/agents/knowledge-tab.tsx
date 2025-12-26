@@ -14,7 +14,6 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
-import { Input as HeroInput, Checkbox } from "@heroui/react";
 import useSWR from "swr";
 
 import {
@@ -24,6 +23,8 @@ import {
   CardBody,
   Badge,
   Skeleton,
+  Input,
+  Checkbox,
 } from "@/components/ui";
 
 import type { AgentDetail } from "@/hooks/company/useAgents";
@@ -145,13 +146,13 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardBody className="p-4">
-            <p className="text-sm text-default-500">Selected Sources</p>
+            <p className="text-sm text-muted-foreground">Selected Sources</p>
             <p className="text-2xl font-bold">{selectedCount}</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody className="p-4">
-            <p className="text-sm text-default-500">Total Tokens</p>
+            <p className="text-sm text-muted-foreground">Total Tokens</p>
             <p className="text-2xl font-bold">{formatTokenCount(totalTokens)}</p>
           </CardBody>
         </Card>
@@ -162,28 +163,27 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
         <CardHeader className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Knowledge Sources</h2>
           <Button
-            as={Link}
-            href="/knowledge/new"
-            variant="bordered"
+            variant="outline"
             size="sm"
-            leftIcon={Plus}
+            asChild
           >
-            Add Source
+            <Link href="/knowledge/new">
+              <Plus size={16} />
+              Add Source
+            </Link>
           </Button>
         </CardHeader>
         <CardBody className="space-y-4">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Select knowledge sources to include in this agent&apos;s context.
             The agent will use these sources to answer questions.
           </p>
 
-          <HeroInput
+          <Input
             placeholder="Search sources..."
             value={searchValue}
             onValueChange={setSearchValue}
-            startContent={<Search className="h-4 w-4 text-default-400" />}
-            isClearable
-            onClear={() => setSearchValue("")}
+            startContent={<Search className="h-4 w-4 text-muted-foreground" />}
           />
 
           {isLoading ? (
@@ -200,17 +200,16 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
               ))}
             </div>
           ) : filteredSources.length === 0 ? (
-            <div className="text-center py-8 text-default-500">
-              <FileText className="h-12 w-12 mx-auto mb-2 text-default-300" />
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
               <p>No indexed knowledge sources found</p>
               <Button
-                as={Link}
-                href="/knowledge/new"
-                variant="bordered"
+                variant="outline"
                 size="sm"
                 className="mt-4"
+                asChild
               >
-                Add Your First Source
+                <Link href="/knowledge/new">Add Your First Source</Link>
               </Button>
             </div>
           ) : (
@@ -225,7 +224,7 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
                   <div
                     key={source.id}
                     className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                      isSelected ? "border-primary bg-primary/5" : "hover:bg-default-50"
+                      isSelected ? "border-primary bg-primary/5" : "hover:bg-muted"
                     }`}
                     onClick={() => handleToggleSource(source.id)}
                   >
@@ -234,7 +233,7 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
                       onValueChange={() => handleToggleSource(source.id)}
                     />
 
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-default-100">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                       <TypeIcon className="h-5 w-5" />
                     </div>
 
@@ -246,7 +245,7 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
                           {status.label}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-default-400">
+                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                         <span className="capitalize">{source.type}</span>
                         <span>{source.chunkCount} chunks</span>
                         <span>{formatTokenCount(source.tokenCount)} tokens</span>
@@ -260,17 +259,18 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
 
           {/* Link to Knowledge Base */}
           <div className="flex items-center justify-between pt-4 border-t">
-            <p className="text-sm text-default-500">
+            <p className="text-sm text-muted-foreground">
               Need more knowledge sources?
             </p>
             <Button
-              as={Link}
-              href="/knowledge"
-              variant="light"
+              variant="ghost"
               size="sm"
-              rightIcon={ExternalLink}
+              asChild
             >
-              Manage Knowledge Base
+              <Link href="/knowledge">
+                Manage Knowledge Base
+                <ExternalLink size={16} />
+              </Link>
             </Button>
           </div>
         </CardBody>

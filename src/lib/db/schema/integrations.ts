@@ -2,8 +2,8 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
+  integer,
   jsonb,
-  pgTable,
   text,
   timestamp,
   uuid,
@@ -11,12 +11,12 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { companies } from "./companies";
-import { integrationStatusEnum, integrationTypeEnum, invitationStatusEnum } from "./enums";
+import { chatappSchema, integrationStatusEnum, integrationTypeEnum, invitationStatusEnum } from "./enums";
 import { users } from "./users";
 
 // Integrations Table
-export const integrations = pgTable(
-  "chatapp_integrations",
+export const integrations = chatappSchema.table(
+  "integrations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -60,8 +60,8 @@ export const integrations = pgTable(
 );
 
 // Webhooks Table (outgoing webhooks)
-export const webhooks = pgTable(
-  "chatapp_webhooks",
+export const webhooks = chatappSchema.table(
+  "webhooks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -107,8 +107,8 @@ export const webhooks = pgTable(
 );
 
 // Webhook Deliveries Table (delivery history)
-export const webhookDeliveries = pgTable(
-  "chatapp_webhook_deliveries",
+export const webhookDeliveries = chatappSchema.table(
+  "webhook_deliveries",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -146,8 +146,8 @@ export const webhookDeliveries = pgTable(
 );
 
 // Team Invitations Table
-export const invitations = pgTable(
-  "chatapp_invitations",
+export const invitations = chatappSchema.table(
+  "invitations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -186,8 +186,8 @@ export const invitations = pgTable(
 );
 
 // Audit Log Table
-export const auditLogs = pgTable(
-  "chatapp_audit_logs",
+export const auditLogs = chatappSchema.table(
+  "audit_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -211,6 +211,10 @@ export const auditLogs = pgTable(
     // Request Info
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),
+
+    // Status
+    success: boolean("success").default(true),
+    errorMessage: text("error_message"),
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),

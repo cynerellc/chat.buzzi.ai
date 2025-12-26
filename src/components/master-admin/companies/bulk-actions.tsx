@@ -33,7 +33,7 @@ export function BulkActions({
 
       <div className="flex items-center gap-2">
         <Button
-          variant="flat"
+          variant="secondary"
           size="sm"
           startContent={<CheckCircle size={16} />}
           onPress={onActivate}
@@ -43,7 +43,7 @@ export function BulkActions({
         </Button>
 
         <Button
-          variant="flat"
+          variant="secondary"
           size="sm"
           startContent={<Ban size={16} />}
           onPress={onSuspend}
@@ -53,7 +53,7 @@ export function BulkActions({
         </Button>
 
         <Button
-          variant="flat"
+          variant="secondary"
           size="sm"
           startContent={<Download size={16} />}
           onPress={onExport}
@@ -63,7 +63,7 @@ export function BulkActions({
         </Button>
 
         <Button
-          variant="flat"
+          variant="secondary"
           color="danger"
           size="sm"
           startContent={<Trash2 size={16} />}

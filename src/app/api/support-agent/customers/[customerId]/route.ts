@@ -9,8 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { endUsers, conversations } from "@/lib/db/schema/conversations";
 import { agents } from "@/lib/db/schema/agents";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, desc, sql, avg, count } from "drizzle-orm";
 import { z } from "zod/v4";
 
@@ -32,17 +31,7 @@ export async function GET(
   try {
     const { customerId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Get customer
     const [customer] = await db
@@ -146,17 +135,7 @@ export async function PATCH(
   try {
     const { customerId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Verify customer exists and belongs to company
     const [existing] = await db

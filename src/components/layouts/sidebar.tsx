@@ -58,7 +58,7 @@ export function Sidebar({ logo, logoCollapsed, sections, footer, className }: Si
     <SidebarContext.Provider value={{ isCollapsed, toggleCollapse }}>
       <motion.aside
         className={cn(
-          "fixed left-0 top-0 z-40 h-screen flex flex-col border-r border-divider bg-background",
+          "fixed left-0 top-0 z-40 h-screen flex flex-col border-r border-border/50 bg-card/50 backdrop-blur-xl",
           className
         )}
         variants={sidebarExpand}
@@ -67,14 +67,15 @@ export function Sidebar({ logo, logoCollapsed, sections, footer, className }: Si
         transition={smoothTransition}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-center border-b border-divider px-4">
+        <div className="flex h-16 items-center justify-center border-b border-border/50 px-4">
           <AnimatePresence mode="wait">
             {isCollapsed ? (
               <motion.div
                 key="collapsed"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.15 }}
               >
                 {logoCollapsed ?? logo}
               </motion.div>
@@ -84,6 +85,7 @@ export function Sidebar({ logo, logoCollapsed, sections, footer, className }: Si
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
               >
                 {logo}
               </motion.div>
@@ -92,13 +94,16 @@ export function Sidebar({ logo, logoCollapsed, sections, footer, className }: Si
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
           {sections.map((section, index) => (
             <div key={section.key} className={cn(index > 0 && "mt-6")}>
               {section.title && !isCollapsed && (
-                <h3 className="px-3 mb-2 text-xs font-semibold text-default-400 uppercase tracking-wider">
+                <h3 className="px-3 mb-3 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-widest">
                   {section.title}
                 </h3>
+              )}
+              {isCollapsed && section.title && index > 0 && (
+                <div className="h-px bg-border/50 mx-2 my-3" />
               )}
               <ul className="space-y-1">
                 {section.items.map((item) => (
@@ -116,20 +121,28 @@ export function Sidebar({ logo, logoCollapsed, sections, footer, className }: Si
 
         {/* Footer */}
         {footer && (
-          <div className="border-t border-divider p-3">
+          <div className="border-t border-border/50 p-3">
             {footer}
           </div>
         )}
 
         {/* Collapse button */}
-        <div className="border-t border-divider p-3">
+        <div className="border-t border-border/50 p-3">
           <Button
-            variant="light"
+            variant="ghost"
             size="sm"
-            className="w-full justify-center"
-            onPress={toggleCollapse}
+            className={cn(
+              "w-full justify-center hover:bg-muted/80 transition-colors",
+              isCollapsed && "px-2"
+            )}
+            onClick={toggleCollapse}
           >
-            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            <motion.div
+              animate={{ rotate: isCollapsed ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronLeft size={18} />
+            </motion.div>
           </Button>
         </div>
       </motion.aside>
@@ -149,21 +162,34 @@ function SidebarNavItem({ item, isActive, isCollapsed }: SidebarNavItemProps) {
     <Link
       href={item.disabled ? "#" : item.href}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+        "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
         isActive
-          ? "bg-primary text-primary-foreground"
-          : "text-default-600 hover:bg-default-100 hover:text-foreground",
-        item.disabled && "opacity-50 cursor-not-allowed"
+          ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        item.disabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
     >
-      <item.icon size={20} />
+      <item.icon
+        size={20}
+        className={cn(
+          "flex-shrink-0 transition-transform duration-200",
+          !isActive && "group-hover:scale-110"
+        )}
+      />
       {!isCollapsed && (
         <>
-          <span className="flex-1">{item.label}</span>
+          <span className="flex-1 truncate">{item.label}</span>
           {item.badge !== undefined && item.badge > 0 && (
-            <CountBadge count={item.badge} color={isActive ? "default" : "danger"} />
+            <CountBadge count={item.badge} variant={isActive ? "default" : "danger"} />
           )}
         </>
+      )}
+      {isActive && !isCollapsed && (
+        <motion.div
+          layoutId="activeIndicator"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-foreground/50 rounded-r-full"
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        />
       )}
     </Link>
   );
@@ -171,7 +197,7 @@ function SidebarNavItem({ item, isActive, isCollapsed }: SidebarNavItemProps) {
   if (isCollapsed) {
     return (
       <li>
-        <Tooltip content={item.label} placement="right">
+        <Tooltip content={item.label} side="right">
           {content}
         </Tooltip>
       </li>

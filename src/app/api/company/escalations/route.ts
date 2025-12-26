@@ -11,7 +11,6 @@ import { users } from "@/lib/db/schema/users";
 import { agents } from "@/lib/db/schema/agents";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { getEscalationService } from "@/lib/escalation";
 
 /**
@@ -20,11 +19,7 @@ import { getEscalationService } from "@/lib/escalation";
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
@@ -122,11 +117,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body = await request.json();
     const { conversationId, reason, priority = "medium" } = body;

@@ -1,9 +1,9 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Search, MessageSquare, Hash, User, Building2, X } from "lucide-react";
-import { Input, Badge, Spinner, ScrollShadow } from "@/components/ui";
-import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/react";
+import { Search, MessageSquare, Hash, User, Building2, X, Sparkles, TrendingUp } from "lucide-react";
+import { Input, Badge, Spinner, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 interface CannedResponse {
@@ -134,130 +134,168 @@ export function CannedResponsesPicker({
       onClose={onClose}
       size="lg"
       hideCloseButton
-      classNames={{
-        base: "max-h-[80vh]",
-      }}
+      className="max-h-[80vh]"
     >
       <ModalContent>
-        <ModalHeader className="flex items-center gap-2 border-b border-divider pb-3">
-          <MessageSquare size={18} className="text-primary" />
-          <span>Canned Responses</span>
-          <span className="text-xs text-default-400 ml-auto">
-            Press <kbd className="bg-default-100 px-1.5 py-0.5 rounded text-xs">Esc</kbd> to close
+        <ModalHeader className="flex items-center gap-3 border-b border-border/50 pb-4 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5">
+            <MessageSquare size={18} className="text-primary" />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold">Canned Responses</h2>
+            <p className="text-xs text-muted-foreground">Quick replies for common questions</p>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            Press <kbd className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-medium">Esc</kbd> to close
           </span>
         </ModalHeader>
         <ModalBody className="p-0" onKeyDown={handleKeyDown}>
           {/* Search Input */}
-          <div className="p-3 border-b border-divider sticky top-0 bg-content1 z-10">
+          <div className="p-4 border-b border-border/50 sticky top-0 bg-card z-10">
             <Input
               ref={searchInputRef}
               placeholder="Search responses..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              startContent={<Search size={16} className="text-default-400" />}
+              startContent={<Search size={16} className="text-muted-foreground" />}
               endContent={
                 searchQuery && (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => setSearchQuery("")}
-                    className="text-default-400 hover:text-default-600"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <X size={14} />
-                  </button>
+                  </motion.button>
                 )
               }
               size="sm"
               autoFocus
             />
-            <p className="text-xs text-default-400 mt-2">
-              Type to search or use <kbd className="bg-default-100 px-1 rounded">/shortcut</kbd>
+            <p className="text-xs text-muted-foreground mt-2">
+              Type to search or use <kbd className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-medium">/shortcut</kbd>
             </p>
           </div>
 
           {/* Responses List */}
           <ScrollShadow className="max-h-[400px]" ref={listRef}>
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Spinner size="md" />
+              <div className="p-4 space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="p-3 rounded-xl border border-border/50">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <Skeleton className="h-4 w-32" />
+                      <div className="flex gap-1">
+                        <Skeleton className="h-5 w-12 rounded-full" />
+                        <Skeleton className="h-5 w-16 rounded-full" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-3/4 mt-1" />
+                  </div>
+                ))}
               </div>
             ) : filteredResponses.length === 0 ? (
-              <div className="py-8 text-center text-default-500">
-                <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="py-12 text-center"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare size={28} className="text-muted-foreground" />
+                </div>
+                <p className="font-medium text-foreground">
                   {searchQuery
                     ? "No responses found"
                     : "No canned responses yet"}
                 </p>
                 {!searchQuery && (
-                  <p className="text-xs mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Create responses in Settings to use them here
                   </p>
                 )}
-              </div>
+              </motion.div>
             ) : (
-              <div className="divide-y divide-divider">
-                {filteredResponses.map((response, index) => (
-                  <button
-                    key={response.id}
-                    data-index={index}
-                    onClick={() => handleSelect(response)}
-                    className={cn(
-                      "w-full text-left p-3 hover:bg-content2 transition-colors",
-                      index === selectedIndex && "bg-primary/10"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <span className="font-medium text-sm truncate">
-                        {response.title}
-                      </span>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {response.shortcut && (
-                          <Badge variant="default" className="text-xs">
-                            <Hash size={10} className="mr-0.5" />
-                            {response.shortcut}
-                          </Badge>
-                        )}
-                        {response.isPersonal ? (
-                          <Badge variant="info" className="text-xs">
-                            <User size={10} className="mr-0.5" />
-                            Personal
-                          </Badge>
-                        ) : (
-                          <Badge variant="default" className="text-xs">
-                            <Building2 size={10} className="mr-0.5" />
-                            Team
-                          </Badge>
-                        )}
+              <div className="p-2">
+                <AnimatePresence>
+                  {filteredResponses.map((response, index) => (
+                    <motion.button
+                      key={response.id}
+                      data-index={index}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      whileHover={{ x: 2 }}
+                      onClick={() => handleSelect(response)}
+                      className={cn(
+                        "w-full text-left p-3 rounded-xl mb-1 transition-all duration-200",
+                        "border border-transparent",
+                        index === selectedIndex
+                          ? "bg-primary/10 border-primary/20"
+                          : "hover:bg-muted/50 hover:border-border/50"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <span className="font-medium text-sm truncate text-foreground">
+                          {response.title}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {response.usageCount > 0 && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                              <TrendingUp size={10} />
+                              {response.usageCount}
+                            </span>
+                          )}
+                          {response.shortcut && (
+                            <Badge variant="default" className="text-[10px] px-1.5 py-0 h-5 bg-primary/10 text-primary border-primary/20">
+                              <Hash size={8} className="mr-0.5" />
+                              {response.shortcut}
+                            </Badge>
+                          )}
+                          {response.isPersonal ? (
+                            <Badge variant="info" className="text-[10px] px-1.5 py-0 h-5">
+                              <User size={8} className="mr-0.5" />
+                              Personal
+                            </Badge>
+                          ) : (
+                            <Badge variant="default" className="text-[10px] px-1.5 py-0 h-5">
+                              <Building2 size={8} className="mr-0.5" />
+                              Team
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-xs text-default-500 line-clamp-2">
-                      {response.content}
-                    </p>
-                    {response.category && (
-                      <Badge variant="default" size="sm" className="mt-1">
-                        {response.category}
-                      </Badge>
-                    )}
-                  </button>
-                ))}
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {response.content}
+                      </p>
+                      {response.category && (
+                        <Badge variant="default" size="sm" className="mt-2 text-[10px] bg-muted">
+                          {response.category}
+                        </Badge>
+                      )}
+                    </motion.button>
+                  ))}
+                </AnimatePresence>
               </div>
             )}
           </ScrollShadow>
 
           {/* Footer */}
-          <div className="p-3 border-t border-divider bg-content2/50 text-xs text-default-400">
+          <div className="p-3 border-t border-border/50 bg-muted/30 text-xs text-muted-foreground">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span>
-                  <kbd className="bg-default-100 px-1.5 py-0.5 rounded">↑</kbd>
-                  <kbd className="bg-default-100 px-1.5 py-0.5 rounded ml-0.5">↓</kbd>
-                  {" "}Navigate
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <kbd className="bg-background px-1.5 py-0.5 rounded border border-border/50 text-[10px]">↑</kbd>
+                  <kbd className="bg-background px-1.5 py-0.5 rounded border border-border/50 text-[10px]">↓</kbd>
+                  <span className="ml-1">Navigate</span>
                 </span>
-                <span>
-                  <kbd className="bg-default-100 px-1.5 py-0.5 rounded">Enter</kbd>
-                  {" "}Select
+                <span className="flex items-center gap-1">
+                  <kbd className="bg-background px-1.5 py-0.5 rounded border border-border/50 text-[10px]">Enter</kbd>
+                  <span className="ml-1">Select</span>
                 </span>
               </div>
-              <span>{filteredResponses.length} responses</span>
+              <span className="font-medium">{filteredResponses.length} responses</span>
             </div>
           </div>
         </ModalBody>

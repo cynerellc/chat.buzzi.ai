@@ -20,7 +20,7 @@ import {
   Button,
   Card,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
   EmptyState,
   Input,
   Skeleton,
@@ -83,7 +83,7 @@ export function CompanyAgents({ companyId }: CompanyAgentsProps) {
     router.push(`/admin/companies/${companyId}/agents/${agentId}`);
   };
 
-  const getAgentDropdownItems = (agentId: string): DropdownMenuItem[] => [
+  const getAgentDropdownItems = (agentId: string): DropdownMenuItemData[] => [
     {
       key: "configure",
       label: "Configure Agent",
@@ -146,8 +146,7 @@ export function CompanyAgents({ companyId }: CompanyAgentsProps) {
           value={searchQuery}
           onValueChange={setSearchQuery}
           startContent={<Search size={16} className="text-default-400" />}
-          className="w-64"
-          size="sm"
+          className="w-64 h-9"
         />
       </div>
 
@@ -194,7 +193,7 @@ export function CompanyAgents({ companyId }: CompanyAgentsProps) {
 
                 <Dropdown
                   trigger={
-                    <Button isIconOnly variant="flat" size="sm">
+                    <Button variant="secondary" size="icon">
                       <MoreVertical size={16} />
                     </Button>
                   }
@@ -230,10 +229,10 @@ export function CompanyAgents({ companyId }: CompanyAgentsProps) {
               </div>
 
               <Button
-                variant="flat"
+                variant="secondary"
                 className="w-full mt-3"
                 startContent={<Settings size={16} />}
-                onPress={() => handleConfigureAgent(agent.id)}
+                onClick={() => handleConfigureAgent(agent.id)}
               >
                 Configure
               </Button>

@@ -8,7 +8,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { knowledgeSources } from "@/lib/db/schema";
 import {
@@ -37,8 +36,7 @@ export async function POST(
   { params }: { params: Promise<RouteParams> }
 ) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { sourceId } = await params;
 
     if (!company) {

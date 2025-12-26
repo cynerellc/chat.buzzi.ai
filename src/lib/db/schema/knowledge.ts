@@ -4,7 +4,6 @@ import {
   index,
   integer,
   jsonb,
-  pgTable,
   text,
   timestamp,
   uuid,
@@ -12,11 +11,11 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { companies } from "./companies";
-import { knowledgeSourceStatusEnum, knowledgeSourceTypeEnum } from "./enums";
+import { chatappSchema, knowledgeSourceStatusEnum, knowledgeSourceTypeEnum } from "./enums";
 
 // Knowledge Categories Table (for organizing knowledge sources)
-export const knowledgeCategories = pgTable(
-  "chatapp_knowledge_categories",
+export const knowledgeCategories = chatappSchema.table(
+  "knowledge_categories",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -53,8 +52,8 @@ export const knowledgeCategories = pgTable(
 );
 
 // Knowledge Sources Table
-export const knowledgeSources = pgTable(
-  "chatapp_knowledge_sources",
+export const knowledgeSources = chatappSchema.table(
+  "knowledge_sources",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -103,8 +102,8 @@ export const knowledgeSources = pgTable(
 );
 
 // Knowledge Chunks Table (for tracking individual chunks)
-export const knowledgeChunks = pgTable(
-  "chatapp_knowledge_chunks",
+export const knowledgeChunks = chatappSchema.table(
+  "knowledge_chunks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -121,7 +120,13 @@ export const knowledgeChunks = pgTable(
     // Vector ID (reference to vector store)
     vectorId: varchar("vector_id", { length: 255 }),
 
-    // Metadata (section, page number, etc.)
+    // Position tracking
+    startOffset: integer("start_offset"), // Character offset start in source
+    endOffset: integer("end_offset"), // Character offset end in source
+    pageNumber: integer("page_number"), // Page number for PDF/document sources
+    sectionTitle: varchar("section_title", { length: 500 }), // Section/heading the chunk belongs to
+
+    // Metadata (additional info)
     metadata: jsonb("metadata").default({}),
 
     // Timestamps
@@ -134,8 +139,8 @@ export const knowledgeChunks = pgTable(
 );
 
 // FAQ Items Table (structured Q&A for quick responses)
-export const faqItems = pgTable(
-  "chatapp_faq_items",
+export const faqItems = chatappSchema.table(
+  "faq_items",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -217,8 +222,8 @@ export const faqItemsRelations = relations(faqItems, ({ one }) => ({
 }));
 
 // Company Files Table (for managing uploaded files)
-export const companyFiles = pgTable(
-  "chatapp_company_files",
+export const companyFiles = chatappSchema.table(
+  "company_files",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 

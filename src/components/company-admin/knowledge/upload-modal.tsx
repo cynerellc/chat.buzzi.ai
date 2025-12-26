@@ -11,7 +11,6 @@ import {
   CheckCircle,
   Loader2,
 } from "lucide-react";
-import { Textarea, Tabs, Tab } from "@heroui/react";
 
 import {
   Button,
@@ -22,6 +21,8 @@ import {
   ModalBody,
   ModalFooter,
   Badge,
+  Textarea,
+  Tabs,
 } from "@/components/ui";
 
 interface UploadModalProps {
@@ -283,18 +284,19 @@ export function UploadModal({
     (activeTab === "text" && text.trim());
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={handleClose} size="2xl">
+    <Modal isOpen={isOpen} onClose={handleClose} size="xl">
       <ModalContent>
         <ModalHeader>Upload Content</ModalHeader>
         <ModalBody>
           <Tabs
+            items={[
+              { key: "file", label: "File", icon: FileText },
+              { key: "url", label: "URL", icon: LinkIcon },
+              { key: "text", label: "Text", icon: FileType },
+            ]}
             selectedKey={activeTab}
             onSelectionChange={(key) => setActiveTab(key as string)}
-          >
-            <Tab key="file" title={<span className="flex items-center gap-2"><FileText className="h-4 w-4" /> File</span>} />
-            <Tab key="url" title={<span className="flex items-center gap-2"><LinkIcon className="h-4 w-4" /> URL</span>} />
-            <Tab key="text" title={<span className="flex items-center gap-2"><FileType className="h-4 w-4" /> Text</span>} />
-          </Tabs>
+          />
 
           <div className="mt-4">
             {activeTab === "file" && (
@@ -307,7 +309,7 @@ export function UploadModal({
                   className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
                     isDragActive
                       ? "border-primary bg-primary/5"
-                      : "border-default-300 hover:border-primary hover:bg-default-50"
+                      : "border-muted-foreground/30 hover:border-primary hover:bg-muted"
                   }`}
                 >
                   <input
@@ -318,18 +320,18 @@ export function UploadModal({
                     onChange={handleFileInputChange}
                     className="hidden"
                   />
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-default-400" />
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   {isDragActive ? (
                     <p className="text-primary font-medium">Drop files here...</p>
                   ) : (
                     <>
                       <p className="font-medium">Drag & drop files here</p>
-                      <p className="text-sm text-default-500 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         or click to browse
                       </p>
                     </>
                   )}
-                  <p className="text-xs text-default-400 mt-4">
+                  <p className="text-xs text-muted-foreground mt-4">
                     Supported: PDF, TXT, MD, CSV, DOCX, DOC, XLSX, JSON, HTML (max 10MB)
                   </p>
                 </div>
@@ -341,18 +343,17 @@ export function UploadModal({
                         key={index}
                         className="flex items-center gap-3 p-3 border rounded-lg"
                       >
-                        <FileText className="h-5 w-5 text-default-500" />
+                        <FileText className="h-5 w-5 text-muted-foreground" />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{f.file.name}</p>
-                          <p className="text-xs text-default-400">
+                          <p className="text-xs text-muted-foreground">
                             {formatFileSize(f.file.size)}
                           </p>
                         </div>
                         {f.status === "pending" && (
                           <Button
-                            variant="light"
-                            isIconOnly
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
                             onPress={() => removeFile(index)}
                           >
                             <X className="h-4 w-4" />
@@ -384,7 +385,7 @@ export function UploadModal({
                   placeholder="https://example.com/page"
                   value={url}
                   onValueChange={setUrl}
-                  startContent={<LinkIcon className="h-4 w-4 text-default-400" />}
+                  startContent={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
                 />
                 <Input
                   label="Name (optional)"
@@ -392,7 +393,7 @@ export function UploadModal({
                   value={urlName}
                   onValueChange={setUrlName}
                 />
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-muted-foreground">
                   The content from this URL will be fetched and processed as a knowledge source.
                 </p>
               </div>
@@ -413,7 +414,7 @@ export function UploadModal({
                   onValueChange={setText}
                   minRows={8}
                 />
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-muted-foreground">
                   This text will be processed and added to your knowledge base.
                 </p>
               </div>
@@ -428,7 +429,7 @@ export function UploadModal({
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={handleClose}>
+          <Button variant="ghost" onPress={handleClose}>
             Cancel
           </Button>
           <Button

@@ -40,11 +40,11 @@ export interface BarChartProps {
 }
 
 const defaultColors = [
-  "hsl(var(--heroui-primary))",
-  "hsl(var(--heroui-secondary))",
-  "hsl(var(--heroui-success))",
-  "hsl(var(--heroui-warning))",
-  "hsl(var(--heroui-danger))",
+  "hsl(var(--primary))",
+  "hsl(var(--secondary))",
+  "hsl(var(--success))",
+  "hsl(var(--warning))",
+  "hsl(var(--destructive))",
 ];
 
 export function BarChart({
@@ -70,7 +70,7 @@ export function BarChart({
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="hsl(var(--heroui-divider))"
+              stroke="hsl(var(--border))"
               vertical={layout === "horizontal" ? false : true}
               horizontal={layout === "horizontal" ? true : false}
             />
@@ -79,13 +79,13 @@ export function BarChart({
             <>
               <XAxis
                 dataKey={xAxisKey}
-                tick={{ fontSize: 12, fill: "hsl(var(--heroui-default-500))" }}
-                axisLine={{ stroke: "hsl(var(--heroui-divider))" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={{ stroke: "hsl(var(--border))" }}
                 tickLine={false}
               />
               <YAxis
                 width={yAxisWidth}
-                tick={{ fontSize: 12, fill: "hsl(var(--heroui-default-500))" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -94,15 +94,15 @@ export function BarChart({
             <>
               <XAxis
                 type="number"
-                tick={{ fontSize: 12, fill: "hsl(var(--heroui-default-500))" }}
-                axisLine={{ stroke: "hsl(var(--heroui-divider))" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={{ stroke: "hsl(var(--border))" }}
                 tickLine={false}
               />
               <YAxis
                 dataKey={xAxisKey}
                 type="category"
                 width={yAxisWidth}
-                tick={{ fontSize: 12, fill: "hsl(var(--heroui-default-500))" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -111,13 +111,13 @@ export function BarChart({
           {showTooltip && (
             <Tooltip
               contentStyle={{
-                backgroundColor: "hsl(var(--heroui-content1))",
-                border: "1px solid hsl(var(--heroui-divider))",
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
                 fontSize: "12px",
               }}
               labelStyle={{ fontWeight: 600, marginBottom: 4 }}
-              cursor={{ fill: "hsl(var(--heroui-default-100))" }}
+              cursor={{ fill: "hsl(var(--muted))" }}
             />
           )}
           {showLegend && (

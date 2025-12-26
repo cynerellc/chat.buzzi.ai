@@ -8,8 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { conversations, messages } from "@/lib/db/schema/conversations";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
@@ -45,17 +44,7 @@ export async function GET(
   try {
     const { conversationId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Verify conversation exists and belongs to company
     const [conversation] = await db
@@ -127,17 +116,7 @@ export async function POST(
   try {
     const { conversationId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Verify conversation exists and belongs to company
     const [conversation] = await db
@@ -194,7 +173,7 @@ export async function POST(
         type: messageType,
         content: messageContent,
         attachments: [attachment],
-        userId: session.user.id,
+        userId: user.id,
       })
       .returning();
 

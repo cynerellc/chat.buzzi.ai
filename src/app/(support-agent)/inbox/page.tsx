@@ -30,7 +30,7 @@ import {
   Spinner,
   Chip,
 } from "@/components/ui";
-import type { TabItem, DropdownMenuItem } from "@/components/ui";
+import type { TabItem, DropdownMenuItemData } from "@/components/ui";
 import { StatCard } from "@/components/shared";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -295,11 +295,10 @@ export default function SupportAgentInbox() {
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            startContent={<Search size={16} className="text-default-400" />}
+            startContent={<Search size={16} className="text-muted-foreground" />}
             className="w-full sm:w-64"
-            size="sm"
           />
-          <Button variant="bordered" size="sm">
+          <Button variant="outline" size="sm">
             <Filter size={16} />
             Filter
           </Button>
@@ -321,10 +320,10 @@ export default function SupportAgentInbox() {
             </Button>
           </div>
         ) : conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-default-400">
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <Inbox size={64} className="opacity-30 mb-4" />
             <p className="text-sm">No conversations found</p>
-            <p className="text-xs text-default-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {selectedFilter === "all"
                 ? "Conversations will appear here once assigned"
                 : `No ${selectedFilter} conversations`}
@@ -345,7 +344,7 @@ export default function SupportAgentInbox() {
                       e.stopPropagation();
                       toggleStar(conversation.id, conversation.isStarred);
                     }}
-                    className="mt-1 text-default-400 hover:text-warning transition-colors"
+                    className="mt-1 text-muted-foreground hover:text-warning transition-colors"
                   >
                     {conversation.isStarred ? (
                       <Star size={18} className="fill-warning text-warning" />
@@ -369,13 +368,13 @@ export default function SupportAgentInbox() {
                           {conversation.endUser?.name ?? "Anonymous"}
                         </span>
                         {conversation.endUser?.email && (
-                          <span className="text-xs text-default-400 truncate hidden sm:inline">
+                          <span className="text-xs text-muted-foreground truncate hidden sm:inline">
                             {conversation.endUser.email}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-xs text-default-400">
+                        <span className="text-xs text-muted-foreground">
                           {conversation.lastMessageAt
                             ? formatDistanceToNow(new Date(conversation.lastMessageAt), {
                                 addSuffix: true,
@@ -388,7 +387,7 @@ export default function SupportAgentInbox() {
 
                     {/* Last message preview */}
                     {conversation.lastMessage && (
-                      <p className="text-sm text-default-500 truncate mt-1">
+                      <p className="text-sm text-muted-foreground truncate mt-1">
                         {conversation.lastMessage.role === "user" && (
                           <User size={12} className="inline mr-1" />
                         )}
@@ -402,17 +401,17 @@ export default function SupportAgentInbox() {
                     {/* Tags and Agent */}
                     <div className="flex items-center gap-2 mt-2">
                       {conversation.agent && (
-                        <Chip size="sm" variant="flat" className="text-xs">
+                        <Chip size="sm"  className="text-xs">
                           {conversation.agent.name}
                         </Chip>
                       )}
                       {(conversation.tags as string[])?.slice(0, 3).map((tag) => (
-                        <Chip key={tag} size="sm" variant="bordered" className="text-xs">
+                        <Chip key={tag} size="sm" chipVariant="faded" className="text-xs">
                           {tag}
                         </Chip>
                       ))}
                       {conversation.escalation && (
-                        <Chip size="sm" color="danger" variant="flat" className="text-xs">
+                        <Chip size="sm" color="danger"  className="text-xs">
                           {conversation.escalation.priority} priority
                         </Chip>
                       )}
@@ -434,7 +433,7 @@ export default function SupportAgentInbox() {
                       { key: "open", label: "Open" },
                       { key: "star", label: conversation.isStarred ? "Unstar" : "Star" },
                       ...(!conversation.assignedUser ? [{ key: "take", label: "Take Conversation" }] : []),
-                    ] satisfies DropdownMenuItem[]}
+                    ] satisfies DropdownMenuItemData[]}
                     onAction={(key) => {
                       if (key === "open") openConversation(conversation.id);
                       if (key === "star") toggleStar(conversation.id, conversation.isStarred);
@@ -459,14 +458,14 @@ export default function SupportAgentInbox() {
                   {stats.unassigned} unassigned conversation
                   {stats.unassigned > 1 ? "s" : ""} waiting
                 </p>
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-muted-foreground">
                   Pick up conversations from the unassigned queue
                 </p>
               </div>
             </div>
             <Button
               color="warning"
-              variant="flat"
+              variant="secondary"
               size="sm"
               onClick={() => router.push("/inbox/unassigned")}
             >

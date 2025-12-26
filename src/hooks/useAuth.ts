@@ -4,7 +4,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 
-import type { UserRole } from "@/lib/auth/config";
+import type { UserRole } from "@/lib/auth/role-utils";
 
 export interface AuthUser {
   id: string;
@@ -12,7 +12,6 @@ export interface AuthUser {
   name: string | null;
   image: string | null;
   role: UserRole;
-  companyId: string | null;
 }
 
 export function useAuth() {
@@ -28,7 +27,6 @@ export function useAuth() {
       name: session.user.name ?? null,
       image: session.user.image ?? null,
       role: session.user.role,
-      companyId: session.user.companyId ?? null,
     };
   }, [session]);
 
@@ -41,15 +39,31 @@ export function useAuth() {
         email,
         password,
         redirect: false,
-        callbackUrl: callbackUrl ?? getDashboardUrl(user?.role),
       });
 
       if (result?.error) {
         throw new Error(result.error);
       }
 
-      if (result?.url) {
-        router.push(result.url);
+      // If there's a specific callback URL, use it
+      if (callbackUrl) {
+        router.push(callbackUrl);
+        return result;
+      }
+
+      // Otherwise, get smart redirect from API
+      try {
+        const redirectResponse = await fetch("/api/auth/redirect");
+        if (redirectResponse.ok) {
+          const { redirectUrl } = await redirectResponse.json();
+          router.push(redirectUrl);
+        } else {
+          // Fallback to basic redirect
+          router.push(getDashboardUrl(user?.role));
+        }
+      } catch {
+        // Fallback to basic redirect
+        router.push(getDashboardUrl(user?.role));
       }
 
       return result;
@@ -79,14 +93,15 @@ export function useAuth() {
     await signOut({ callbackUrl: "/login" });
   }, []);
 
+  // Check if user has the required base role
+  // Note: company-specific permissions (company_admin, support_agent) are checked via company context
   const hasRole = useCallback(
     (role: UserRole): boolean => {
       if (!user) return false;
 
       const roleHierarchy: Record<UserRole, number> = {
-        master_admin: 3,
-        company_admin: 2,
-        support_agent: 1,
+        "chatapp.master_admin": 2,
+        "chatapp.user": 1,
       };
 
       return roleHierarchy[user.role] >= roleHierarchy[role];
@@ -94,22 +109,16 @@ export function useAuth() {
     [user]
   );
 
-  const isMasterAdmin = useMemo(() => user?.role === "master_admin", [user]);
+  const isMasterAdmin = useMemo(() => user?.role === "chatapp.master_admin", [user]);
+
+  // Note: These now only check if user is master_admin (god mode)
+  // For company-specific permission checks, use useCompanyContext hook
   const isCompanyAdmin = useMemo(
-    () => user?.role === "company_admin" || user?.role === "master_admin",
+    () => user?.role === "chatapp.master_admin",
     [user]
   );
   const isSupportAgent = useMemo(
-    () => ["master_admin", "company_admin", "support_agent"].includes(user?.role ?? ""),
-    [user]
-  );
-
-  const belongsToCompany = useCallback(
-    (companyId: string): boolean => {
-      if (!user) return false;
-      if (user.role === "master_admin") return true;
-      return user.companyId === companyId;
-    },
+    () => user?.role === "chatapp.master_admin",
     [user]
   );
 
@@ -130,20 +139,17 @@ export function useAuth() {
     isMasterAdmin,
     isCompanyAdmin,
     isSupportAgent,
-    belongsToCompany,
     refreshSession,
   };
 }
 
 function getDashboardUrl(role?: UserRole): string {
   switch (role) {
-    case "master_admin":
+    case "chatapp.master_admin":
       return "/admin/dashboard";
-    case "company_admin":
-      return "/dashboard";
-    case "support_agent":
-      return "/inbox";
+    case "chatapp.user":
+      return "/companies"; // Users go to company selection first
     default:
-      return "/dashboard";
+      return "/companies";
   }
 }

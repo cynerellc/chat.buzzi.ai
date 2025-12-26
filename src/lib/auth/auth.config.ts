@@ -14,14 +14,12 @@ declare module "next-auth" {
       name: string | null;
       image: string | null;
       role: UserRole;
-      companyId: string | null;
     };
   }
 
   interface User {
     id: string;
     role: UserRole;
-    companyId: string | null;
   }
 }
 
@@ -45,7 +43,6 @@ export const authConfig: NextAuthConfig = {
         // Initial sign in - store user data in token
         token.id = user.id;
         token.role = user.role;
-        token.companyId = user.companyId;
       }
 
       return token;
@@ -54,7 +51,6 @@ export const authConfig: NextAuthConfig = {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
-        session.user.companyId = token.companyId as string | null;
       }
 
       return session;

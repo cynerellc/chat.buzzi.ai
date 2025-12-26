@@ -59,13 +59,12 @@ export function PackageSelector({
           return (
             <Card
               key={pkg.id}
-              isPressable
               className={`cursor-pointer transition-all ${
                 isSelected
                   ? "border-primary ring-2 ring-primary ring-offset-2"
                   : "hover:border-primary/50"
               }`}
-              onPress={() => onSelect(isSelected ? null : pkg.id)}
+              onClick={() => onSelect(isSelected ? null : pkg.id)}
             >
               <CardBody className="p-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
@@ -78,7 +77,7 @@ export function PackageSelector({
                 {Array.isArray(pkg.features) && pkg.features.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1">
                     {(pkg.features as string[]).slice(0, 3).map((feature, i) => (
-                      <Chip key={i} size="sm" variant="flat">
+                      <Chip key={i} size="sm" >
                         {feature}
                       </Chip>
                     ))}
@@ -91,13 +90,12 @@ export function PackageSelector({
 
         {/* Start from Scratch Option */}
         <Card
-          isPressable
           className={`cursor-pointer transition-all ${
             selectedPackageId === null
               ? "border-primary ring-2 ring-primary ring-offset-2"
               : "hover:border-primary/50"
           }`}
-          onPress={() => onSelect(null)}
+          onClick={() => onSelect(null)}
         >
           <CardBody className="flex h-full flex-col items-center justify-center p-6 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-default-100">

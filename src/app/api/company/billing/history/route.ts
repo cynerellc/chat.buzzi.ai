@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { paymentHistory } from "@/lib/db/schema";
 
@@ -20,12 +19,7 @@ export interface PaymentHistoryItem {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1", 10);

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, ilike, ne, or } from "drizzle-orm";
+import { and, eq, ilike, ne, or, sql } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { companies, users } from "@/lib/db/schema";
+import { companies, companyPermissions, users } from "@/lib/db/schema";
 
 /**
  * GET /api/master-admin/users/search
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Must be master admin
-    if (session.user.role !== "master_admin") {
+    if (session.user.role !== "chatapp.master_admin") {
       return NextResponse.json(
         { error: "Only master admins can search users" },
         { status: 403 }
@@ -32,22 +32,26 @@ export async function GET(request: NextRequest) {
     }
 
     // Search users by name or email, excluding master admins and the current user
+    // Get company info via company_permissions
     const results = await db
       .select({
         id: users.id,
         email: users.email,
         name: users.name,
         role: users.role,
-        companyId: users.companyId,
+        companyId: companyPermissions.companyId,
+        companyRole: companyPermissions.role,
         companyName: companies.name,
       })
       .from(users)
-      .leftJoin(companies, eq(users.companyId, companies.id))
+      .leftJoin(companyPermissions, eq(users.id, companyPermissions.userId))
+      .leftJoin(companies, eq(companyPermissions.companyId, companies.id))
       .where(
         and(
-          ne(users.role, "master_admin"),
+          ne(users.role, "chatapp.master_admin"),
           ne(users.id, session.user.id),
           eq(users.isActive, true),
+          sql`${users.deletedAt} IS NULL`,
           or(
             ilike(users.email, `%${query}%`),
             ilike(users.name, `%${query}%`)
@@ -61,7 +65,7 @@ export async function GET(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: user.companyRole ?? user.role, // Prefer company role
         companyId: user.companyId,
         companyName: user.companyName,
       })),

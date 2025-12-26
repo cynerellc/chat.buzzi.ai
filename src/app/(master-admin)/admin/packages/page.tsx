@@ -38,7 +38,7 @@ export default function PackagesPage() {
           <Button
             color="primary"
             startContent={<Plus size={16} />}
-            onPress={handleCreatePackage}
+            onClick={handleCreatePackage}
           >
             Create Package
           </Button>

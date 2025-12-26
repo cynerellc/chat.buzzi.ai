@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
-import { agents, agentPackages, conversations } from "@/lib/db/schema";
+import { agents, agentPackages, conversations, type PackageVariableDefinition } from "@/lib/db/schema";
 
 export interface AgentListItem {
   id: string;
@@ -22,12 +21,7 @@ export interface AgentListItem {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
@@ -140,16 +134,13 @@ interface CreateAgentRequest {
   modelId?: string;
   temperature?: number;
   behavior?: Record<string, unknown>;
+  // Variable values are now stored as a simple key-value object
+  variableValues?: Record<string, string>;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body: CreateAgentRequest = await request.json();
 
@@ -200,7 +191,33 @@ Be professional, friendly, and concise in your responses.
 If you cannot help with something, offer to connect the customer with a human agent.`;
     }
 
-    // Create the agent
+    // If packageId is provided, initialize variable values from package defaults
+    let variableValues: Record<string, string> = {};
+    if (body.packageId) {
+      // Get package to read its variable definitions
+      const [agentPackage] = await db
+        .select({ variables: agentPackages.variables })
+        .from(agentPackages)
+        .where(eq(agentPackages.id, body.packageId))
+        .limit(1);
+
+      if (agentPackage) {
+        const pkgVariables = (agentPackage.variables as PackageVariableDefinition[]) || [];
+        // Initialize with defaults, then override with provided values
+        pkgVariables.forEach((pv) => {
+          if (pv.defaultValue && pv.variableType !== "secured_variable") {
+            variableValues[pv.name] = pv.defaultValue;
+          }
+        });
+      }
+
+      // Override with provided values
+      if (body.variableValues) {
+        variableValues = { ...variableValues, ...body.variableValues };
+      }
+    }
+
+    // Create the agent with variable values stored as JSONB
     const [newAgent] = await db
       .insert(agents)
       .values({
@@ -224,6 +241,7 @@ If you cannot help with something, offer to connect the customer with a human ag
           workingHours: null,
           offlineMessage: "We're currently offline. Please leave a message and we'll get back to you.",
         },
+        variableValues,
       })
       .returning();
 

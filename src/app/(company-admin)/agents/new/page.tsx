@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import { addToast, Textarea } from "@heroui/react";
+import { ArrowLeft, ArrowRight, Lock, Variable } from "lucide-react";
 
-import { Button, Input, Select, Card, CardHeader, CardBody } from "@/components/ui";
+import { Button, Input, Select, Card, CardHeader, CardBody, Textarea, addToast } from "@/components/ui";
 import { PackageSelector } from "@/components/company-admin/agents/package-selector";
 import { useAgentPackages, useCreateAgent } from "@/hooks/company";
 
-type Step = "package" | "details";
+type Step = "package" | "details" | "variables";
 
 const TYPE_OPTIONS = [
   { value: "support", label: "Support" },
@@ -26,13 +25,29 @@ export default function NewAgentPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<"support" | "sales" | "general" | "custom">("custom");
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { packages, isLoading: packagesLoading } = useAgentPackages();
   const { createAgent } = useCreateAgent();
 
+  // Get selected package and its variables
+  const selectedPackage = useMemo(
+    () => packages.find((p) => p.id === selectedPackageId),
+    [packages, selectedPackageId]
+  );
+
+  const packageVariables = useMemo(
+    () => selectedPackage?.variables || [],
+    [selectedPackage]
+  );
+
+  const hasVariables = packageVariables.length > 0;
+
   const handlePackageSelect = (packageId: string | null) => {
     setSelectedPackageId(packageId);
+    // Reset variable values when package changes
+    setVariableValues({});
     if (packageId) {
       const pkg = packages.find((p) => p.id === packageId);
       if (pkg?.category) {
@@ -43,15 +58,47 @@ export default function NewAgentPage() {
         };
         setType(categoryToType[pkg.category.toLowerCase()] || "custom");
       }
+      // Initialize variable values with defaults
+      if (pkg?.variables) {
+        const defaults: Record<string, string> = {};
+        pkg.variables.forEach((v) => {
+          if (v.defaultValue) {
+            defaults[v.name] = v.defaultValue;
+          }
+        });
+        setVariableValues(defaults);
+      }
     }
   };
 
   const handleContinue = () => {
-    setStep("details");
+    if (step === "package") {
+      setStep("details");
+    } else if (step === "details" && hasVariables) {
+      setStep("variables");
+    }
   };
 
   const handleBack = () => {
-    setStep("package");
+    if (step === "variables") {
+      setStep("details");
+    } else if (step === "details") {
+      setStep("package");
+    }
+  };
+
+  const updateVariableValue = (name: string, value: string) => {
+    setVariableValues((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const validateVariables = (): boolean => {
+    for (const variable of packageVariables) {
+      if (variable.required && !variableValues[variable.name]?.trim()) {
+        addToast({ title: `${variable.displayName} is required`, color: "warning" });
+        return false;
+      }
+    }
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,6 +106,11 @@ export default function NewAgentPage() {
 
     if (!name.trim()) {
       addToast({ title: "Please enter an agent name", color: "warning" });
+      return;
+    }
+
+    // Validate variables if there are any
+    if (hasVariables && !validateVariables()) {
       return;
     }
 
@@ -70,6 +122,7 @@ export default function NewAgentPage() {
         description: description.trim() || undefined,
         type,
         packageId: selectedPackageId || undefined,
+        variableValues: hasVariables ? variableValues : undefined,
       });
 
       addToast({ title: "Agent created successfully", color: "success" });
@@ -81,22 +134,40 @@ export default function NewAgentPage() {
     }
   };
 
+  const getStepDescription = () => {
+    switch (step) {
+      case "package":
+        return "Choose a template to get started";
+      case "details":
+        return "Configure your agent details";
+      case "variables":
+        return "Set up your configuration variables";
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button as={Link} href="/agents" variant="light" isIconOnly aria-label="Back">
-          <ArrowLeft size={18} />
+        <Button asChild variant="ghost" size="icon" aria-label="Back">
+          <Link href="/agents">
+            <ArrowLeft size={18} />
+          </Link>
         </Button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create New Agent</h1>
-          <p className="text-default-500">
-            {step === "package"
-              ? "Choose a template to get started"
-              : "Configure your agent details"}
-          </p>
+          <p className="text-muted-foreground">{getStepDescription()}</p>
         </div>
       </div>
+
+      {/* Step Progress */}
+      {hasVariables && (
+        <div className="flex items-center gap-2">
+          <div className={`h-2 flex-1 rounded-full ${step === "package" || step === "details" || step === "variables" ? "bg-primary" : "bg-muted"}`} />
+          <div className={`h-2 flex-1 rounded-full ${step === "details" || step === "variables" ? "bg-primary" : "bg-muted"}`} />
+          <div className={`h-2 flex-1 rounded-full ${step === "variables" ? "bg-primary" : "bg-muted"}`} />
+        </div>
+      )}
 
       {/* Step 1: Package Selection */}
       {step === "package" && (
@@ -118,7 +189,7 @@ export default function NewAgentPage() {
 
       {/* Step 2: Agent Details */}
       {step === "details" && (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={hasVariables ? (e) => { e.preventDefault(); handleContinue(); } : handleSubmit} className="space-y-6">
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold">Agent Details</h2>
@@ -151,19 +222,75 @@ export default function NewAgentPage() {
               />
 
               {selectedPackageId && (
-                <div className="rounded-lg bg-default-100 p-3 text-sm">
+                <div className="rounded-lg bg-muted p-3 text-sm">
                   <p className="font-medium">Using template:</p>
-                  <p className="text-default-500">
-                    {packages.find((p) => p.id === selectedPackageId)?.name ||
-                      "Selected package"}
+                  <p className="text-muted-foreground">
+                    {selectedPackage?.name || "Selected package"}
                   </p>
+                  {hasVariables && (
+                    <p className="text-xs text-primary mt-1">
+                      This template has {packageVariables.length} configuration variable{packageVariables.length !== 1 ? "s" : ""}
+                    </p>
+                  )}
                 </div>
               )}
             </CardBody>
           </Card>
 
           <div className="flex justify-between">
-            <Button variant="bordered" onPress={handleBack} leftIcon={ArrowLeft}>
+            <Button variant="outline" onPress={handleBack} leftIcon={ArrowLeft}>
+              Back
+            </Button>
+            {hasVariables ? (
+              <Button type="submit" color="primary" rightIcon={ArrowRight}>
+                Continue to Variables
+              </Button>
+            ) : (
+              <Button type="submit" color="primary" isLoading={isSubmitting}>
+                Create Agent
+              </Button>
+            )}
+          </div>
+        </form>
+      )}
+
+      {/* Step 3: Variables Configuration */}
+      {step === "variables" && (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Variable size={20} />
+                <h2 className="text-lg font-semibold">Configuration Variables</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Set the values for your agent&apos;s configuration variables. Secured variables will be encrypted.
+              </p>
+            </CardHeader>
+            <CardBody className="space-y-4">
+              {packageVariables.map((variable) => (
+                <div key={variable.name} className="space-y-1">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-sm font-medium">{variable.displayName}</span>
+                    {variable.variableType === "secured_variable" && (
+                      <Lock size={14} className="text-muted-foreground" />
+                    )}
+                    {variable.required && <span className="text-danger text-sm">*</span>}
+                  </div>
+                  <Input
+                    placeholder={variable.placeholder || `Enter ${variable.displayName.toLowerCase()}`}
+                    value={variableValues[variable.name] || ""}
+                    onValueChange={(v) => updateVariableValue(variable.name, v)}
+                    type={variable.variableType === "secured_variable" ? "password" : "text"}
+                    description={variable.description}
+                  />
+                </div>
+              ))}
+            </CardBody>
+          </Card>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onPress={handleBack} leftIcon={ArrowLeft}>
               Back
             </Button>
             <Button type="submit" color="primary" isLoading={isSubmitting}>

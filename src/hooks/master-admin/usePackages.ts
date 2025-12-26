@@ -15,11 +15,27 @@ const fetcher = async (url: string) => {
 // Re-export types for convenience
 export type { PackageListItem, PackageDetails };
 
+// Package Agent type for agents within a package
+export interface PackageAgentData {
+  id?: string;
+  agentIdentifier: string;
+  name: string;
+  designation?: string;
+  agentType: "worker" | "supervisor";
+  systemPrompt: string;
+  modelId: string;
+  temperature: number;
+  tools?: string[];
+  managedAgentIds?: string[];
+  sortOrder: number;
+}
+
 export interface UsePackagesParams {
   page?: number;
   pageSize?: number;
   search?: string;
   category?: string;
+  packageType?: "single_agent" | "multi_agent" | "all";
   isActive?: boolean | null;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
@@ -46,6 +62,9 @@ export function usePackages(params: UsePackagesParams = {}): UsePackagesReturn {
   if (params.pageSize) searchParams.set("pageSize", String(params.pageSize));
   if (params.search) searchParams.set("search", params.search);
   if (params.category) searchParams.set("category", params.category);
+  if (params.packageType && params.packageType !== "all") {
+    searchParams.set("packageType", params.packageType);
+  }
   if (params.isActive !== undefined && params.isActive !== null) {
     searchParams.set("isActive", String(params.isActive));
   }
@@ -104,14 +123,28 @@ export interface CreatePackageData {
   name: string;
   description?: string;
   category?: string;
-  defaultSystemPrompt: string;
+  packageType: "single_agent" | "multi_agent";
+  // Legacy fields for single agent packages
+  defaultSystemPrompt?: string;
   defaultModelId?: string;
   defaultTemperature?: number;
   defaultBehavior?: Record<string, unknown>;
   features?: string[];
+  // Bundle info
+  bundlePath?: string | null;
+  bundleVersion?: string;
+  bundleChecksum?: string | null;
+  executionConfig?: {
+    maxExecutionTimeMs?: number;
+    maxMemoryMb?: number;
+    allowedNetworkDomains?: string[];
+    sandboxMode?: boolean;
+  };
   isActive?: boolean;
   isPublic?: boolean;
   sortOrder?: number;
+  // Package agents configuration
+  packageAgents?: PackageAgentData[];
 }
 
 export async function createPackage(data: CreatePackageData): Promise<PackageListItem> {
@@ -135,14 +168,28 @@ export interface UpdatePackageData {
   name?: string;
   description?: string | null;
   category?: string | null;
+  packageType?: "single_agent" | "multi_agent";
+  // Legacy fields for single agent packages
   defaultSystemPrompt?: string;
   defaultModelId?: string;
   defaultTemperature?: number;
   defaultBehavior?: Record<string, unknown>;
   features?: string[];
+  // Bundle info
+  bundlePath?: string | null;
+  bundleVersion?: string;
+  bundleChecksum?: string | null;
+  executionConfig?: {
+    maxExecutionTimeMs?: number;
+    maxMemoryMb?: number;
+    allowedNetworkDomains?: string[];
+    sandboxMode?: boolean;
+  };
   isActive?: boolean;
   isPublic?: boolean;
   sortOrder?: number;
+  // Package agents configuration
+  packageAgents?: PackageAgentData[];
 }
 
 export async function updatePackage(packageId: string, data: UpdatePackageData): Promise<PackageListItem> {

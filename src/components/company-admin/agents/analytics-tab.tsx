@@ -81,7 +81,7 @@ export function AnalyticsTab({ agentId }: AnalyticsTabProps) {
             }}
             className="w-32"
           />
-          <Button variant="bordered" size="sm" isDisabled leftIcon={Download}>
+          <Button variant="outline" size="sm" disabled startContent={<Download size={16} />}>
             Export
           </Button>
         </div>

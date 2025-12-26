@@ -33,10 +33,9 @@ export function AnalyticsHeader({
         {dateRanges.map((range) => (
           <Button
             key={range.days}
-            variant={selectedDays === range.days ? "solid" : "flat"}
-            color={selectedDays === range.days ? "primary" : "default"}
+            variant={selectedDays === range.days ? "default" : "outline"}
             size="sm"
-            onPress={() => onDaysChange(range.days)}
+            onClick={() => onDaysChange(range.days)}
           >
             {range.label}
           </Button>
@@ -45,9 +44,9 @@ export function AnalyticsHeader({
 
       {onExport && (
         <Button
-          variant="flat"
+          variant="secondary"
           startContent={<Download size={16} />}
-          onPress={onExport}
+          onClick={onExport}
         >
           Export Report
         </Button>

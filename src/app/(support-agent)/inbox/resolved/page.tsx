@@ -180,7 +180,6 @@ export default function ResolvedInboxPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1"
-          size="sm"
         />
         <Select
           selectedKeys={[dateRange]}
@@ -189,7 +188,6 @@ export default function ResolvedInboxPage() {
             if (selected) setDateRange(selected);
           }}
           className="w-40"
-          size="sm"
           aria-label="Date range"
           options={dateRangeOptions.map((option) => ({
             value: option.value,
@@ -207,7 +205,7 @@ export default function ResolvedInboxPage() {
             </div>
             <div>
               <p className="text-2xl font-semibold">{filteredConversations.length}</p>
-              <p className="text-xs text-default-500">Total Resolved</p>
+              <p className="text-xs text-muted-foreground">Total Resolved</p>
             </div>
           </div>
         </Card>
@@ -224,7 +222,7 @@ export default function ResolvedInboxPage() {
                   return c.lastMessageAt && new Date(c.lastMessageAt) >= today;
                 }).length}
               </p>
-              <p className="text-xs text-default-500">Resolved Today</p>
+              <p className="text-xs text-muted-foreground">Resolved Today</p>
             </div>
           </div>
         </Card>
@@ -242,7 +240,7 @@ export default function ResolvedInboxPage() {
                 )}
                 %
               </p>
-              <p className="text-xs text-default-500">Positive Sentiment</p>
+              <p className="text-xs text-muted-foreground">Positive Sentiment</p>
             </div>
           </div>
         </Card>
@@ -262,10 +260,10 @@ export default function ResolvedInboxPage() {
             </Button>
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-default-400">
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <CheckCircle size={64} className="opacity-30 mb-4" />
             <p className="text-sm font-medium">No resolved conversations</p>
-            <p className="text-xs text-default-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {searchQuery
                 ? "No conversations match your search"
                 : "Resolved conversations will appear here"}
@@ -301,7 +299,7 @@ export default function ResolvedInboxPage() {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {getSentimentIndicator(conversation.sentiment)}
-                        <span className="text-xs text-default-400">
+                        <span className="text-xs text-muted-foreground">
                           {conversation.lastMessageAt
                             ? format(new Date(conversation.lastMessageAt), "MMM d, yyyy")
                             : ""}
@@ -311,7 +309,7 @@ export default function ResolvedInboxPage() {
 
                     {/* Last message preview */}
                     {conversation.lastMessage && (
-                      <p className="text-sm text-default-500 truncate mt-1">
+                      <p className="text-sm text-muted-foreground truncate mt-1">
                         {conversation.lastMessage.role === "user" && (
                           <User size={12} className="inline mr-1" />
                         )}
@@ -324,16 +322,16 @@ export default function ResolvedInboxPage() {
 
                     {/* Tags and Agent */}
                     <div className="flex items-center gap-2 mt-2">
-                      <Chip size="sm" variant="flat" className="text-xs">
+                      <Chip size="sm"  className="text-xs">
                         {conversation.messageCount} messages
                       </Chip>
                       {conversation.agent && (
-                        <Chip size="sm" variant="bordered" className="text-xs">
+                        <Chip size="sm" chipVariant="faded" className="text-xs">
                           {conversation.agent.name}
                         </Chip>
                       )}
                       {(conversation.tags as string[])?.slice(0, 2).map((tag) => (
-                        <Chip key={tag} size="sm" variant="bordered" className="text-xs">
+                        <Chip key={tag} size="sm" chipVariant="faded" className="text-xs">
                           {tag}
                         </Chip>
                       ))}

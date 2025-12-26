@@ -1,10 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, companyPermissions } from "@/lib/db/schema";
 
 import { auth } from "./index";
-import type { UserRole } from "./config";
+import type { UserRole } from "./role-utils";
 
 export interface SessionUser {
   id: string;
@@ -12,7 +12,6 @@ export interface SessionUser {
   name: string | null;
   image: string | null;
   role: UserRole;
-  companyId: string | null;
 }
 
 /**
@@ -42,12 +41,40 @@ export async function getFullUser() {
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.user.id),
+  });
+
+  return user;
+}
+
+/**
+ * Get full user data with their company permissions
+ */
+export async function getFullUserWithPermissions() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.user.id),
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  const permissions = await db.query.companyPermissions.findMany({
+    where: eq(companyPermissions.userId, session.user.id),
     with: {
       company: true,
     },
   });
 
-  return user;
+  return {
+    ...user,
+    companyPermissions: permissions,
+  };
 }
 
 /**
@@ -85,7 +112,7 @@ export async function hasRole(role: UserRole): Promise<boolean> {
 }
 
 /**
- * Check if user belongs to a company
+ * Check if user belongs to a company (has any permission)
  */
 export async function belongsToCompany(companyId: string): Promise<boolean> {
   const session = await auth();
@@ -95,9 +122,17 @@ export async function belongsToCompany(companyId: string): Promise<boolean> {
   }
 
   // Master admins have access to all companies
-  if (session.user.role === "master_admin") {
+  if (session.user.role === "chatapp.master_admin") {
     return true;
   }
 
-  return session.user.companyId === companyId;
+  // Check company_permissions table
+  const permission = await db.query.companyPermissions.findFirst({
+    where: and(
+      eq(companyPermissions.userId, session.user.id),
+      eq(companyPermissions.companyId, companyId)
+    ),
+  });
+
+  return !!permission;
 }

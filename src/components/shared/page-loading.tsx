@@ -1,8 +1,8 @@
 "use client";
 
-import { Spinner } from "@heroui/react";
 import { motion } from "framer-motion";
 
+import { Spinner } from "@/components/ui";
 import { fadeIn } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,7 @@ export function PageLoading({ message = "Loading...", className }: PageLoadingPr
       animate="animate"
     >
       <Spinner size="lg" />
-      <p className="text-default-500 text-sm">{message}</p>
+      <p className="text-muted-foreground text-sm">{message}</p>
     </motion.div>
   );
 }

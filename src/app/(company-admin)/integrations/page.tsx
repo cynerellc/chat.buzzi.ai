@@ -15,15 +15,15 @@ import {
   ModalHeader,
   Skeleton,
   Switch,
-  Table,
+  TableRoot,
   TableBody,
   TableCell,
-  TableColumn,
+  TableHead,
   TableHeader,
   TableRow,
   Textarea,
-  useDisclosure,
-} from "@heroui/react";
+} from "@/components/ui";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   AlertTriangle,
   Check,
@@ -187,7 +187,7 @@ export default function IntegrationsPage() {
         actions={
           <Button
             color="primary"
-            startContent={<Plus className="w-4 h-4" />}
+            leftIcon={Plus}
             onPress={webhookModal.onOpen}
           >
             Add Webhook
@@ -202,12 +202,14 @@ export default function IntegrationsPage() {
             <h3 className="text-lg font-semibold">Connected Integrations</h3>
           </CardHeader>
           <CardBody>
-            <Table aria-label="Connected integrations" removeWrapper>
+            <TableRoot>
               <TableHeader>
-                <TableColumn>INTEGRATION</TableColumn>
-                <TableColumn>STATUS</TableColumn>
-                <TableColumn>LAST ACTIVITY</TableColumn>
-                <TableColumn width={100}>ACTIONS</TableColumn>
+                <TableRow>
+                  <TableHead>INTEGRATION</TableHead>
+                  <TableHead>STATUS</TableHead>
+                  <TableHead>LAST ACTIVITY</TableHead>
+                  <TableHead className="w-24">ACTIONS</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {integrations.map((integration) => (
@@ -215,11 +217,11 @@ export default function IntegrationsPage() {
                     <TableCell>
                       <div>
                         <p className="font-medium">{integration.name}</p>
-                        <p className="text-sm text-default-500">{integration.type}</p>
+                        <p className="text-sm text-muted-foreground">{integration.type}</p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Chip size="sm" color={statusColors[integration.status]} variant="flat">
+                      <Chip color={statusColors[integration.status]}>
                         {integration.status}
                       </Chip>
                       {integration.lastError && (
@@ -227,16 +229,16 @@ export default function IntegrationsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <span className="text-default-500">
+                      <span className="text-muted-foreground">
                         {formatDate(integration.updatedAt)}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button isIconOnly size="sm" variant="light">
+                        <Button size="icon" variant="ghost">
                           <Settings2 className="w-4 h-4" />
                         </Button>
-                        <Button isIconOnly size="sm" variant="light" color="danger">
+                        <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -244,7 +246,7 @@ export default function IntegrationsPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </TableRoot>
           </CardBody>
         </Card>
       )}
@@ -254,19 +256,21 @@ export default function IntegrationsPage() {
         <CardHeader className="flex justify-between items-center">
           <div>
             <h3 className="text-lg font-semibold">Webhooks</h3>
-            <p className="text-sm text-default-500">Send real-time data to external services</p>
+            <p className="text-sm text-muted-foreground">Send real-time data to external services</p>
           </div>
         </CardHeader>
         <CardBody>
           {webhooks.length > 0 ? (
-            <Table aria-label="Webhooks" removeWrapper>
+            <TableRoot>
               <TableHeader>
-                <TableColumn>NAME</TableColumn>
-                <TableColumn>ENDPOINT</TableColumn>
-                <TableColumn>EVENTS</TableColumn>
-                <TableColumn>STATS</TableColumn>
-                <TableColumn>STATUS</TableColumn>
-                <TableColumn width={100}>ACTIONS</TableColumn>
+                <TableRow>
+                  <TableHead>NAME</TableHead>
+                  <TableHead>ENDPOINT</TableHead>
+                  <TableHead>EVENTS</TableHead>
+                  <TableHead>STATS</TableHead>
+                  <TableHead>STATUS</TableHead>
+                  <TableHead className="w-24">ACTIONS</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {webhooks.map((webhook) => (
@@ -275,24 +279,24 @@ export default function IntegrationsPage() {
                       <div>
                         <p className="font-medium">{webhook.name}</p>
                         {webhook.description && (
-                          <p className="text-xs text-default-500">{webhook.description}</p>
+                          <p className="text-xs text-muted-foreground">{webhook.description}</p>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs bg-default-100 px-2 py-1 rounded">
+                      <code className="text-xs bg-muted px-2 py-1 rounded">
                         {webhook.url.length > 40 ? `${webhook.url.substring(0, 40)}...` : webhook.url}
                       </code>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {webhook.events.slice(0, 2).map((event) => (
-                          <Chip key={event} size="sm" variant="flat">
+                          <Chip key={event}>
                             {event.split(".")[1]}
                           </Chip>
                         ))}
                         {webhook.events.length > 2 && (
-                          <Chip size="sm" variant="flat">
+                          <Chip>
                             +{webhook.events.length - 2}
                           </Chip>
                         )}
@@ -311,14 +315,14 @@ export default function IntegrationsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Switch size="sm" isSelected={webhook.isActive} />
+                      <Switch isSelected={webhook.isActive} />
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button isIconOnly size="sm" variant="light" title="Test webhook">
+                        <Button size="icon" variant="ghost" title="Test webhook">
                           <RefreshCw className="w-4 h-4" />
                         </Button>
-                        <Button isIconOnly size="sm" variant="light" color="danger">
+                        <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -326,17 +330,16 @@ export default function IntegrationsPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </TableRoot>
           ) : (
             <div className="text-center py-8">
-              <Webhook className="w-12 h-12 mx-auto mb-3 text-default-300" />
-              <p className="text-default-500 mb-4">No webhooks configured</p>
+              <Webhook className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+              <p className="text-muted-foreground mb-4">No webhooks configured</p>
               <Button
-                color="primary"
-                variant="flat"
-                startContent={<Plus className="w-4 h-4" />}
-                onPress={webhookModal.onOpen}
+                variant="secondary"
+                onClick={webhookModal.onOpen}
               >
+                <Plus className="w-4 h-4 mr-2" />
                 Create Webhook
               </Button>
             </div>
@@ -362,22 +365,17 @@ export default function IntegrationsPage() {
                       <div className="flex items-center gap-2">
                         <h4 className="font-medium">{integration.name}</h4>
                         {!integration.available && (
-                          <Chip size="sm" variant="flat">Coming Soon</Chip>
+                          <Chip size="sm">Coming Soon</Chip>
                         )}
                       </div>
-                      <p className="text-sm text-default-500 mt-1">{integration.description}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{integration.description}</p>
                       <Button
                         size="sm"
                         className="mt-3"
-                        color={integration.available ? "primary" : "default"}
-                        variant={integration.available ? "flat" : "flat"}
-                        isDisabled={!integration.available}
-                        startContent={
-                          integration.available ? (
-                            <Plus className="w-3 h-3" />
-                          ) : null
-                        }
+                        variant={integration.available ? "default" : "secondary"}
+                        disabled={!integration.available}
                       >
+                        {integration.available && <Plus className="w-4 h-4 mr-2" />}
                         {integration.available ? "Connect" : "Coming Soon"}
                       </Button>
                     </div>
@@ -398,16 +396,16 @@ export default function IntegrationsPage() {
             </div>
             <div className="flex-1">
               <h4 className="font-medium mb-1">Custom Integrations via API</h4>
-              <p className="text-sm text-default-500 mb-3">
+              <p className="text-sm text-muted-foreground mb-3">
                 Build custom integrations using our REST API. Access conversations, messages,
                 and more programmatically.
               </p>
               <Button
-                variant="flat"
+                variant="secondary"
                 size="sm"
-                endContent={<ExternalLink className="w-3 h-3" />}
               >
                 View API Documentation
+                <ExternalLink className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </div>
@@ -415,7 +413,7 @@ export default function IntegrationsPage() {
       </Card>
 
       {/* Create Webhook Modal */}
-      <Modal isOpen={webhookModal.isOpen} onClose={webhookModal.onClose} size="lg">
+      <Modal isOpen={webhookModal.isOpen} onClose={webhookModal.onClose}>
         <ModalContent>
           <ModalHeader>Create Webhook</ModalHeader>
           <ModalBody>
@@ -441,7 +439,7 @@ export default function IntegrationsPage() {
                 value={webhookForm.url}
                 onValueChange={(value) => setWebhookForm((prev) => ({ ...prev, url: value }))}
                 isRequired
-                startContent={<Globe className="w-4 h-4 text-default-400" />}
+                startContent={<Globe className="w-4 h-4 text-muted-foreground" />}
               />
               <div>
                 <label className="text-sm font-medium mb-2 block">
@@ -455,7 +453,7 @@ export default function IntegrationsPage() {
                     >
                       <div>
                         <p className="font-medium text-sm">{event.label}</p>
-                        <p className="text-xs text-default-500">{event.description}</p>
+                        <p className="text-xs text-muted-foreground">{event.description}</p>
                       </div>
                       <Switch
                         size="sm"
@@ -483,13 +481,13 @@ export default function IntegrationsPage() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={webhookModal.onClose}>
+            <Button variant="ghost" onPress={webhookModal.onClose}>
               Cancel
             </Button>
             <Button
               color="primary"
               isLoading={isCreating}
-              isDisabled={!webhookForm.name || !webhookForm.url || webhookForm.events.length === 0}
+              disabled={!webhookForm.name || !webhookForm.url || webhookForm.events.length === 0}
               onPress={handleCreateWebhook}
             >
               Create Webhook

@@ -23,17 +23,17 @@ export function MaintenanceSettings({
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
-            variant="flat"
+            variant="secondary"
             startContent={<Database size={16} />}
             isDisabled
           >
             Run Database Migrations
           </Button>
-          <Button variant="flat" isDisabled>
+          <Button variant="secondary" isDisabled>
             Seed Sample Data
           </Button>
           <Button
-            variant="flat"
+            variant="secondary"
             color="warning"
             startContent={<Trash2 size={16} />}
             isDisabled
@@ -49,13 +49,13 @@ export function MaintenanceSettings({
       <Card className="p-6">
         <h3 className="font-semibold mb-4">Cache Management</h3>
         <div className="flex flex-wrap gap-2">
-          <Button variant="flat" isDisabled>
+          <Button variant="secondary" isDisabled>
             Clear All Caches
           </Button>
-          <Button variant="flat" isDisabled>
+          <Button variant="secondary" isDisabled>
             Clear Session Cache
           </Button>
-          <Button variant="flat" isDisabled>
+          <Button variant="secondary" isDisabled>
             Clear API Cache
           </Button>
         </div>

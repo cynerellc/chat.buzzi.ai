@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { agents } from "@/lib/db/schema";
 
@@ -24,13 +23,8 @@ interface TestMessageResponse {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { agentId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     // Get the agent
     const [agent] = await db

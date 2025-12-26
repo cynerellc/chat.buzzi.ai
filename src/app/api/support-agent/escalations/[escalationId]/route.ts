@@ -9,7 +9,6 @@ import { db } from "@/lib/db";
 import { escalations, conversations, messages } from "@/lib/db/schema/conversations";
 import { eq, and, desc } from "drizzle-orm";
 import { requireSupportAgent } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { getEscalationService } from "@/lib/escalation";
 
 interface RouteParams {
@@ -23,11 +22,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { escalationId } = await params;
-    await requireSupportAgent();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireSupportAgent();
 
     // Verify escalation belongs to company
     const [escalation] = await db
@@ -57,7 +52,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const conversationMessages = await db
       .select()
       .from(messages)
-      .where(eq(messages.conversationId, escalation.chatapp_escalations.conversationId))
+      .where(eq(messages.conversationId, escalation.escalations.conversationId))
       .orderBy(desc(messages.createdAt))
       .limit(50);
 
@@ -81,11 +76,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { escalationId } = await params;
-    const user = await requireSupportAgent();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     const body = await request.json();
     const { action, resolution, returnToAi } = body;

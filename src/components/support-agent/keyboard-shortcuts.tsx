@@ -1,9 +1,9 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useEffect, useCallback, useState } from "react";
-import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/react";
-import { Keyboard } from "lucide-react";
-import { Divider } from "@/components/ui";
+import { Keyboard, Command, Navigation, MessageSquare, HelpCircle } from "lucide-react";
+import { Separator, Modal, ModalContent, ModalHeader, ModalBody } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 interface ShortcutAction {
@@ -164,6 +164,29 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig) {
   return { showHelp, setShowHelp, shortcuts };
 }
 
+const categoryConfig = {
+  Navigation: {
+    icon: Navigation,
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-500/10",
+  },
+  Actions: {
+    icon: Command,
+    color: "text-violet-600 dark:text-violet-400",
+    bg: "bg-violet-500/10",
+  },
+  Chat: {
+    icon: MessageSquare,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-500/10",
+  },
+  Help: {
+    icon: HelpCircle,
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-500/10",
+  },
+};
+
 // Keyboard shortcuts help modal
 export function KeyboardShortcutsHelp({
   isOpen,
@@ -187,54 +210,87 @@ export function KeyboardShortcutsHelp({
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
       <ModalContent>
-        <ModalHeader className="flex items-center gap-2">
-          <Keyboard size={20} className="text-primary" />
-          Keyboard Shortcuts
+        <ModalHeader className="flex items-center gap-3 border-b border-border/50 pb-4 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5">
+            <Keyboard size={18} className="text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold">Keyboard Shortcuts</h2>
+            <p className="text-xs text-muted-foreground">Navigate faster with shortcuts</p>
+          </div>
         </ModalHeader>
         <ModalBody className="pb-6">
-          <div className="space-y-6">
-            {Object.entries(categories).map(([category, categoryShortcuts]) => (
-              <div key={category}>
-                <h3 className="text-sm font-semibold text-default-600 mb-3">
-                  {category}
-                </h3>
-                <div className="space-y-2">
-                  {categoryShortcuts.map((shortcut) => (
-                    <div
-                      key={shortcut.key}
-                      className="flex items-center justify-between py-1"
-                    >
-                      <span className="text-sm text-default-700">
-                        {shortcut.description}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {shortcut.keys.map((key, index) => (
-                          <span key={index}>
-                            <kbd className="bg-default-100 px-2 py-1 rounded text-xs font-mono">
-                              {key === "Cmd"
-                                ? navigator.platform.toUpperCase().indexOf("MAC") >= 0
-                                  ? "Cmd"
-                                  : "Ctrl"
-                                : key}
-                            </kbd>
-                            {index < shortcut.keys.length - 1 && (
-                              <span className="mx-0.5 text-default-400">+</span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
+          <div className="space-y-5">
+            {Object.entries(categories).map(([category, categoryShortcuts], categoryIndex) => {
+              const config = categoryConfig[category as keyof typeof categoryConfig] || {
+                icon: Keyboard,
+                color: "text-muted-foreground",
+                bg: "bg-muted",
+              };
+              const CategoryIcon = config.icon;
+
+              return (
+                <motion.div
+                  key={category}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: categoryIndex * 0.1 }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={cn("flex h-6 w-6 items-center justify-center rounded-md", config.bg)}>
+                      <CategoryIcon size={12} className={config.color} />
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {category}
+                    </h3>
+                  </div>
+                  <div className="space-y-1.5 pl-8">
+                    {categoryShortcuts.map((shortcut, index) => (
+                      <motion.div
+                        key={shortcut.key}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: categoryIndex * 0.1 + index * 0.03 }}
+                        className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <span className="text-sm text-foreground">
+                          {shortcut.description}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {shortcut.keys.map((key, keyIndex) => (
+                            <span key={keyIndex} className="flex items-center">
+                              <kbd className="min-w-[28px] h-7 px-2 flex items-center justify-center bg-muted border border-border/50 rounded-md text-xs font-mono font-medium shadow-sm">
+                                {key === "Cmd"
+                                  ? navigator.platform.toUpperCase().indexOf("MAC") >= 0
+                                    ? "⌘"
+                                    : "Ctrl"
+                                  : key === "Shift"
+                                  ? "⇧"
+                                  : key}
+                              </kbd>
+                              {keyIndex < shortcut.keys.length - 1 && (
+                                <span className="mx-1 text-muted-foreground text-xs">+</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
 
-          <Divider className="my-4" />
+          <Separator className="my-5 bg-border/50" />
 
-          <p className="text-xs text-default-400 text-center">
-            Press <kbd className="bg-default-100 px-1 rounded">Esc</kbd> to close
-          </p>
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span>Press</span>
+            <kbd className="min-w-[28px] h-6 px-2 flex items-center justify-center bg-muted border border-border/50 rounded-md text-xs font-mono font-medium">
+              Esc
+            </kbd>
+            <span>to close</span>
+          </div>
         </ModalBody>
       </ModalContent>
     </Modal>

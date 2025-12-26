@@ -1,4 +1,4 @@
-import { and, count, eq, gte, sql, sum } from "drizzle-orm";
+import { count, eq, sql, sum } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
@@ -26,6 +26,10 @@ export async function GET() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
+    // Convert dates to ISO strings for the postgres driver
+    const startOfMonthStr = startOfMonth.toISOString();
+    const startOfLastMonthStr = startOfLastMonth.toISOString();
+
     // Get total companies (not deleted)
     const [totalCompaniesResult] = await db
       .select({ count: count() })
@@ -37,10 +41,7 @@ export async function GET() {
       .select({ count: count() })
       .from(companies)
       .where(
-        and(
-          sql`${companies.deletedAt} IS NULL`,
-          gte(companies.createdAt, startOfMonth)
-        )
+        sql`${companies.deletedAt} IS NULL AND ${companies.createdAt} >= ${startOfMonthStr}::timestamp`
       );
 
     // Get companies created last month
@@ -48,11 +49,7 @@ export async function GET() {
       .select({ count: count() })
       .from(companies)
       .where(
-        and(
-          sql`${companies.deletedAt} IS NULL`,
-          gte(companies.createdAt, startOfLastMonth),
-          sql`${companies.createdAt} < ${startOfMonth}`
-        )
+        sql`${companies.deletedAt} IS NULL AND ${companies.createdAt} >= ${startOfLastMonthStr}::timestamp AND ${companies.createdAt} < ${startOfMonthStr}::timestamp`
       );
 
     // Get active companies (with active subscription)
@@ -60,10 +57,7 @@ export async function GET() {
       .select({ count: count() })
       .from(companies)
       .where(
-        and(
-          sql`${companies.deletedAt} IS NULL`,
-          eq(companies.status, "active")
-        )
+        sql`${companies.deletedAt} IS NULL AND ${companies.status} = 'active'`
       );
 
     // Get active companies last month
@@ -71,10 +65,7 @@ export async function GET() {
       .select({ count: count() })
       .from(companySubscriptions)
       .where(
-        and(
-          eq(companySubscriptions.status, "active"),
-          sql`${companySubscriptions.createdAt} < ${startOfMonth}`
-        )
+        sql`${companySubscriptions.status} = 'active' AND ${companySubscriptions.createdAt} < ${startOfMonthStr}::timestamp`
       );
 
     // Get total users
@@ -88,10 +79,7 @@ export async function GET() {
       .select({ count: count() })
       .from(users)
       .where(
-        and(
-          sql`${users.deletedAt} IS NULL`,
-          gte(users.createdAt, startOfMonth)
-        )
+        sql`${users.deletedAt} IS NULL AND ${users.createdAt} >= ${startOfMonthStr}::timestamp`
       );
 
     // Get users last month at this point
@@ -99,10 +87,7 @@ export async function GET() {
       .select({ count: count() })
       .from(users)
       .where(
-        and(
-          sql`${users.deletedAt} IS NULL`,
-          sql`${users.createdAt} < ${startOfMonth}`
-        )
+        sql`${users.deletedAt} IS NULL AND ${users.createdAt} < ${startOfMonthStr}::timestamp`
       );
 
     // Get MRR (monthly recurring revenue)

@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Bug } from "lucide-react";
-import { Switch, ScrollShadow } from "@heroui/react";
-import { Spinner } from "@heroui/react";
 
 import {
   Button,
@@ -12,6 +10,9 @@ import {
   ModalContent,
   ModalHeader,
   ModalBody,
+  Switch,
+  ScrollArea,
+  Spinner,
 } from "@/components/ui";
 import { useTestAgent } from "@/hooks/company";
 
@@ -108,7 +109,7 @@ export function TestChatModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl" scrollBehavior="inside">
+    <Modal isOpen={isOpen} onClose={onClose} size="xl">
       <ModalContent className="h-[600px]">
         <ModalHeader className="flex items-center justify-between border-b border-divider">
           <div className="flex items-center gap-2">
@@ -130,10 +131,10 @@ export function TestChatModal({
 
         <ModalBody className="flex-1 flex flex-col p-0 gap-0">
           {/* Messages */}
-          <ScrollShadow className="flex-1 p-4" ref={scrollRef}>
+          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
             <div className="space-y-4">
               {messages.length === 0 && (
-                <div className="text-center text-default-500 py-8">
+                <div className="text-center text-muted-foreground py-8">
                   <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>Send a message to test your agent</p>
                   <p className="text-sm">
@@ -153,7 +154,7 @@ export function TestChatModal({
                       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
-                          : "bg-default-100"
+                          : "bg-muted"
                       }`}
                     >
                       {message.role === "user" ? (
@@ -166,7 +167,7 @@ export function TestChatModal({
                       className={`rounded-lg px-4 py-2 max-w-[80%] ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
-                          : "bg-default-100"
+                          : "bg-muted"
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -175,7 +176,7 @@ export function TestChatModal({
 
                   {/* Debug info */}
                   {debugMode && message.role === "assistant" && message.reasoning && (
-                    <div className="ml-11 mt-1 p-2 rounded bg-default-50 text-xs text-default-500">
+                    <div className="ml-11 mt-1 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
                       <div className="font-medium mb-1">Debug Info:</div>
                       <div>{message.reasoning}</div>
                       {message.tokensUsed && (
@@ -188,16 +189,16 @@ export function TestChatModal({
 
               {isTesting && (
                 <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-default-100">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
                     <Bot className="h-4 w-4" />
                   </div>
-                  <div className="rounded-lg px-4 py-2 bg-default-100">
+                  <div className="rounded-lg px-4 py-2 bg-muted">
                     <Spinner size="sm" />
                   </div>
                 </div>
               )}
             </div>
-          </ScrollShadow>
+          </ScrollArea>
 
           {/* Input */}
           <div className="p-4 border-t border-divider">
@@ -213,7 +214,7 @@ export function TestChatModal({
                 color="primary"
                 onPress={handleSend}
                 isDisabled={!input.trim() || isTesting}
-                isIconOnly
+                size="icon"
               >
                 {isTesting ? (
                   <Spinner size="sm" color="current" />
@@ -222,7 +223,7 @@ export function TestChatModal({
                 )}
               </Button>
             </div>
-            <p className="text-xs text-default-400 mt-2 text-center">
+            <p className="text-xs text-muted-foreground mt-2 text-center">
               This is a test environment. Responses use the current agent configuration.
             </p>
           </div>

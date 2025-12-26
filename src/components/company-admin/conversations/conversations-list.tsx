@@ -144,9 +144,8 @@ export function ConversationsList({
         return (
           <Card
             key={conversation.id}
-            isPressable
-            onPress={() => onSelect(conversation.id)}
-            className={`transition-colors ${
+            onClick={() => onSelect(conversation.id)}
+            className={`cursor-pointer transition-colors ${
               isSelected ? "border-primary bg-primary/5" : "hover:bg-default-50"
             }`}
           >
@@ -219,10 +218,9 @@ export function ConversationsList({
                 {/* View Button */}
                 {!compact && (
                   <Button
-                    variant="light"
-                    isIconOnly
-                    size="sm"
-                    onPress={() => {
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
                       router.push(`/conversations/${conversation.id}`);
                     }}
                   >

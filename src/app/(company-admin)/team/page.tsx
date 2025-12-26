@@ -9,9 +9,7 @@ import {
   CardHeader,
   Chip,
   Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
+  type DropdownMenuItemData,
   Input,
   Modal,
   ModalBody,
@@ -19,16 +17,15 @@ import {
   ModalFooter,
   ModalHeader,
   Select,
-  SelectItem,
   Skeleton,
-  Table,
+  TableRoot,
   TableBody,
   TableCell,
-  TableColumn,
+  TableHead,
   TableHeader,
   TableRow,
-  useDisclosure,
-} from "@heroui/react";
+} from "@/components/ui";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   Clock,
   Mail,
@@ -54,8 +51,8 @@ import {
 } from "@/hooks/company";
 
 const roleOptions = [
-  { key: "company_admin", label: "Admin", description: "Full access to company settings" },
-  { key: "support_agent", label: "Support Agent", description: "Handle conversations and support" },
+  { key: "chatapp.company_admin", label: "Admin", description: "Full access to company settings" },
+  { key: "chatapp.support_agent", label: "Support Agent", description: "Handle conversations and support" },
 ];
 
 const statusColors: Record<string, "success" | "warning" | "danger" | "default"> = {
@@ -67,9 +64,9 @@ const statusColors: Record<string, "success" | "warning" | "danger" | "default">
 
 function getRoleIcon(role: string) {
   switch (role) {
-    case "company_admin":
+    case "chatapp.company_admin":
       return <ShieldCheck className="w-4 h-4" />;
-    case "support_agent":
+    case "chatapp.support_agent":
       return <Shield className="w-4 h-4" />;
     default:
       return <Shield className="w-4 h-4" />;
@@ -78,11 +75,11 @@ function getRoleIcon(role: string) {
 
 function getRoleLabel(role: string) {
   switch (role) {
-    case "company_admin":
+    case "chatapp.company_admin":
       return "Admin";
-    case "support_agent":
+    case "chatapp.support_agent":
       return "Support Agent";
-    case "master_admin":
+    case "chatapp.master_admin":
       return "Master Admin";
     default:
       return role;
@@ -114,9 +111,9 @@ export default function TeamPage() {
   const roleModal = useDisclosure();
 
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"company_admin" | "support_agent">("support_agent");
+  const [inviteRole, setInviteRole] = useState<"chatapp.company_admin" | "chatapp.support_agent">("chatapp.support_agent");
   const [selectedMember, setSelectedMember] = useState<{ id: string; name: string | null; email: string } | null>(null);
-  const [newRole, setNewRole] = useState<"company_admin" | "support_agent">("support_agent");
+  const [newRole, setNewRole] = useState<"chatapp.company_admin" | "chatapp.support_agent">("chatapp.support_agent");
 
   const handleInvite = async () => {
     if (!inviteEmail) return;
@@ -129,7 +126,7 @@ export default function TeamPage() {
         color: "success",
       });
       setInviteEmail("");
-      setInviteRole("support_agent");
+      setInviteRole("chatapp.support_agent");
       inviteModal.onClose();
       mutate();
     } catch (error) {
@@ -205,7 +202,7 @@ export default function TeamPage() {
 
   const openRoleModal = (member: { id: string; name: string | null; email: string; role: string }) => {
     setSelectedMember(member);
-    setNewRole(member.role as "company_admin" | "support_agent");
+    setNewRole(member.role as "chatapp.company_admin" | "chatapp.support_agent");
     roleModal.onOpen();
   };
 
@@ -220,7 +217,7 @@ export default function TeamPage() {
         title="Team Management"
         description="Manage your team members and invitations"
         actions={
-          <Button color="primary" startContent={<Plus className="w-4 h-4" />} onPress={inviteModal.onOpen}>
+          <Button color="primary" leftIcon={Plus} onClick={inviteModal.onOpen}>
             Invite Member
           </Button>
         }
@@ -234,7 +231,7 @@ export default function TeamPage() {
               <Users className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-default-500">Total Members</p>
+              <p className="text-sm text-muted-foreground">Total Members</p>
               {isLoading ? (
                 <Skeleton className="h-8 w-16 rounded-lg" />
               ) : (
@@ -250,12 +247,12 @@ export default function TeamPage() {
               <ShieldCheck className="w-6 h-6 text-success" />
             </div>
             <div>
-              <p className="text-sm text-default-500">Admins</p>
+              <p className="text-sm text-muted-foreground">Admins</p>
               {isLoading ? (
                 <Skeleton className="h-8 w-16 rounded-lg" />
               ) : (
                 <p className="text-2xl font-bold">
-                  {members.filter((m) => m.role === "company_admin").length}
+                  {members.filter((m) => m.role === "chatapp.company_admin").length}
                 </p>
               )}
             </div>
@@ -268,7 +265,7 @@ export default function TeamPage() {
               <Mail className="w-6 h-6 text-warning" />
             </div>
             <div>
-              <p className="text-sm text-default-500">Pending Invites</p>
+              <p className="text-sm text-muted-foreground">Pending Invites</p>
               {isLoading ? (
                 <Skeleton className="h-8 w-16 rounded-lg" />
               ) : (
@@ -285,92 +282,89 @@ export default function TeamPage() {
           <h3 className="text-lg font-semibold">Team Members</h3>
         </CardHeader>
         <CardBody>
-          <Table aria-label="Team members table" removeWrapper>
-            <TableHeader>
-              <TableColumn>MEMBER</TableColumn>
-              <TableColumn>ROLE</TableColumn>
-              <TableColumn>STATUS</TableColumn>
-              <TableColumn>LAST LOGIN</TableColumn>
-              <TableColumn>JOINED</TableColumn>
-              <TableColumn width={80}>ACTIONS</TableColumn>
-            </TableHeader>
-            <TableBody
-              isLoading={isLoading}
-              loadingContent={<Skeleton className="h-16 w-full rounded-lg" />}
-              emptyContent="No team members found"
-            >
-              {members.map((member, index) => (
-                <TableRow key={member.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar
-                        src={member.avatarUrl ?? undefined}
-                        name={member.name || member.email}
-                        size="sm"
-                      />
-                      <div>
-                        <p className="font-medium">
-                          {member.name || "No name"}
-                          {index === 0 && (
-                            <Chip size="sm" variant="flat" color="primary" className="ml-2">
-                              You
-                            </Chip>
-                          )}
-                        </p>
-                        <p className="text-xs text-default-500">{member.email}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getRoleIcon(member.role)}
-                      <span>{getRoleLabel(member.role)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Chip size="sm" color={statusColors[member.status]} variant="flat">
-                      {member.status}
-                    </Chip>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-default-500">{formatDate(member.lastLoginAt)}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-default-500">{formatDate(member.createdAt)}</span>
-                  </TableCell>
-                  <TableCell>
-                    {index !== 0 && member.role !== "master_admin" && (
-                      <Dropdown>
-                        <DropdownTrigger>
-                          <Button isIconOnly size="sm" variant="light">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownTrigger>
-                        <DropdownMenu aria-label="Member actions">
-                          <DropdownItem
-                            key="role"
-                            startContent={<UserCog className="w-4 h-4" />}
-                            onPress={() => openRoleModal(member)}
-                          >
-                            Change Role
-                          </DropdownItem>
-                          <DropdownItem
-                            key="remove"
-                            startContent={<UserMinus className="w-4 h-4" />}
-                            className="text-danger"
-                            color="danger"
-                            onPress={() => openRemoveModal(member)}
-                          >
-                            Remove from Team
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    )}
-                  </TableCell>
+          {isLoading ? (
+            <Skeleton className="h-16 w-full rounded-lg" />
+          ) : members.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No team members found</p>
+          ) : (
+            <TableRoot>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>MEMBER</TableHead>
+                  <TableHead>ROLE</TableHead>
+                  <TableHead>STATUS</TableHead>
+                  <TableHead>LAST LOGIN</TableHead>
+                  <TableHead>JOINED</TableHead>
+                  <TableHead className="w-20">ACTIONS</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {members.map((member, index) => {
+                  const memberDropdownItems: DropdownMenuItemData[] = [
+                    { key: "role", label: "Change Role", icon: UserCog },
+                    { key: "remove", label: "Remove from Team", icon: UserMinus, isDanger: true },
+                  ];
+                  return (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={member.avatarUrl ?? undefined}
+                            name={member.name || member.email}
+                            size="sm"
+                          />
+                          <div>
+                            <p className="font-medium">
+                              {member.name || "No name"}
+                              {index === 0 && (
+                                <Chip color="primary" className="ml-2">
+                                  You
+                                </Chip>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{member.email}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getRoleIcon(member.role)}
+                          <span>{getRoleLabel(member.role)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Chip color={statusColors[member.status]}>
+                          {member.status}
+                        </Chip>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{formatDate(member.lastLoginAt)}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{formatDate(member.createdAt)}</span>
+                      </TableCell>
+                      <TableCell>
+                        {index !== 0 && member.role !== "chatapp.master_admin" && (
+                          <Dropdown
+                            trigger={
+                              <Button size="icon" variant="ghost">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            }
+                            items={memberDropdownItems}
+                            onAction={(key) => {
+                              if (key === "role") openRoleModal(member);
+                              else if (key === "remove") openRemoveModal(member);
+                            }}
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </TableRoot>
+          )}
         </CardBody>
       </Card>
 
@@ -381,20 +375,22 @@ export default function TeamPage() {
             <h3 className="text-lg font-semibold">Pending Invitations</h3>
           </CardHeader>
           <CardBody>
-            <Table aria-label="Pending invitations table" removeWrapper>
+            <TableRoot>
               <TableHeader>
-                <TableColumn>EMAIL</TableColumn>
-                <TableColumn>ROLE</TableColumn>
-                <TableColumn>EXPIRES</TableColumn>
-                <TableColumn>INVITED BY</TableColumn>
-                <TableColumn width={80}>ACTIONS</TableColumn>
+                <TableRow>
+                  <TableHead>EMAIL</TableHead>
+                  <TableHead>ROLE</TableHead>
+                  <TableHead>EXPIRES</TableHead>
+                  <TableHead>INVITED BY</TableHead>
+                  <TableHead className="w-20">ACTIONS</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {invitations.map((invitation) => (
                   <TableRow key={invitation.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-default-400" />
+                        <Mail className="w-4 h-4 text-muted-foreground" />
                         <span>{invitation.email}</span>
                       </div>
                     </TableCell>
@@ -406,7 +402,7 @@ export default function TeamPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-default-400" />
+                        <Clock className="w-4 h-4 text-muted-foreground" />
                         <span className={isExpired(invitation.expiresAt) ? "text-danger" : ""}>
                           {isExpired(invitation.expiresAt)
                             ? "Expired"
@@ -415,18 +411,17 @@ export default function TeamPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-default-500">
+                      <span className="text-muted-foreground">
                         {invitation.invitedBy.name || invitation.invitedBy.email}
                       </span>
                     </TableCell>
                     <TableCell>
                       <Button
-                        isIconOnly
-                        size="sm"
-                        variant="light"
+                        size="icon"
+                        variant="ghost"
                         color="danger"
                         isLoading={isRevoking}
-                        onPress={() => handleRevokeInvitation(invitation.id)}
+                        onClick={() => handleRevokeInvitation(invitation.id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -434,7 +429,7 @@ export default function TeamPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </TableRoot>
           </CardBody>
         </Card>
       )}
@@ -451,37 +446,29 @@ export default function TeamPage() {
                 type="email"
                 value={inviteEmail}
                 onValueChange={setInviteEmail}
-                startContent={<Mail className="w-4 h-4 text-default-400" />}
+                startContent={<Mail className="w-4 h-4 text-muted-foreground" />}
               />
               <Select
                 label="Role"
                 placeholder="Select a role"
-                selectedKeys={[inviteRole]}
+                options={roleOptions.map((role) => ({ value: role.key, label: role.label }))}
+                selectedKeys={new Set([inviteRole])}
                 onSelectionChange={(keys) => {
                   const selected = Array.from(keys)[0] as string;
-                  if (selected) setInviteRole(selected as "company_admin" | "support_agent");
+                  if (selected) setInviteRole(selected as "chatapp.company_admin" | "chatapp.support_agent");
                 }}
-              >
-                {roleOptions.map((role) => (
-                  <SelectItem key={role.key} textValue={role.label}>
-                    <div>
-                      <p className="font-medium">{role.label}</p>
-                      <p className="text-xs text-default-500">{role.description}</p>
-                    </div>
-                  </SelectItem>
-                ))}
-              </Select>
+              />
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={inviteModal.onClose}>
+            <Button variant="ghost" onClick={inviteModal.onClose}>
               Cancel
             </Button>
             <Button
               color="primary"
               isLoading={isInviting}
-              isDisabled={!inviteEmail}
-              onPress={handleInvite}
+              disabled={!inviteEmail}
+              onClick={handleInvite}
             >
               Send Invitation
             </Button>
@@ -494,33 +481,25 @@ export default function TeamPage() {
         <ModalContent>
           <ModalHeader>Change Role</ModalHeader>
           <ModalBody>
-            <p className="text-default-500 mb-4">
+            <p className="text-muted-foreground mb-4">
               Change role for <strong>{selectedMember?.name || selectedMember?.email}</strong>
             </p>
             <Select
               label="New Role"
               placeholder="Select a role"
-              selectedKeys={[newRole]}
+              options={roleOptions.map((role) => ({ value: role.key, label: role.label }))}
+              selectedKeys={new Set([newRole])}
               onSelectionChange={(keys) => {
                 const selected = Array.from(keys)[0] as string;
-                if (selected) setNewRole(selected as "company_admin" | "support_agent");
+                if (selected) setNewRole(selected as "chatapp.company_admin" | "chatapp.support_agent");
               }}
-            >
-              {roleOptions.map((role) => (
-                <SelectItem key={role.key} textValue={role.label}>
-                  <div>
-                    <p className="font-medium">{role.label}</p>
-                    <p className="text-xs text-default-500">{role.description}</p>
-                  </div>
-                </SelectItem>
-              ))}
-            </Select>
+            />
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={roleModal.onClose}>
+            <Button variant="ghost" onClick={roleModal.onClose}>
               Cancel
             </Button>
-            <Button color="primary" isLoading={isUpdating} onPress={handleUpdateRole}>
+            <Button color="primary" isLoading={isUpdating} onClick={handleUpdateRole}>
               Update Role
             </Button>
           </ModalFooter>
@@ -539,15 +518,15 @@ export default function TeamPage() {
               Are you sure you want to remove{" "}
               <strong>{selectedMember?.name || selectedMember?.email}</strong> from your team?
             </p>
-            <p className="text-sm text-default-500">
+            <p className="text-sm text-muted-foreground">
               They will lose access to all company resources immediately.
             </p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={removeModal.onClose}>
+            <Button variant="ghost" onClick={removeModal.onClose}>
               Cancel
             </Button>
-            <Button color="danger" isLoading={isRemoving} onPress={handleRemoveMember}>
+            <Button color="danger" isLoading={isRemoving} onClick={handleRemoveMember}>
               Remove Member
             </Button>
           </ModalFooter>

@@ -135,12 +135,12 @@ Companies may deploy multiple agents for different purposes:
 ## 4. Pluggable Agent Framework (Unified Execution Environment)
 
 ### 4.1 Design Philosophy
-To ensure maximum performance, low latency, and efficient resource capability, the platform utilizes a **Unified Execution Environment**. Instead of deploying heavy, separate microservices for every agent, custom agent logic is run as dynamically loaded modules (Plugins) within a highly optimized, distinct fleet of "Agent Runners."
+To ensure maximum performance, low latency, and efficient resource capability, the platform utilizes a **Unified Execution Environment**. Instead of deploying heavy, separate microservices for every agent packs, custom agent logic is run as dynamically loaded modules (Plugins) within a highly optimized, distinct fleet of "Agent Runners."
 
 This approach offers:
 - **Zero Cold Starts**: Agents respond instantly.
 - **High Density**: Thousands of agents can run on shared infrastructure, reducing costs.
-- **Strict Isolation**: Using Node.js Worker Threads or V8 Isolates (cloudflare v8) (e.g., `isolated-vm`), each agent's code is sandboxed to prevent it from crashing the platform or accessing other tenants' data.
+- **Strict Isolation**: Using Node.js Worker Threads or Claudflare V8 Isolates (cloudflare v8) (e.g., `isolated-vm`), each agent's code is sandboxed to prevent it from crashing the platform or accessing other tenants' data.
 
 ### 4.2 Universal Agent Runner
 The "Agent Runner" is a specialized service responsible for executing custom agent code.
@@ -152,40 +152,83 @@ The "Agent Runner" is a specialized service responsible for executing custom age
 Agents are packaged as standard Node.js modules.
 
 ```javascript
-// File: index.js
-// The agent exports a factory function or class that meets the Universal Interface
-import { BaseAgent } from "@buzzi/base-agent";
+// ============================================
+// Example 1: Single Agent
+// ============================================
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import { createBuzziAgent, createAgentPackage, AgentTypes } from "@buzzi/base-agent";
 
-export default class SalesAgent extends BaseAgent {
-    constructor(config) {
-        super(config);
-        // Custom initialization
-    }
+// Define tools BEFORE using them
+const searchTool = tool(
+  async ({ query }) => {
+    // Implementation
+  },
+  {
+    name: "web_search",
+    description: "Search the web for information",
+    schema: z.object({ query: z.string().describe("Search query") }),
+  }
+);
 
-    async processMessage(context) {
-        // Custom logic before calling standard LLM
-        if (context.message.includes("discount")) {
-           return this.offerDiscount(context);
-        }
-        return super.processMessage(context);
-    }
-}
+const salesAgent = createBuzziAgent({
+  agentId: "...",
+  type: AgentTypes.Worker,
+  tools: [searchTool]
+});
+
+// Entry point - use default export
+export default createAgentPackage("agent_package_id", salesAgent);
+```
+
+```javascript
+// ============================================
+// Example 2: Multi Agent
+// ============================================
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import { createBuzziAgent, createAgentPackage, AgentTypes } from "@buzzi/base-agent";
+
+// Define worker agents first
+const mathAgent = createBuzziAgent({
+  agentId: "efg...",
+  type: AgentTypes.Worker,
+  tools: [someTool2]
+});
+
+const researchAgent = createBuzziAgent({
+  agentId: "hij...",
+  type: AgentTypes.Worker,
+  tools: [someTool2, someTool3]
+});
+
+// Define supervisor with workers
+const orchestratorAgent = createBuzziAgent({
+  agentId: "abc...",
+  type: AgentTypes.Supervisor,
+  agents: [mathAgent, researchAgent],
+  tools: [someTool]
+});
+
+// Entry point
+export default createAgentPackage("agent_package_id", orchestratorAgent);
+
 ```
 
 **Directory Structure**:
 ```text
-/agent-packages
-  /company_123_sales_v1.zip
+src/agent-packages
+  /[package_id]  
     - index.js          # Entry point
-    - package.json      # Dependencies (must be pre-approved/bundled)
+    - agents/           # Agents
     - tools/            # Custom tools
 ```
 
 ### 4.4 Execution Flow
 1. **Platform receives message** -> Routes to `Agent Runner Service`.
 2. **Runner Service**:
-   - Identifies `agent_id` and `company_id`.
-   - Checks local cache for the Agent's code bundle. if missing, downloads from Supabase Storage.
+   - Identifies `package_id`.
+   - If '/agent-packages/[package_id]' folder exists then load the agent from there. else Checks local cache for the Agent's code bundle. if missing, downloads from Supabase Storage.
    - Spins up a **Worker Thread** (or reuses a warm one).
    - Injects the `context` (User message, History, RAG results).
 3. **Agent Logic**: Executes synchronously or asynchronously within the thread.
@@ -196,7 +239,11 @@ export default class SalesAgent extends BaseAgent {
 - **Hot-Swap**: Updating an agent is as simple as uploading a new `bundle.js`. The next message will automatically use the new code.
 - **Security limits**: The sandbox restricts network access (allowlist only), file system access (read-only), and execution time (timeout prevention).
 
----
+### 4.6 Admin panel options
+- in master admin's admin panel, when agent package adds, give a package id(guid), ask whther its single agent or multi agent
+- if multi agent ask number of agents; 
+- Master admin need options to edit each agent's agent name, designation, system prompt, model and temprature(if model supports temprature). 
+- Show agents list as tabs where tabname will change when name field in that tab updates.
 
 ## 5. Webhook & API Architecture
 

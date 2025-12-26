@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { companySubscriptions, paymentHistory, subscriptionPlans } from "@/lib/db/schema";
 
@@ -65,12 +64,7 @@ export interface BillingResponse {
 
 export async function GET() {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     // Get current subscription with plan details
     const [subscription] = await db

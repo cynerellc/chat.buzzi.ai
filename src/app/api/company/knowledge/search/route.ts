@@ -6,8 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireCompanyAdmin, requireSupportAgent } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireCompanyAccess } from "@/lib/auth/guards";
 import { searchKnowledge, type SearchOptions } from "@/lib/knowledge";
 
 interface SearchRequest {
@@ -21,17 +20,7 @@ interface SearchRequest {
 export async function POST(request: NextRequest) {
   try {
     // Allow both admins and support agents to search
-    try {
-      await requireCompanyAdmin();
-    } catch {
-      await requireSupportAgent();
-    }
-
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAccess();
 
     const body: SearchRequest = await request.json();
 

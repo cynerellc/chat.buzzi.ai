@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -6,6 +7,8 @@ import * as schema from "./schema";
 // Seed script for development/testing
 async function seed() {
   const connectionString = process.env.DATABASE_URL;
+  const adminEmail = process.env.ADMIN_USERNAME || "admin@buzzi.ai";
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is not set");
@@ -272,14 +275,22 @@ Guidelines:
 
     // 5. Create master admin user
     console.log("👤 Creating master admin user...");
+    let hashedPassword: string | null = null;
+    if (adminPassword) {
+      hashedPassword = await bcrypt.hash(adminPassword, 10);
+      console.log(`   Using password from ADMIN_PASSWORD env variable`);
+    } else {
+      console.log(`   ⚠️ No ADMIN_PASSWORD set - admin will need to use OAuth or reset password`);
+    }
     const masterAdminResult = await db
       .insert(schema.users)
       .values({
-        email: "admin@buzzi.ai",
+        email: adminEmail,
         name: "Master Admin",
-        role: "master_admin",
+        role: "chatapp.master_admin",
         status: "active",
         isActive: true,
+        hashedPassword,
       })
       .returning();
     const masterAdmin = masterAdminResult[0];
@@ -295,8 +306,7 @@ Guidelines:
       .values({
         email: "admin@demo.com",
         name: "Demo Admin",
-        companyId: demoCompany.id,
-        role: "company_admin",
+        role: "chatapp.user",
         status: "active",
         isActive: true,
       })
@@ -305,7 +315,14 @@ Guidelines:
     if (!companyAdmin) {
       throw new Error("Failed to create company admin");
     }
-    console.log(`   ✓ Created user: ${companyAdmin.email}\n`);
+
+    // Add company_admin permission for demo company
+    await db.insert(schema.companyPermissions).values({
+      companyId: demoCompany.id,
+      userId: companyAdmin.id,
+      role: "chatapp.company_admin",
+    });
+    console.log(`   ✓ Created user: ${companyAdmin.email} (company admin)\n`);
 
     // 7. Create support agent
     console.log("👤 Creating support agent user...");
@@ -314,8 +331,7 @@ Guidelines:
       .values({
         email: "agent@demo.com",
         name: "Demo Agent",
-        companyId: demoCompany.id,
-        role: "support_agent",
+        role: "chatapp.user",
         status: "active",
         isActive: true,
       })
@@ -324,7 +340,14 @@ Guidelines:
     if (!supportAgent) {
       throw new Error("Failed to create support agent");
     }
-    console.log(`   ✓ Created user: ${supportAgent.email}\n`);
+
+    // Add support_agent permission for demo company
+    await db.insert(schema.companyPermissions).values({
+      companyId: demoCompany.id,
+      userId: supportAgent.id,
+      role: "chatapp.support_agent",
+    });
+    console.log(`   ✓ Created user: ${supportAgent.email} (support agent)\n`);
 
     // 8. Create a demo AI agent
     console.log("🤖 Creating demo AI agent...");
@@ -356,10 +379,10 @@ Guidelines:
 
     console.log("✅ Seed completed successfully!\n");
     console.log("Demo Credentials:");
-    console.log("  Master Admin: admin@buzzi.ai");
+    console.log(`  Master Admin: ${adminEmail}${adminPassword ? " (password set from ADMIN_PASSWORD)" : ""}`);
     console.log("  Company Admin: admin@demo.com");
     console.log("  Support Agent: agent@demo.com");
-    console.log("\n(Note: These users have no passwords set. Use OAuth or set passwords manually.)\n");
+    console.log("\n(Note: Company admin and support agent have no passwords set. Use OAuth or set passwords manually.)\n");
   } catch (error) {
     console.error("❌ Seed failed:", error);
     throw error;

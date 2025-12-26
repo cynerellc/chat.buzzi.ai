@@ -3,7 +3,6 @@
 import { useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, Trash2, AlertTriangle, Shield, Key, Webhook } from "lucide-react";
-import { addToast, Switch, Textarea } from "@heroui/react";
 
 import {
   Button,
@@ -12,13 +11,15 @@ import {
   CardBody,
   Input,
   Select,
-  Badge,
   Skeleton,
   Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Switch,
+  Textarea,
+  addToast,
 } from "@/components/ui";
 import { useAgent, type AgentDetail } from "@/hooks/company";
 
@@ -122,9 +123,9 @@ export default function AgentSettingsPage({ params }: PageProps) {
   if (!agent) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <p className="text-default-500">Agent not found</p>
-        <Button as={Link} href="/agents" variant="bordered">
-          Back to Agents
+        <p className="text-muted-foreground">Agent not found</p>
+        <Button asChild variant="outline">
+          <Link href="/agents">Back to Agents</Link>
         </Button>
       </div>
     );
@@ -136,12 +137,14 @@ export default function AgentSettingsPage({ params }: PageProps) {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <Button as={Link} href={`/agents/${agentId}`} variant="light" isIconOnly aria-label="Back">
-              <ArrowLeft size={18} />
+            <Button asChild variant="ghost" size="icon" aria-label="Back">
+              <Link href={`/agents/${agentId}`}>
+                <ArrowLeft size={18} />
+              </Link>
             </Button>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">{agent.name} Settings</h1>
-              <p className="text-default-500">Configure advanced settings for this agent</p>
+              <p className="text-muted-foreground">Configure advanced settings for this agent</p>
             </div>
           </div>
           <Button color="primary" leftIcon={Save} onPress={handleSave} isLoading={isSaving}>
@@ -172,7 +175,7 @@ export default function AgentSettingsPage({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Enable Logging</p>
-                <p className="text-sm text-default-500">Log all agent interactions for debugging</p>
+                <p className="text-sm text-muted-foreground">Log all agent interactions for debugging</p>
               </div>
               <Switch
                 isSelected={settings.enableLogging}
@@ -183,7 +186,7 @@ export default function AgentSettingsPage({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Enable Analytics</p>
-                <p className="text-sm text-default-500">Track conversation metrics and performance</p>
+                <p className="text-sm text-muted-foreground">Track conversation metrics and performance</p>
               </div>
               <Switch
                 isSelected={settings.enableAnalytics}
@@ -216,7 +219,7 @@ export default function AgentSettingsPage({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Allow Anonymous Users</p>
-                <p className="text-sm text-default-500">Allow users to chat without identification</p>
+                <p className="text-sm text-muted-foreground">Allow users to chat without identification</p>
               </div>
               <Switch
                 isSelected={settings.allowAnonymous}
@@ -227,7 +230,7 @@ export default function AgentSettingsPage({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Require API Key</p>
-                <p className="text-sm text-default-500">Require API key for widget embedding</p>
+                <p className="text-sm text-muted-foreground">Require API key for widget embedding</p>
               </div>
               <Switch
                 isSelected={settings.apiKeyRequired}
@@ -286,11 +289,11 @@ export default function AgentSettingsPage({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Delete Agent</p>
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-muted-foreground">
                   Permanently delete this agent and all its data. This action cannot be undone.
                 </p>
               </div>
-              <Button color="danger" variant="bordered" leftIcon={Trash2} onPress={() => setShowDeleteModal(true)}>
+              <Button color="danger" variant="outline" leftIcon={Trash2} onPress={() => setShowDeleteModal(true)}>
                 Delete Agent
               </Button>
             </div>
@@ -309,13 +312,13 @@ export default function AgentSettingsPage({ params }: PageProps) {
             <p>
               Are you sure you want to delete <strong>{agent.name}</strong>?
             </p>
-            <p className="text-sm text-default-500">
+            <p className="text-sm text-muted-foreground">
               This will permanently delete the agent and all associated conversations, analytics,
               and configuration. This action cannot be undone.
             </p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setShowDeleteModal(false)}>
+            <Button variant="ghost" onPress={() => setShowDeleteModal(false)}>
               Cancel
             </Button>
             <Button color="danger" isLoading={isDeleting} onPress={handleDelete}>

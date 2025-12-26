@@ -38,10 +38,10 @@ export function Sparkline({
   const effectiveColor =
     color ??
     (effectiveTrend === "up"
-      ? "hsl(var(--heroui-success))"
+      ? "hsl(var(--success))"
       : effectiveTrend === "down"
-        ? "hsl(var(--heroui-danger))"
-        : "hsl(var(--heroui-default-400))");
+        ? "hsl(var(--destructive))"
+        : "hsl(var(--muted-foreground))");
 
   // Calculate min/max for proper scaling
   const minValue = Math.min(...data);

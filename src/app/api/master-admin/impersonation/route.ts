@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { companyPermissions, users } from "@/lib/db/schema";
 import { startImpersonation, endImpersonation, getImpersonationSession } from "@/lib/auth/impersonation";
 import { createAuditLog } from "@/lib/audit/logger";
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Must be master admin
-    if (session.user.role !== "master_admin") {
+    if (session.user.role !== "chatapp.master_admin") {
       return NextResponse.json(
         { error: "Only master admins can impersonate users" },
         { status: 403 }
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cannot impersonate another master admin
-    if (targetUser[0].role === "master_admin") {
+    if (targetUser[0].role === "chatapp.master_admin") {
       return NextResponse.json(
         { error: "Cannot impersonate another master admin" },
         { status: 403 }
@@ -153,6 +153,16 @@ export async function GET() {
       .where(eq(users.id, impersonationSession.impersonatedUserId))
       .limit(1);
 
+    // Get the user's company and role from company_permissions
+    const [permission] = await db
+      .select({
+        companyId: companyPermissions.companyId,
+        companyRole: companyPermissions.role,
+      })
+      .from(companyPermissions)
+      .where(eq(companyPermissions.userId, impersonationSession.impersonatedUserId))
+      .limit(1);
+
     return NextResponse.json({
       active: true,
       session: {
@@ -160,8 +170,8 @@ export async function GET() {
         targetUserName: targetUser[0]
           ? targetUser[0].name || targetUser[0].email
           : impersonationSession.impersonatedUserEmail,
-        targetUserRole: targetUser[0]?.role,
-        targetCompanyId: targetUser[0]?.companyId,
+        targetUserRole: permission?.companyRole ?? targetUser[0]?.role,
+        targetCompanyId: permission?.companyId ?? null,
       },
     });
   } catch (error) {

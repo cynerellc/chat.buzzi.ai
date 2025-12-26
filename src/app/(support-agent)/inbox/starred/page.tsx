@@ -170,10 +170,10 @@ export default function StarredInboxPage() {
             </Button>
           </div>
         ) : conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-default-400">
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <Star size={64} className="opacity-30 mb-4" />
             <p className="text-sm font-medium">No starred conversations</p>
-            <p className="text-xs text-default-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Star important conversations to find them quickly
             </p>
           </div>
@@ -192,7 +192,7 @@ export default function StarredInboxPage() {
                       e.stopPropagation();
                       toggleStar(conversation.id);
                     }}
-                    className="mt-1 text-warning hover:text-default-400 transition-colors"
+                    className="mt-1 text-warning hover:text-muted-foreground transition-colors"
                   >
                     <Star size={18} className="fill-warning" />
                   </button>
@@ -213,7 +213,7 @@ export default function StarredInboxPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-xs text-default-400">
+                        <span className="text-xs text-muted-foreground">
                           {conversation.lastMessageAt
                             ? formatDistanceToNow(new Date(conversation.lastMessageAt), {
                                 addSuffix: true,
@@ -226,7 +226,7 @@ export default function StarredInboxPage() {
 
                     {/* Last message preview */}
                     {conversation.lastMessage && (
-                      <p className="text-sm text-default-500 truncate mt-1">
+                      <p className="text-sm text-muted-foreground truncate mt-1">
                         {conversation.lastMessage.role === "user" && (
                           <User size={12} className="inline mr-1" />
                         )}
@@ -240,12 +240,12 @@ export default function StarredInboxPage() {
                     {/* Tags and Agent */}
                     <div className="flex items-center gap-2 mt-2">
                       {conversation.agent && (
-                        <Chip size="sm" variant="flat" className="text-xs">
+                        <Chip size="sm"  className="text-xs">
                           {conversation.agent.name}
                         </Chip>
                       )}
                       {(conversation.tags as string[])?.slice(0, 3).map((tag) => (
-                        <Chip key={tag} size="sm" variant="bordered" className="text-xs">
+                        <Chip key={tag} size="sm" chipVariant="faded" className="text-xs">
                           {tag}
                         </Chip>
                       ))}

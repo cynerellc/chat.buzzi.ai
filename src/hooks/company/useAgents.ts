@@ -27,6 +27,18 @@ export function useAgents(status?: string) {
   };
 }
 
+// Variable value with definition for display
+export interface AgentVariableValue {
+  name: string;
+  displayName: string;
+  description?: string;
+  variableType: "variable" | "secured_variable";
+  dataType: "string" | "number" | "boolean" | "json";
+  required: boolean;
+  placeholder?: string;
+  value: string | null;
+}
+
 // Agent Detail
 export interface AgentDetail {
   id: string;
@@ -63,7 +75,20 @@ export interface AgentDetail {
     id: string;
     name: string;
     slug: string;
+    variables?: Array<{
+      name: string;
+      displayName: string;
+      description?: string;
+      variableType: "variable" | "secured_variable";
+      dataType: "string" | "number" | "boolean" | "json";
+      required: boolean;
+      placeholder?: string;
+    }>;
   } | null;
+  // Variable values with their definitions for the UI
+  variableValues?: AgentVariableValue[];
+  // Raw variable values (key-value) for editing
+  rawVariableValues?: Record<string, string>;
 }
 
 export function useAgent(agentId: string | null) {
@@ -121,6 +146,7 @@ async function createAgent(
     modelId?: string;
     temperature?: number;
     behavior?: Record<string, unknown>;
+    variableValues?: Record<string, string>;
   }}
 ) {
   const response = await fetch(url, {

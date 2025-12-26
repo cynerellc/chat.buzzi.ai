@@ -4,7 +4,6 @@ import {
   index,
   integer,
   jsonb,
-  pgTable,
   text,
   timestamp,
   uuid,
@@ -15,6 +14,7 @@ import { agents } from "./agents";
 import { companies } from "./companies";
 import {
   channelTypeEnum,
+  chatappSchema,
   conversationStatusEnum,
   escalationPriorityEnum,
   escalationStatusEnum,
@@ -25,8 +25,8 @@ import {
 import { users } from "./users";
 
 // End Users Table (visitors/customers who chat)
-export const endUsers = pgTable(
-  "chatapp_end_users",
+export const endUsers = chatappSchema.table(
+  "end_users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -71,8 +71,8 @@ export const endUsers = pgTable(
 );
 
 // Conversations Table
-export const conversations = pgTable(
-  "chatapp_conversations",
+export const conversations = chatappSchema.table(
+  "conversations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -138,8 +138,8 @@ export const conversations = pgTable(
 );
 
 // Messages Table
-export const messages = pgTable(
-  "chatapp_messages",
+export const messages = chatappSchema.table(
+  "messages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -189,8 +189,8 @@ export const messages = pgTable(
 );
 
 // Escalations Table
-export const escalations = pgTable(
-  "chatapp_escalations",
+export const escalations = chatappSchema.table(
+  "escalations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -220,6 +220,10 @@ export const escalations = pgTable(
     returnedToAi: boolean("returned_to_ai").default(false).notNull(),
     returnedAt: timestamp("returned_at"),
 
+    // Metrics (in seconds)
+    waitTime: integer("wait_time"), // Time from creation to assignment
+    handleTime: integer("handle_time"), // Time from assignment to resolution
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -233,8 +237,8 @@ export const escalations = pgTable(
 );
 
 // Canned Responses Table (quick reply templates for support agents)
-export const cannedResponses = pgTable(
-  "chatapp_canned_responses",
+export const cannedResponses = chatappSchema.table(
+  "canned_responses",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -269,8 +273,8 @@ export const cannedResponses = pgTable(
 );
 
 // Conversation Notes Table (internal notes from support agents)
-export const conversationNotes = pgTable(
-  "chatapp_conversation_notes",
+export const conversationNotes = chatappSchema.table(
+  "conversation_notes",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -305,8 +309,8 @@ export const conversationNotes = pgTable(
 );
 
 // Support Agent Status Table
-export const supportAgentStatus = pgTable(
-  "chatapp_support_agent_status",
+export const supportAgentStatus = chatappSchema.table(
+  "support_agent_status",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 

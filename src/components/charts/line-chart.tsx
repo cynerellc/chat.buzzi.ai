@@ -40,11 +40,11 @@ export interface LineChartProps {
 }
 
 const defaultColors = [
-  "hsl(var(--heroui-primary))",
-  "hsl(var(--heroui-secondary))",
-  "hsl(var(--heroui-success))",
-  "hsl(var(--heroui-warning))",
-  "hsl(var(--heroui-danger))",
+  "hsl(var(--primary))",
+  "hsl(var(--secondary))",
+  "hsl(var(--success))",
+  "hsl(var(--warning))",
+  "hsl(var(--destructive))",
 ];
 
 export function LineChart({
@@ -65,27 +65,27 @@ export function LineChart({
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="hsl(var(--heroui-divider))"
+              stroke="hsl(var(--border))"
               vertical={false}
             />
           )}
           <XAxis
             dataKey={xAxisKey}
-            tick={{ fontSize: 12, fill: "hsl(var(--heroui-default-500))" }}
-            axisLine={{ stroke: "hsl(var(--heroui-divider))" }}
+            tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+            axisLine={{ stroke: "hsl(var(--border))" }}
             tickLine={false}
           />
           <YAxis
             width={yAxisWidth}
-            tick={{ fontSize: 12, fill: "hsl(var(--heroui-default-500))" }}
+            tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
             axisLine={false}
             tickLine={false}
           />
           {showTooltip && (
             <Tooltip
               contentStyle={{
-                backgroundColor: "hsl(var(--heroui-content1))",
-                border: "1px solid hsl(var(--heroui-divider))",
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
                 fontSize: "12px",
               }}

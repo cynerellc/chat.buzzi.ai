@@ -17,8 +17,6 @@ import {
   ChevronUp,
   RefreshCw,
 } from "lucide-react";
-import { Textarea, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
-import { addToast } from "@heroui/react";
 
 import {
   Button,
@@ -27,6 +25,13 @@ import {
   CardHeader,
   CardBody,
   Badge,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Textarea,
+  addToast,
 } from "@/components/ui";
 import { useKnowledgeSource, useKnowledgeChunks, useUpdateKnowledgeSource, useDeleteKnowledgeSource } from "@/hooks/company";
 
@@ -148,7 +153,7 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-default-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -156,10 +161,10 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
   if (!source) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
-        <FileText className="h-12 w-12 text-default-300 mb-4" />
-        <p className="text-default-500 font-medium">Knowledge source not found</p>
+        <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+        <p className="text-muted-foreground font-medium">Knowledge source not found</p>
         <Button
-          variant="bordered"
+          variant="outline"
           className="mt-4"
           onPress={() => router.push("/knowledge")}
         >
@@ -179,14 +184,14 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
-            variant="light"
-            isIconOnly
+            variant="ghost"
+            size="icon"
             onPress={() => router.push("/knowledge")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-default-100">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
               <TypeIcon className="h-6 w-6" />
             </div>
             <div>
@@ -198,21 +203,21 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
                 </Badge>
               </div>
               {source.description && (
-                <p className="text-default-500">{source.description}</p>
+                <p className="text-muted-foreground">{source.description}</p>
               )}
             </div>
           </div>
         </div>
         <div className="flex gap-2">
           <Button
-            variant="bordered"
+            variant="outline"
             leftIcon={Edit2}
             onPress={handleStartEdit}
           >
             Edit
           </Button>
           <Button
-            variant="bordered"
+            variant="outline"
             leftIcon={Trash2}
             className="text-danger"
             onPress={() => setShowDeleteModal(true)}
@@ -230,38 +235,38 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
         <CardBody>
           <dl className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <dt className="text-sm text-default-500">Type</dt>
+              <dt className="text-sm text-muted-foreground">Type</dt>
               <dd className="font-medium capitalize">{source.type}</dd>
             </div>
             <div>
-              <dt className="text-sm text-default-500">Status</dt>
+              <dt className="text-sm text-muted-foreground">Status</dt>
               <dd className="font-medium capitalize">{source.status}</dd>
             </div>
             <div>
-              <dt className="text-sm text-default-500">Chunks</dt>
+              <dt className="text-sm text-muted-foreground">Chunks</dt>
               <dd className="font-medium">{source.chunkCount}</dd>
             </div>
             <div>
-              <dt className="text-sm text-default-500">Tokens</dt>
+              <dt className="text-sm text-muted-foreground">Tokens</dt>
               <dd className="font-medium">{formatTokenCount(source.tokenCount)}</dd>
             </div>
             <div>
-              <dt className="text-sm text-default-500">Created</dt>
+              <dt className="text-sm text-muted-foreground">Created</dt>
               <dd className="font-medium">{formatDate(source.createdAt)}</dd>
             </div>
             <div>
-              <dt className="text-sm text-default-500">Last Updated</dt>
+              <dt className="text-sm text-muted-foreground">Last Updated</dt>
               <dd className="font-medium">{formatDate(source.updatedAt)}</dd>
             </div>
             {source.lastProcessedAt && (
               <div>
-                <dt className="text-sm text-default-500">Last Processed</dt>
+                <dt className="text-sm text-muted-foreground">Last Processed</dt>
                 <dd className="font-medium">{formatDate(source.lastProcessedAt)}</dd>
               </div>
             )}
             {source.vectorCollectionId && (
               <div>
-                <dt className="text-sm text-default-500">Vector Collection</dt>
+                <dt className="text-sm text-muted-foreground">Vector Collection</dt>
                 <dd className="font-medium text-xs truncate">{source.vectorCollectionId}</dd>
               </div>
             )}
@@ -270,7 +275,7 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
           {/* Source Config */}
           {source.type === "url" && Boolean(source.sourceConfig.url) && (
             <div className="mt-6 pt-4 border-t border-divider">
-              <h3 className="text-sm font-medium text-default-500 mb-2">Source URL</h3>
+              <h3 className="text-sm font-medium text-muted-foreground mb-2">Source URL</h3>
               <a
                 href={String(source.sourceConfig.url)}
                 target="_blank"
@@ -284,8 +289,8 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
 
           {source.type === "text" && Boolean(source.sourceConfig.content) && (
             <div className="mt-6 pt-4 border-t border-divider">
-              <h3 className="text-sm font-medium text-default-500 mb-2">Original Content</h3>
-              <pre className="whitespace-pre-wrap text-sm bg-default-50 p-4 rounded-lg max-h-64 overflow-y-auto">
+              <h3 className="text-sm font-medium text-muted-foreground mb-2">Original Content</h3>
+              <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg max-h-64 overflow-y-auto">
                 {String(source.sourceConfig.content)}
               </pre>
             </div>
@@ -300,7 +305,7 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
               </div>
               <p className="text-danger-600 text-sm">{source.processingError}</p>
               <Button
-                variant="bordered"
+                variant="outline"
                 size="sm"
                 className="mt-3"
                 leftIcon={RefreshCw}
@@ -320,13 +325,13 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
         <CardBody className="p-0">
           {isLoadingChunks ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-default-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : chunks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-8 w-8 text-default-300 mb-2" />
-              <p className="text-default-500">No chunks yet</p>
-              <p className="text-default-400 text-sm">
+              <FileText className="h-8 w-8 text-muted-foreground/50 mb-2" />
+              <p className="text-muted-foreground">No chunks yet</p>
+              <p className="text-muted-foreground text-sm">
                 Chunks will appear here once the source is processed
               </p>
             </div>
@@ -343,7 +348,7 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
                             <Badge variant="default">Chunk {chunk.chunkIndex + 1}</Badge>
-                            <span className="text-xs text-default-400">
+                            <span className="text-xs text-muted-foreground">
                               {chunk.tokenCount} tokens
                             </span>
                             {chunk.vectorId && (
@@ -352,14 +357,14 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
                               </Badge>
                             )}
                           </div>
-                          <pre className="whitespace-pre-wrap text-sm text-default-700 font-sans">
+                          <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
                             {shouldTruncate && !isExpanded
                               ? `${chunk.content.slice(0, 300)}...`
                               : chunk.content}
                           </pre>
                           {shouldTruncate && (
                             <Button
-                              variant="light"
+                              variant="ghost"
                               size="sm"
                               className="mt-2"
                               onPress={() => toggleChunkExpanded(chunk.id)}
@@ -388,20 +393,20 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
               {(chunksPagination.hasMore || chunksPage > 1) && (
                 <div className="flex items-center justify-center gap-2 p-4 border-t border-divider">
                   <Button
-                    variant="bordered"
+                    variant="outline"
                     size="sm"
-                    isDisabled={chunksPage <= 1}
+                    disabled={chunksPage <= 1}
                     onPress={() => setChunksPage((p) => p - 1)}
                   >
                     Previous
                   </Button>
-                  <span className="text-sm text-default-500">
+                  <span className="text-sm text-muted-foreground">
                     Page {chunksPage}
                   </span>
                   <Button
-                    variant="bordered"
+                    variant="outline"
                     size="sm"
-                    isDisabled={!chunksPagination.hasMore}
+                    disabled={!chunksPagination.hasMore}
                     onPress={() => setChunksPage((p) => p + 1)}
                   >
                     Next
@@ -432,7 +437,7 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
             />
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={handleCancelEdit}>
+            <Button variant="ghost" onPress={handleCancelEdit}>
               Cancel
             </Button>
             <Button
@@ -454,12 +459,12 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
             <p>
               Are you sure you want to delete &quot;{source.name}&quot;? This action cannot be undone.
             </p>
-            <p className="text-default-500 text-sm mt-2">
+            <p className="text-muted-foreground text-sm mt-2">
               All {source.chunkCount} chunks and vector embeddings will be removed.
             </p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setShowDeleteModal(false)}>
+            <Button variant="ghost" onPress={() => setShowDeleteModal(false)}>
               Cancel
             </Button>
             <Button

@@ -9,9 +9,10 @@ import {
   Badge,
   Button,
   Card,
-  DropdownItem,
   DropdownMenu,
-  DropdownTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Input,
   Modal,
   ModalBody,
@@ -24,7 +25,6 @@ import {
   type BadgeVariant,
   type Column,
 } from "@/components/ui";
-import { Dropdown } from "@heroui/react";
 import { addCompanyUser, useCompanyUsers } from "@/hooks/master-admin";
 
 interface CompanyUsersProps {
@@ -32,8 +32,8 @@ interface CompanyUsersProps {
 }
 
 const roleBadgeVariants: Record<string, BadgeVariant> = {
-  company_admin: "info",
-  support_agent: "default",
+  "chatapp.company_admin": "info",
+  "chatapp.support_agent": "default",
 };
 
 const statusBadgeVariants: Record<string, BadgeVariant> = {
@@ -49,7 +49,7 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
   const [formData, setFormData] = useState({
     email: "",
     name: "",
-    role: "support_agent" as "company_admin" | "support_agent",
+    role: "chatapp.support_agent" as "chatapp.company_admin" | "chatapp.support_agent",
     sendInvite: true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,7 +69,7 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
       setFormData({
         email: "",
         name: "",
-        role: "support_agent",
+        role: "chatapp.support_agent",
         sendInvite: true,
       });
       setIsAddModalOpen(false);
@@ -90,7 +90,7 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
           <UserAvatar name={item.name ?? item.email} size="sm" />
           <div>
             <p className="font-medium">{item.name ?? "No name"}</p>
-            <p className="text-xs text-default-400">{item.email}</p>
+            <p className="text-xs text-muted-foreground">{item.email}</p>
           </div>
         </div>
       ),
@@ -117,7 +117,7 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
       key: "lastLogin",
       label: "Last Login",
       render: (item) => (
-        <span className="text-sm text-default-500">
+        <span className="text-sm text-muted-foreground">
           {item.lastLoginAt
             ? formatDistanceToNow(new Date(item.lastLoginAt), { addSuffix: true })
             : "Never"}
@@ -130,24 +130,24 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
       width: 60,
       align: "end",
       render: () => (
-        <Dropdown>
-          <DropdownTrigger>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
-              className="p-1.5 rounded-lg hover:bg-default-100 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
               aria-label="Actions"
             >
-              <MoreHorizontal size={18} className="text-default-500" />
+              <MoreHorizontal size={18} className="text-muted-foreground" />
             </button>
-          </DropdownTrigger>
-          <DropdownMenu aria-label="User actions">
-            <DropdownItem key="edit">Edit User</DropdownItem>
-            <DropdownItem key="role">Change Role</DropdownItem>
-            <DropdownItem key="resend">Resend Invite</DropdownItem>
-            <DropdownItem key="remove" className="text-danger" color="danger">
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>Edit User</DropdownMenuItem>
+            <DropdownMenuItem>Change Role</DropdownMenuItem>
+            <DropdownMenuItem>Resend Invite</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive focus:text-destructive">
               Remove User
-            </DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];
@@ -159,9 +159,8 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
           <h3 className="font-semibold">Company Users</h3>
           <Button
             size="sm"
-            color="primary"
             startContent={<UserPlus size={16} />}
-            onPress={() => setIsAddModalOpen(true)}
+            onClick={() => setIsAddModalOpen(true)}
           >
             Add User
           </Button>
@@ -173,7 +172,7 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
           keyField="id"
           isLoading={isLoading}
           emptyMessage="No users found"
-          emptyIcon={<Plus size={48} className="text-default-300 mb-4" />}
+          emptyIcon={<Plus size={48} className="text-muted-foreground/50 mb-4" />}
         />
       </Card>
 
@@ -201,10 +200,10 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
               label="Name"
               placeholder="Enter user name"
               value={formData.name}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, name: value }))
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
-              isRequired
+              required
             />
 
             <Input
@@ -212,39 +211,38 @@ export function CompanyUsers({ companyId }: CompanyUsersProps) {
               type="email"
               placeholder="user@example.com"
               value={formData.email}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, email: value }))
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, email: e.target.value }))
               }
-              isRequired
+              required
             />
 
             <Select
               label="Role"
               selectedKeys={new Set([formData.role])}
               onSelectionChange={(keys) => {
-                const selected = Array.from(keys)[0] as "company_admin" | "support_agent";
+                const selected = Array.from(keys)[0] as "chatapp.company_admin" | "chatapp.support_agent";
                 setFormData((prev) => ({ ...prev, role: selected }));
               }}
               options={[
-                { value: "support_agent", label: "Support Agent" },
-                { value: "company_admin", label: "Company Admin" },
+                { value: "chatapp.support_agent", label: "Support Agent" },
+                { value: "chatapp.company_admin", label: "Company Admin" },
               ]}
             />
           </ModalBody>
           <ModalFooter>
             <Button
-              variant="flat"
-              onPress={() => setIsAddModalOpen(false)}
-              isDisabled={isSubmitting}
+              variant="secondary"
+              onClick={() => setIsAddModalOpen(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
-              color="primary"
-              onPress={handleAddUser}
-              isLoading={isSubmitting}
+              onClick={handleAddUser}
+              disabled={isSubmitting}
             >
-              Add User
+              {isSubmitting ? "Adding..." : "Add User"}
             </Button>
           </ModalFooter>
         </ModalContent>

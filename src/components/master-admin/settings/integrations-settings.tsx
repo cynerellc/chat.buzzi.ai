@@ -92,7 +92,7 @@ export function IntegrationsSettings() {
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">Platform Integrations</h3>
         <Button
-          variant="flat"
+          variant="secondary"
           size="sm"
           startContent={<RefreshCw size={14} />}
           onPress={() => mutate()}

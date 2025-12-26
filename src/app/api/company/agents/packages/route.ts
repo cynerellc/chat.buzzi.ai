@@ -3,7 +3,19 @@ import { and, eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agentPackages } from "@/lib/db/schema";
+import { agentPackages, type PackageVariableDefinition } from "@/lib/db/schema";
+
+// Variable definition for agent packages
+export interface PackageVariableItem {
+  name: string;
+  displayName: string;
+  description?: string;
+  variableType: "variable" | "secured_variable";
+  dataType: "string" | "number" | "boolean" | "json";
+  defaultValue?: string;
+  required: boolean;
+  placeholder?: string;
+}
 
 export interface AgentPackageItem {
   id: string;
@@ -12,13 +24,14 @@ export interface AgentPackageItem {
   description: string | null;
   category: string | null;
   features: unknown[];
+  variables: PackageVariableItem[];
 }
 
 export async function GET() {
   try {
     await requireCompanyAdmin();
 
-    // Get all active and public packages
+    // Get all active and public packages with their variable definitions
     const packages = await db
       .select({
         id: agentPackages.id,
@@ -27,6 +40,7 @@ export async function GET() {
         description: agentPackages.description,
         category: agentPackages.category,
         features: agentPackages.features,
+        variables: agentPackages.variables,
       })
       .from(agentPackages)
       .where(
@@ -37,7 +51,27 @@ export async function GET() {
       )
       .orderBy(agentPackages.sortOrder, agentPackages.name);
 
-    return NextResponse.json({ packages });
+    // Transform variables to a clean format
+    const transformedPackages: AgentPackageItem[] = packages.map((pkg) => ({
+      id: pkg.id,
+      name: pkg.name,
+      slug: pkg.slug,
+      description: pkg.description,
+      category: pkg.category,
+      features: pkg.features as unknown[],
+      variables: ((pkg.variables as PackageVariableDefinition[]) || []).map((v) => ({
+        name: v.name,
+        displayName: v.displayName,
+        description: v.description,
+        variableType: v.variableType,
+        dataType: v.dataType,
+        defaultValue: v.variableType === "secured_variable" ? undefined : v.defaultValue,
+        required: v.required,
+        placeholder: v.placeholder,
+      })),
+    }));
+
+    return NextResponse.json({ packages: transformedPackages });
   } catch (error) {
     console.error("Error fetching agent packages:", error);
     return NextResponse.json(

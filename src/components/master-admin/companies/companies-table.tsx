@@ -17,16 +17,16 @@ import type { CompanyListItem } from "@/app/api/master-admin/companies/route";
 import {
   Badge,
   Checkbox,
-  DropdownItem,
   DropdownMenu,
-  DropdownTrigger,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
   Table,
   UserAvatar,
   type BadgeVariant,
   type Column,
   type SortDescriptor,
 } from "@/components/ui";
-import { Dropdown } from "@heroui/react";
 
 interface CompaniesTableProps {
   companies: CompanyListItem[];
@@ -104,7 +104,7 @@ export function CompaniesTable({
             <p className="font-medium truncate group-hover:text-primary transition-colors">
               {item.name}
             </p>
-            <p className="text-xs text-default-400 truncate">
+            <p className="text-xs text-muted-foreground truncate">
               {item.domain ?? item.slug}
             </p>
           </div>
@@ -120,7 +120,7 @@ export function CompaniesTable({
             {item.plan.name}
           </Badge>
         ) : (
-          <span className="text-default-400 text-sm">No plan</span>
+          <span className="text-muted-foreground text-sm">No plan</span>
         ),
     },
     {
@@ -129,7 +129,7 @@ export function CompaniesTable({
       sortable: true,
       align: "center",
       render: (item) => (
-        <div className="flex items-center gap-1 text-default-600">
+        <div className="flex items-center gap-1 text-muted-foreground">
           <Users size={14} />
           <span>{item.usersCount}</span>
         </div>
@@ -150,7 +150,7 @@ export function CompaniesTable({
       label: "Created",
       sortable: true,
       render: (item) => (
-        <span className="text-sm text-default-500">
+        <span className="text-sm text-muted-foreground">
           {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
         </span>
       ),
@@ -161,48 +161,41 @@ export function CompaniesTable({
       width: 60,
       align: "end",
       render: (item) => (
-        <Dropdown>
-          <DropdownTrigger>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
-              className="p-1.5 rounded-lg hover:bg-default-100 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
               aria-label="Actions"
             >
-              <MoreHorizontal size={18} className="text-default-500" />
+              <MoreHorizontal size={18} className="text-muted-foreground" />
             </button>
-          </DropdownTrigger>
-          <DropdownMenu aria-label="Company actions">
-            <DropdownItem
-              key="view"
-              href={`/admin/companies/${item.id}`}
-              startContent={<Eye size={16} />}
-            >
-              View Details
-            </DropdownItem>
-            <DropdownItem
-              key="edit"
-              startContent={<Pencil size={16} />}
-              onPress={() => onEdit(item)}
-            >
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/admin/companies/${item.id}`}>
+                <Eye size={16} className="mr-2" />
+                View Details
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEdit(item)}>
+              <Pencil size={16} className="mr-2" />
               Edit Company
-            </DropdownItem>
-            <DropdownItem
-              key="impersonate"
-              startContent={<UserCog size={16} />}
-              href={`/admin/companies/${item.id}?tab=users`}
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/admin/companies/${item.id}?tab=users`}>
+                <UserCog size={16} className="mr-2" />
+                Manage Users
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(item)}
             >
-              Manage Users
-            </DropdownItem>
-            <DropdownItem
-              key="delete"
-              className="text-danger"
-              color="danger"
-              startContent={<Trash2 size={16} />}
-              onPress={() => onDelete(item)}
-            >
+              <Trash2 size={16} className="mr-2" />
               Delete Company
-            </DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];
@@ -214,14 +207,13 @@ export function CompaniesTable({
       keyField="id"
       isLoading={isLoading}
       emptyMessage="No companies found"
-      emptyIcon={<Building2 size={48} className="text-default-300 mb-4" />}
+      emptyIcon={<Building2 size={48} className="text-muted-foreground/50 mb-4" />}
       sortDescriptor={sortDescriptor}
       onSortChange={onSortChange}
       showPagination
       page={page}
       totalPages={totalPages}
       onPageChange={onPageChange}
-      selectionMode="multiple"
     />
   );
 }
@@ -238,16 +230,16 @@ export function CompaniesTableHeader({
 }) {
   const isAllSelected = selectedCount === totalCount && totalCount > 0;
   const isIndeterminate = selectedCount > 0 && selectedCount < totalCount;
+  const checkedState = isIndeterminate ? "indeterminate" : isAllSelected;
 
   return (
     <div className="flex items-center gap-3 px-2 py-3 border-b border-divider">
       <Checkbox
-        isSelected={isAllSelected}
-        isIndeterminate={isIndeterminate}
-        onValueChange={onSelectAll}
+        checked={checkedState}
+        onCheckedChange={onSelectAll}
         aria-label="Select all"
       />
-      <span className="text-sm text-default-500">
+      <span className="text-sm text-muted-foreground">
         {selectedCount > 0
           ? `${selectedCount} selected`
           : `${totalCount} companies`}

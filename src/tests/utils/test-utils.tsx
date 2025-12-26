@@ -6,8 +6,9 @@
 
 import { render, type RenderOptions } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HeroUIProvider } from "@heroui/react";
 import type { ReactElement, ReactNode } from "react";
+
+import { TooltipProvider } from "@/components/ui";
 
 // ============================================================================
 // Providers
@@ -18,7 +19,7 @@ interface AllProvidersProps {
 }
 
 function AllProviders({ children }: AllProvidersProps) {
-  return <HeroUIProvider>{children}</HeroUIProvider>;
+  return <TooltipProvider>{children}</TooltipProvider>;
 }
 
 // ============================================================================
@@ -67,8 +68,8 @@ export function createMockUser(overrides?: Partial<MockUser>): MockUser {
     id: "user-123",
     email: "test@example.com",
     name: "Test User",
-    role: "company_admin",
-    companyId: "company-123",
+    image: null,
+    role: "chatapp.user",
     ...overrides,
   };
 }
@@ -128,9 +129,15 @@ export function createMockMessage(overrides?: Partial<MockMessage>): MockMessage
 export interface MockUser {
   id: string;
   email: string;
-  name: string;
-  role: "master_admin" | "company_admin" | "support_agent";
-  companyId?: string;
+  name: string | null;
+  image: string | null;
+  role: "chatapp.master_admin" | "chatapp.user";
+}
+
+export interface MockCompanyPermission {
+  userId: string;
+  companyId: string;
+  role: "chatapp.company_admin" | "chatapp.support_agent";
 }
 
 export interface MockCompany {

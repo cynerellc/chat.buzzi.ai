@@ -17,14 +17,31 @@ const publicRoutes = [
   "/api/auth",
   "/api/widget",
   "/widget",
+  "/widget-demo",
 ];
 
-// Routes for each role
-const roleRoutes: Record<string, string[]> = {
-  master_admin: ["/admin"],
-  company_admin: ["/dashboard", "/agents", "/knowledge", "/conversations", "/team", "/settings", "/analytics"],
-  support_agent: ["/inbox", "/conversations"],
-};
+// Routes that require master_admin role
+const masterAdminRoutes = ["/admin"];
+
+// Routes for regular authenticated users (company-level access checked in layouts/routes)
+const userRoutes = [
+  "/dashboard",
+  "/agents",
+  "/knowledge",
+  "/conversations",
+  "/team",
+  "/settings",
+  "/analytics",
+  "/billing",
+  "/integrations",
+  "/widget",
+  "/files",
+  "/inbox",
+  "/customers",
+  "/responses",
+  "/agent-settings",
+  "/companies",
+];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -37,9 +54,14 @@ export default auth((req) => {
 
   // Allow public routes
   if (isPublicRoute) {
-    // If user is already logged in and trying to access auth pages, redirect to dashboard
+    // If user is already logged in and trying to access auth pages, redirect
     if (session?.user && ["/login", "/register"].includes(pathname)) {
-      return redirectToDashboard(req, session.user.role);
+      // For master admin, go directly to admin dashboard
+      if (session.user.role === "chatapp.master_admin") {
+        return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+      }
+      // For regular users, redirect to companies page (smart redirect happens on client)
+      return NextResponse.redirect(new URL("/companies", req.url));
     }
     return NextResponse.next();
   }
@@ -54,27 +76,18 @@ export default auth((req) => {
   const userRole = session.user.role;
 
   // Master admin has access to everything
-  if (userRole === "master_admin") {
+  if (userRole === "chatapp.master_admin") {
     return NextResponse.next();
   }
 
-  // Check if user has access to admin routes
-  if (pathname.startsWith("/admin")) {
+  // Regular users cannot access master admin routes
+  if (masterAdminRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // Check role-specific route access
-  const allowedRoutes = roleRoutes[userRole] || [];
-  const hasAccess = allowedRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
-
-  // For company admin and support agent, check if accessing valid routes
-  if (!hasAccess && !pathname.startsWith("/api")) {
-    // Redirect to appropriate dashboard
-    return redirectToDashboard(req, userRole);
-  }
-
+  // For regular users, company-level access is checked in layouts/routes
+  // since Edge runtime can't query the database
+  // Just allow the request to proceed
   return NextResponse.next();
 });
 
@@ -82,17 +95,15 @@ function redirectToDashboard(req: NextRequest, role: string) {
   let dashboardUrl: string;
 
   switch (role) {
-    case "master_admin":
+    case "chatapp.master_admin":
       dashboardUrl = "/admin/dashboard";
       break;
-    case "company_admin":
-      dashboardUrl = "/dashboard";
-      break;
-    case "support_agent":
-      dashboardUrl = "/inbox";
+    case "chatapp.user":
+      // Regular users go to company selection
+      dashboardUrl = "/companies";
       break;
     default:
-      dashboardUrl = "/dashboard";
+      dashboardUrl = "/companies";
   }
 
   return NextResponse.redirect(new URL(dashboardUrl, req.url));

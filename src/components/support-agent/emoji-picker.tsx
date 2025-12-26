@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Smile, Search, X, Clock } from "lucide-react";
-import { Button, Input, ScrollShadow } from "@/components/ui";
-import { Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
+import { Button, Input, ScrollShadow, PopoverRoot, PopoverTrigger, PopoverContent } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 // Emoji categories with common emojis
@@ -125,36 +124,33 @@ export function EmojiPicker({
   };
 
   return (
-    <Popover
-      isOpen={isOpen}
+    <PopoverRoot
+      open={isOpen}
       onOpenChange={handleOpenChange}
-      placement="top-start"
-      offset={10}
     >
-      <PopoverTrigger>
+      <PopoverTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
-          isIconOnly
+          size="icon"
           className={cn(triggerClassName)}
         >
           <Smile size={20} />
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className={cn("w-72 p-0", className)}>
+      <PopoverContent side="top" align="start" sideOffset={10} className={cn("w-72 p-0", className)}>
         {/* Search */}
         <div className="p-2 border-b border-divider">
           <Input
             placeholder="Search emojis..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            startContent={<Search size={14} className="text-default-400" />}
+            startContent={<Search size={14} className="text-muted-foreground" />}
             endContent={
               searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="text-default-400 hover:text-default-600"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <X size={12} />
                 </button>
@@ -181,7 +177,7 @@ export function EmojiPicker({
                   onClick={() => setActiveCategory(key as keyof typeof EMOJI_CATEGORIES)}
                   className={cn(
                     "p-1.5 rounded transition-colors",
-                    isActive ? "bg-primary/10 text-primary" : "text-default-500 hover:bg-default-100"
+                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
                   )}
                   title={category.label}
                 >
@@ -199,7 +195,7 @@ export function EmojiPicker({
         {/* Emoji Grid */}
         <ScrollShadow className="p-2 max-h-[200px]">
           {filteredEmojis.length === 0 ? (
-            <div className="py-4 text-center text-default-400 text-sm">
+            <div className="py-4 text-center text-muted-foreground text-sm">
               {searchQuery ? "No emojis found" : "No recent emojis"}
             </div>
           ) : (
@@ -208,7 +204,7 @@ export function EmojiPicker({
                 <button
                   key={`${emoji}-${index}`}
                   onClick={() => handleEmojiSelect(emoji)}
-                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-default-100 transition-colors text-lg"
+                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors text-lg"
                 >
                   {emoji}
                 </button>
@@ -218,7 +214,7 @@ export function EmojiPicker({
         </ScrollShadow>
 
         {/* Footer */}
-        <div className="p-2 border-t border-divider text-xs text-default-400 text-center">
+        <div className="p-2 border-t border-divider text-xs text-muted-foreground text-center">
           {searchQuery ? (
             `${filteredEmojis.length} results`
           ) : (
@@ -226,7 +222,7 @@ export function EmojiPicker({
           )}
         </div>
       </PopoverContent>
-    </Popover>
+    </PopoverRoot>
   );
 }
 

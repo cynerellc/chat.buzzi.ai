@@ -6,11 +6,13 @@ import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import {
   companies,
+  companyPermissions,
   companySubscriptions,
   subscriptionPlans,
   users,
   type Company,
 } from "@/lib/db/schema";
+import type { CompanyPermissionRole } from "@/lib/db/schema/company-permissions";
 import { generateSlug } from "@/lib/utils";
 
 // Company list item interface
@@ -144,13 +146,14 @@ export async function GET(request: Request) {
           return null;
         }
 
-        // Get user count
+        // Get user count via company_permissions
         const [userCountResult] = await db
           .select({ count: count() })
-          .from(users)
+          .from(companyPermissions)
+          .innerJoin(users, eq(companyPermissions.userId, users.id))
           .where(
             and(
-              eq(users.companyId, company.id),
+              eq(companyPermissions.companyId, company.id),
               sql`${users.deletedAt} IS NULL`
             )
           );
@@ -246,17 +249,27 @@ export async function POST(request: Request) {
       throw new Error("Failed to create company");
     }
 
-    // Create admin user
+    // Create admin user with base role
     const [newUser] = await db
       .insert(users)
       .values({
         email: data.adminEmail,
         name: data.adminName,
-        companyId: newCompany.id,
-        role: "company_admin",
+        role: "chatapp.user",
         status: "pending",
       })
       .returning();
+
+    if (!newUser) {
+      throw new Error("Failed to create admin user");
+    }
+
+    // Create company permission for the admin user
+    await db.insert(companyPermissions).values({
+      companyId: newCompany.id,
+      userId: newUser.id,
+      role: "chatapp.company_admin" as CompanyPermissionRole,
+    });
 
     // Create subscription if plan is specified
     if (data.planId) {

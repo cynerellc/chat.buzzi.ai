@@ -121,7 +121,7 @@ export function PackageDeployments({
       <Card className="p-6 text-center">
         <p className="text-danger">{error.message}</p>
         <Button
-          variant="flat"
+          variant="secondary"
           size="sm"
           className="mt-3"
           startContent={<RefreshCw size={16} />}
@@ -148,19 +148,19 @@ export function PackageDeployments({
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search agents or companies..."
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            startContent={<Search size={16} className="text-default-400" />}
-            className="w-64"
-            size="sm"
-          />
+          <div className="relative w-64">
+            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search agents or companies..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 pl-8"
+            />
+          </div>
           <Button
-            variant="flat"
-            size="sm"
-            isIconOnly
-            onPress={() => mutate()}
+            variant="outline"
+            size="icon"
+            onClick={() => mutate()}
             aria-label="Refresh deployments"
           >
             <RefreshCw size={16} />
@@ -246,7 +246,7 @@ export function PackageDeployments({
 
                     {onViewAgent && (
                       <Button
-                        variant="flat"
+                        variant="secondary"
                         size="sm"
                         className="mt-3 w-full"
                         endContent={<ArrowRight size={14} />}

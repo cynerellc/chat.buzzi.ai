@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import {
   Users,
   MoreVertical,
@@ -9,15 +10,17 @@ import {
   ShieldCheck,
   Mail,
   Clock,
+  UserPlus,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardBody,
   Badge,
   Avatar,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
   Skeleton,
 } from "@/components/ui";
 
@@ -40,37 +43,25 @@ interface TeamGridProps {
   onRemoveMember: (member: TeamMember) => void;
 }
 
-const statusColors: Record<string, "success" | "warning" | "danger" | "default"> = {
-  active: "success",
-  inactive: "default",
-  pending: "warning",
-  suspended: "danger",
+const statusConfig: Record<string, { color: string; bg: string; dot: string }> = {
+  active: { color: "text-success", bg: "bg-success/10", dot: "bg-success" },
+  inactive: { color: "text-muted-foreground", bg: "bg-muted", dot: "bg-muted-foreground" },
+  pending: { color: "text-warning", bg: "bg-warning/10", dot: "bg-warning" },
+  suspended: { color: "text-destructive", bg: "bg-destructive/10", dot: "bg-destructive" },
 };
 
-function getRoleIcon(role: string) {
-  switch (role) {
-    case "company_admin":
-      return <ShieldCheck className="w-4 h-4 text-primary" />;
-    case "master_admin":
-      return <ShieldCheck className="w-4 h-4 text-warning" />;
-    case "support_agent":
-      return <Shield className="w-4 h-4 text-default-500" />;
-    default:
-      return <Shield className="w-4 h-4 text-default-500" />;
-  }
+const roleConfig: Record<string, { icon: typeof ShieldCheck; color: string; bg: string; label: string }> = {
+  "chatapp.company_admin": { icon: ShieldCheck, color: "text-primary", bg: "bg-primary/10", label: "Admin" },
+  "chatapp.master_admin": { icon: ShieldCheck, color: "text-warning", bg: "bg-warning/10", label: "Master Admin" },
+  "chatapp.support_agent": { icon: Shield, color: "text-muted-foreground", bg: "bg-muted", label: "Support Agent" },
+};
+
+function getRoleConfig(role: string) {
+  return roleConfig[role] ?? { icon: Shield, color: "text-muted-foreground", bg: "bg-muted", label: role };
 }
 
-function getRoleLabel(role: string) {
-  switch (role) {
-    case "company_admin":
-      return "Admin";
-    case "support_agent":
-      return "Support Agent";
-    case "master_admin":
-      return "Master Admin";
-    default:
-      return role;
-  }
+function getStatusConfig(status: string) {
+  return statusConfig[status] ?? statusConfig.inactive;
 }
 
 function formatDate(dateString: string | null) {
@@ -94,13 +85,17 @@ export function TeamGrid({
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <Card key={i}>
-            <CardBody className="p-4">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-12 w-12 rounded-full" />
+            <CardBody className="p-5">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-14 w-14 rounded-2xl" />
                 <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-36" />
                 </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-3 w-32" />
               </div>
             </CardBody>
           </Card>
@@ -111,100 +106,130 @@ export function TeamGrid({
 
   if (members.length === 0) {
     return (
-      <Card>
-        <CardBody className="text-center py-12">
-          <Users className="h-12 w-12 mx-auto mb-4 text-default-300" />
-          <p className="text-default-500 font-medium">No team members found</p>
-          <p className="text-sm text-default-400">
-            Invite team members to get started
-          </p>
-        </CardBody>
-      </Card>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <Card>
+          <CardBody className="text-center py-16">
+            <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+              <UserPlus className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="font-medium text-foreground mb-1">No team members yet</p>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+              Invite team members to collaborate and manage conversations together
+            </p>
+          </CardBody>
+        </Card>
+      </motion.div>
     );
   }
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {members.map((member) => {
+      {members.map((member, index) => {
         const isCurrentUser = member.id === currentUserId;
-        const isMasterAdmin = member.role === "master_admin";
+        const isMasterAdmin = member.role === "chatapp.master_admin";
         const canManage = !isCurrentUser && !isMasterAdmin;
+        const role = getRoleConfig(member.role);
+        const status = getStatusConfig(member.status);
+        const RoleIcon = role.icon;
 
-        const dropdownItems: DropdownMenuItem[] = [
+        const dropdownItems: DropdownMenuItemData[] = [
           { key: "role", label: "Change Role", icon: UserCog },
           { key: "remove", label: "Remove from Team", icon: UserMinus, isDanger: true },
         ];
 
         return (
-          <Card key={member.id}>
-            <CardBody className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    src={member.avatarUrl || undefined}
-                    name={member.name || member.email}
-                    size="lg"
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">
-                        {member.name || "No name"}
-                      </span>
-                      {isCurrentUser && (
-                        <Badge variant="info" className="shrink-0">You</Badge>
+          <motion.div
+            key={member.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+          >
+            <Card className="group hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 transition-all duration-300">
+              <CardBody className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <Avatar
+                        src={member.avatarUrl || undefined}
+                        name={member.name || member.email}
+                        size="lg"
+                        className="w-14 h-14 rounded-2xl"
+                      />
+                      {member.status === "active" && (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-success border-2 border-card" />
                       )}
                     </div>
-                    <p className="text-sm text-default-500 truncate">{member.email}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-semibold truncate group-hover:text-primary transition-colors">
+                          {member.name || "No name"}
+                        </span>
+                        {isCurrentUser && (
+                          <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {member.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  {canManage && (
+                    <Dropdown
+                      trigger={
+                        <button className="p-1.5 hover:bg-muted rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      }
+                      items={dropdownItems}
+                      onAction={(key) => {
+                        if (key === "role") {
+                          onChangeRole(member);
+                        } else if (key === "remove") {
+                          onRemoveMember(member);
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                  {/* Role Badge */}
+                  <div className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium",
+                    role.bg, role.color
+                  )}>
+                    <RoleIcon className="h-3 w-3" />
+                    {role.label}
+                  </div>
+
+                  {/* Status Badge */}
+                  <div className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium capitalize",
+                    status.bg, status.color
+                  )}>
+                    <span className={cn("h-1.5 w-1.5 rounded-full", status.dot, member.status === "active" && "animate-pulse")} />
+                    {member.status}
                   </div>
                 </div>
 
-                {canManage && (
-                  <Dropdown
-                    trigger={
-                      <button className="p-1 hover:bg-default-100 rounded-lg">
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                    }
-                    items={dropdownItems}
-                    onAction={(key) => {
-                      if (key === "role") {
-                        onChangeRole(member);
-                      } else if (key === "remove") {
-                        onRemoveMember(member);
-                      }
-                    }}
-                  />
-                )}
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {/* Role */}
-                <div className="flex items-center gap-2">
-                  {getRoleIcon(member.role)}
-                  <span className="text-sm">{getRoleLabel(member.role)}</span>
-                </div>
-
-                {/* Status */}
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={statusColors[member.status] || "default"}
-                    className="capitalize"
-                  >
-                    {member.status}
-                  </Badge>
-                </div>
-
                 {/* Dates */}
-                <div className="text-xs text-default-400 space-y-1 pt-2 border-t">
+                <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     <span>Last login: {formatDate(member.lastLoginAt)}</span>
                   </div>
-                  <p>Joined: {formatDate(member.createdAt)}</p>
+                  <span>Joined {formatDate(member.createdAt)}</span>
                 </div>
-              </div>
-            </CardBody>
-          </Card>
+              </CardBody>
+            </Card>
+          </motion.div>
         );
       })}
     </div>
@@ -254,10 +279,10 @@ export function TeamList({
     <div className="space-y-2">
       {members.map((member) => {
         const isCurrentUser = member.id === currentUserId;
-        const isMasterAdmin = member.role === "master_admin";
+        const isMasterAdmin = member.role === "chatapp.master_admin";
         const canManage = !isCurrentUser && !isMasterAdmin;
 
-        const dropdownItems: DropdownMenuItem[] = [
+        const dropdownItems: DropdownMenuItemData[] = [
           { key: "role", label: "Change Role", icon: UserCog },
           { key: "remove", label: "Remove from Team", icon: UserMinus, isDanger: true },
         ];

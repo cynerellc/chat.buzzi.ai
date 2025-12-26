@@ -1,9 +1,9 @@
-import { count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { companies, companySubscriptions, subscriptionPlans, users } from "@/lib/db/schema";
+import { companies, companyPermissions, companySubscriptions, subscriptionPlans, users } from "@/lib/db/schema";
 
 export interface RecentCompany {
   id: string;
@@ -54,11 +54,17 @@ export async function GET(request: Request) {
           .where(eq(companySubscriptions.companyId, company.id))
           .limit(1);
 
-        // Get user count
+        // Get user count via company_permissions
         const [userCount] = await db
           .select({ count: count() })
-          .from(users)
-          .where(eq(users.companyId, company.id));
+          .from(companyPermissions)
+          .innerJoin(users, eq(companyPermissions.userId, users.id))
+          .where(
+            and(
+              eq(companyPermissions.companyId, company.id),
+              sql`${users.deletedAt} IS NULL`
+            )
+          );
 
         return {
           ...company,

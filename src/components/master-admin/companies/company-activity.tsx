@@ -174,7 +174,7 @@ export function CompanyActivity({ companyId }: CompanyActivityProps) {
       <Card className="p-6 text-center">
         <p className="text-danger">{error.message}</p>
         <Button
-          variant="flat"
+          variant="secondary"
           size="sm"
           className="mt-3"
           startContent={<RefreshCw size={16} />}
@@ -212,7 +212,6 @@ export function CompanyActivity({ companyId }: CompanyActivityProps) {
             }}
             options={filterOptions}
             className="w-40"
-            size="sm"
             aria-label="Filter activities"
           />
           <Select
@@ -223,14 +222,12 @@ export function CompanyActivity({ companyId }: CompanyActivityProps) {
             }}
             options={timeframeOptions}
             className="w-36"
-            size="sm"
             aria-label="Select timeframe"
           />
           <Button
-            variant="flat"
-            size="sm"
-            isIconOnly
-            onPress={() => mutate()}
+            variant="outline"
+            size="icon"
+            onClick={() => mutate()}
             aria-label="Refresh activity"
           >
             <RefreshCw size={16} />

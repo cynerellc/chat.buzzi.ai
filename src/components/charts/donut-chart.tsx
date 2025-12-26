@@ -25,12 +25,12 @@ export interface DonutChartProps {
 }
 
 const defaultColors = [
-  "hsl(var(--heroui-primary))",
-  "hsl(var(--heroui-secondary))",
-  "hsl(var(--heroui-success))",
-  "hsl(var(--heroui-warning))",
-  "hsl(var(--heroui-danger))",
-  "hsl(var(--heroui-default-400))",
+  "hsl(var(--primary))",
+  "hsl(var(--secondary))",
+  "hsl(var(--success))",
+  "hsl(var(--warning))",
+  "hsl(var(--destructive))",
+  "hsl(var(--muted-foreground))",
 ];
 
 export function DonutChart({
@@ -78,8 +78,8 @@ export function DonutChart({
           {showTooltip && (
             <Tooltip
               contentStyle={{
-                backgroundColor: "hsl(var(--heroui-content1))",
-                border: "1px solid hsl(var(--heroui-divider))",
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
                 fontSize: "12px",
               }}

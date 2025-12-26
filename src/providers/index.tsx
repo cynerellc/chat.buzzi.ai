@@ -1,10 +1,9 @@
 "use client";
 
-import { HeroUIProvider } from "@heroui/react";
-import { useRouter } from "next/navigation";
 import { type ReactNode } from "react";
 
 import { AuthProvider } from "@/lib/auth/provider";
+import { Toaster } from "@/components/ui/toast";
 
 import { ThemeProvider } from "./theme-provider";
 
@@ -13,14 +12,11 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
-  const router = useRouter();
-
   return (
     <ThemeProvider>
       <AuthProvider>
-        <HeroUIProvider navigate={router.push}>
-          {children}
-        </HeroUIProvider>
+        {children}
+        <Toaster />
       </AuthProvider>
     </ThemeProvider>
   );

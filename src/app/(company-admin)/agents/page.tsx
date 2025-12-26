@@ -3,10 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { addToast } from "@heroui/react";
 
-import { Button } from "@/components/ui";
-import { Tabs, type TabItem } from "@/components/ui";
+import { Button, Tabs, type TabItem, addToast } from "@/components/ui";
 import { AgentsGrid } from "@/components/company-admin/agents/agents-grid";
 import { useAgents } from "@/hooks/company";
 
@@ -75,12 +73,12 @@ export default function AgentsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">AI Agents</h1>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             Manage your AI agents and their configurations
           </p>
         </div>
-        <Button as={Link} href="/agents/new" color="primary" leftIcon={Plus}>
-          Create Agent
+        <Button asChild leftIcon={Plus}>
+          <Link href="/agents/new">Create Agent</Link>
         </Button>
       </div>
 

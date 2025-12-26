@@ -3,7 +3,6 @@ import {
   boolean,
   index,
   jsonb,
-  pgTable,
   text,
   timestamp,
   uuid,
@@ -11,10 +10,11 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { companies } from "./companies";
+import { chatappSchema } from "./enums";
 
 // Widget Configuration Table (per company)
-export const widgetConfigs = pgTable(
-  "chatapp_widget_configs",
+export const widgetConfigs = chatappSchema.table(
+  "widget_configs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 

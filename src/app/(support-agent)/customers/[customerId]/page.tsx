@@ -33,7 +33,7 @@ import {
   Tabs,
   Divider,
 } from "@/components/ui";
-import type { TabItem, DropdownMenuItem } from "@/components/ui";
+import type { TabItem, DropdownMenuItemData } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -166,7 +166,7 @@ export default function CustomerProfilePage() {
 
   // Sentiment indicator
   const getSentimentColor = (sentiment: number | null) => {
-    if (sentiment === null) return "text-default-400";
+    if (sentiment === null) return "text-muted-foreground";
     if (sentiment >= 50) return "text-success";
     if (sentiment >= 0) return "text-warning";
     return "text-danger";
@@ -229,14 +229,14 @@ export default function CustomerProfilePage() {
             />
             <Dropdown
               trigger={
-                <Button variant="ghost" size="sm" isIconOnly>
+                <Button variant="ghost" size="icon">
                   <MoreVertical size={16} />
                 </Button>
               }
               items={[
                 { key: "edit", label: "Edit Customer", icon: Edit2 },
                 { key: "delete", label: "Delete Customer", icon: Trash2, isDanger: true },
-              ] satisfies DropdownMenuItem[]}
+              ] satisfies DropdownMenuItemData[]}
               onAction={(key) => {
                 // Handle actions
                 console.log("Action:", key);
@@ -255,7 +255,7 @@ export default function CustomerProfilePage() {
           <div className="space-y-3">
             {customer.email && (
               <div className="flex items-center gap-3 text-sm">
-                <Mail size={16} className="text-default-400 flex-shrink-0" />
+                <Mail size={16} className="text-muted-foreground flex-shrink-0" />
                 <a href={`mailto:${customer.email}`} className="text-primary hover:underline truncate">
                   {customer.email}
                 </a>
@@ -263,7 +263,7 @@ export default function CustomerProfilePage() {
             )}
             {customer.phone && (
               <div className="flex items-center gap-3 text-sm">
-                <Phone size={16} className="text-default-400 flex-shrink-0" />
+                <Phone size={16} className="text-muted-foreground flex-shrink-0" />
                 <a href={`tel:${customer.phone}`} className="text-primary hover:underline">
                   {customer.phone}
                 </a>
@@ -271,7 +271,7 @@ export default function CustomerProfilePage() {
             )}
             {customer.location?.city && (
               <div className="flex items-center gap-3 text-sm">
-                <MapPin size={16} className="text-default-400 flex-shrink-0" />
+                <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
                 <span>
                   {[customer.location.city, customer.location.country].filter(Boolean).join(", ")}
                 </span>
@@ -279,17 +279,17 @@ export default function CustomerProfilePage() {
             )}
             {customer.externalId && (
               <div className="flex items-center gap-3 text-sm">
-                <ExternalLink size={16} className="text-default-400 flex-shrink-0" />
+                <ExternalLink size={16} className="text-muted-foreground flex-shrink-0" />
                 <span className="font-mono text-xs truncate">{customer.externalId}</span>
               </div>
             )}
             <div className="flex items-center gap-3 text-sm">
-              <Calendar size={16} className="text-default-400 flex-shrink-0" />
+              <Calendar size={16} className="text-muted-foreground flex-shrink-0" />
               <span>Customer since {format(new Date(customer.createdAt), "MMM d, yyyy")}</span>
             </div>
             {customer.lastSeenAt && (
               <div className="flex items-center gap-3 text-sm">
-                <Clock size={16} className="text-default-400 flex-shrink-0" />
+                <Clock size={16} className="text-muted-foreground flex-shrink-0" />
                 <span>
                   Last seen {formatDistanceToNow(new Date(customer.lastSeenAt), { addSuffix: true })}
                 </span>
@@ -301,25 +301,25 @@ export default function CustomerProfilePage() {
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-default-100 rounded-lg p-3 text-center">
+            <div className="bg-muted rounded-lg p-3 text-center">
               <p className="text-2xl font-bold">{stats.totalConversations}</p>
-              <p className="text-xs text-default-500">Conversations</p>
+              <p className="text-xs text-muted-foreground">Conversations</p>
             </div>
-            <div className="bg-default-100 rounded-lg p-3 text-center">
+            <div className="bg-muted rounded-lg p-3 text-center">
               <p className="text-2xl font-bold">{stats.resolvedConversations}</p>
-              <p className="text-xs text-default-500">Resolved</p>
+              <p className="text-xs text-muted-foreground">Resolved</p>
             </div>
-            <div className="bg-default-100 rounded-lg p-3 text-center">
+            <div className="bg-muted rounded-lg p-3 text-center">
               <p className="text-2xl font-bold">
                 {stats.averageSatisfaction !== null ? `${stats.averageSatisfaction.toFixed(1)}/5` : "-"}
               </p>
-              <p className="text-xs text-default-500">Avg. Rating</p>
+              <p className="text-xs text-muted-foreground">Avg. Rating</p>
             </div>
-            <div className="bg-default-100 rounded-lg p-3 text-center">
+            <div className="bg-muted rounded-lg p-3 text-center">
               <p className={cn("text-2xl font-bold", getSentimentColor(stats.averageSentiment))}>
                 {stats.averageSentiment !== null ? `${stats.averageSentiment}%` : "-"}
               </p>
-              <p className="text-xs text-default-500">Sentiment</p>
+              <p className="text-xs text-muted-foreground">Sentiment</p>
             </div>
           </div>
 
@@ -327,11 +327,11 @@ export default function CustomerProfilePage() {
           {customer.metadata && Object.keys(customer.metadata).length > 0 && (
             <>
               <Divider className="my-4" />
-              <h3 className="text-sm font-medium text-default-500 mb-3">Custom Attributes</h3>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Custom Attributes</h3>
               <div className="space-y-2">
                 {Object.entries(customer.metadata).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between text-sm">
-                    <span className="text-default-500 capitalize">{key.replace(/_/g, " ")}</span>
+                    <span className="text-muted-foreground capitalize">{key.replace(/_/g, " ")}</span>
                     <span className="font-medium truncate ml-2 max-w-[150px]">
                       {String(value)}
                     </span>
@@ -389,7 +389,7 @@ export default function CustomerProfilePage() {
                         </span>
                         {getStatusBadge(conversation.status)}
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-default-500">
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         {getChannelBadge(conversation.channel)}
                         <span>{conversation.messageCount} messages</span>
                         {conversation.agent && (
@@ -405,7 +405,7 @@ export default function CustomerProfilePage() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right text-sm text-default-400 flex-shrink-0">
+                    <div className="text-right text-sm text-muted-foreground flex-shrink-0">
                       <p>{format(new Date(conversation.createdAt), "MMM d, yyyy")}</p>
                       <p className="text-xs">
                         {formatDistanceToNow(new Date(conversation.createdAt), { addSuffix: true })}

@@ -166,16 +166,16 @@ export default function SettingsPage() {
         actions={
           <div className="flex items-center gap-2">
             {hasChanges && (
-              <Button variant="flat" onPress={handleReset}>
+              <Button variant="secondary" onClick={handleReset}>
                 Reset
               </Button>
             )}
             <Button
               color="primary"
               startContent={<Save size={16} />}
-              onPress={handleSave}
+              onClick={handleSave}
               isLoading={isSaving}
-              isDisabled={!hasChanges}
+              disabled={!hasChanges}
             >
               Save Changes
             </Button>
@@ -200,9 +200,7 @@ export default function SettingsPage() {
         selectedKey={activeTab}
         onSelectionChange={(key) => setActiveTab(key as TabKey)}
         aria-label="Settings tabs"
-        classNames={{
-          tabList: "mb-6",
-        }}
+        className="mb-6"
       />
     </div>
   );

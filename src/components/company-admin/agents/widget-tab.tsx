@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Plus, X, ExternalLink } from "lucide-react";
-import { Switch } from "@heroui/react";
 
 import {
   Button,
@@ -12,6 +11,7 @@ import {
   CardHeader,
   CardBody,
   Table,
+  Switch,
   type Column,
 } from "@/components/ui";
 
@@ -62,10 +62,9 @@ export function WidgetTab({ agent, onSave, isSaving }: WidgetTabProps) {
       width: 50,
       render: (rule) => (
         <Button
-          variant="light"
-          isIconOnly
-          size="sm"
-          onPress={() => removePageRule(String(rule.id))}
+          variant="ghost"
+          size="icon"
+          onClick={() => removePageRule(String(rule.id))}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -110,15 +109,15 @@ export function WidgetTab({ agent, onSave, isSaving }: WidgetTabProps) {
           <h2 className="text-lg font-semibold">Widget Assignment</h2>
         </CardHeader>
         <CardBody className="space-y-6">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             This agent is assigned to handle conversations from the chat widget.
           </p>
 
           {/* Default Agent Toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+          <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <span className="font-medium">Use as default widget agent</span>
-              <p className="text-sm text-default-500">
+              <p className="text-sm text-muted-foreground">
                 This agent will handle all new widget conversations
               </p>
             </div>
@@ -132,7 +131,7 @@ export function WidgetTab({ agent, onSave, isSaving }: WidgetTabProps) {
           <h2 className="text-lg font-semibold">Page-specific Assignment (Optional)</h2>
         </CardHeader>
         <CardBody className="space-y-4">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Assign different agents based on which page the visitor is on.
           </p>
 
@@ -149,20 +148,18 @@ export function WidgetTab({ agent, onSave, isSaving }: WidgetTabProps) {
             <Input
               placeholder="e.g., /pricing/*, /support/*, /docs/*"
               value={newPattern}
-              onValueChange={setNewPattern}
+              onChange={(e) => setNewPattern(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addPageRule()}
-              classNames={{
-                input: "font-mono",
-              }}
+              className="font-mono"
             />
-            <Button variant="bordered" onPress={addPageRule} leftIcon={Plus}>
+            <Button variant="outline" onClick={addPageRule} startContent={<Plus size={16} />}>
               Add Rule
             </Button>
           </div>
 
-          <div className="rounded-lg bg-default-100 p-4">
+          <div className="rounded-lg bg-muted p-4">
             <h4 className="font-medium mb-2">Pattern Examples</h4>
-            <ul className="text-sm text-default-500 space-y-1">
+            <ul className="text-sm text-muted-foreground space-y-1">
               <li>
                 <code className="bg-background px-1 rounded">/pricing/*</code> - Match all
                 pricing pages
@@ -185,11 +182,14 @@ export function WidgetTab({ agent, onSave, isSaving }: WidgetTabProps) {
           <h2 className="text-lg font-semibold">Widget Customization</h2>
         </CardHeader>
         <CardBody>
-          <p className="text-sm text-default-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             Customize the appearance and behavior of your chat widget.
           </p>
-          <Button as={Link} href="/widget" variant="bordered" rightIcon={ExternalLink}>
-            Go to Widget Customizer
+          <Button asChild variant="outline">
+            <Link href="/widget" className="inline-flex items-center gap-2">
+              Go to Widget Customizer
+              <ExternalLink size={16} />
+            </Link>
           </Button>
         </CardBody>
       </Card>

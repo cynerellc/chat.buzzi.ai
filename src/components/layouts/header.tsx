@@ -1,14 +1,12 @@
 "use client";
 
-import { Input } from "@heroui/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, Search, HelpCircle, X } from "lucide-react";
-import { useState } from "react";
+import { Menu, Search, HelpCircle, X, Command } from "lucide-react";
+import { useState, useEffect } from "react";
 
 import { fadeIn, smoothTransition } from "@/lib/animations";
 import { cn } from "@/lib/utils";
-
-import { IconButton, Tooltip } from "../ui";
+import { IconButton, Tooltip, Input } from "@/components/ui";
 
 import { NotificationDropdown } from "./notification-dropdown";
 import { UserMenu } from "./user-menu";
@@ -37,6 +35,22 @@ export function Header({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+      if (e.key === "Escape" && isSearchOpen) {
+        setIsSearchOpen(false);
+        setSearchQuery("");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSearchOpen]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSearch?.(searchQuery);
@@ -45,7 +59,7 @@ export function Header({
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-divider bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 lg:px-6",
+        "sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/50 bg-background/80 backdrop-blur-xl px-4 lg:px-6",
         className
       )}
     >
@@ -54,7 +68,7 @@ export function Header({
         <IconButton
           icon={Menu}
           aria-label="Toggle menu"
-          variant="light"
+          variant="ghost"
           className="lg:hidden"
           onPress={onMenuClick}
         />
@@ -63,8 +77,8 @@ export function Header({
       {/* Title */}
       {title && (
         <div className="hidden sm:block">
-          <h1 className="text-lg font-semibold">{title}</h1>
-          {subtitle && <p className="text-xs text-default-500">{subtitle}</p>}
+          <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
       )}
 
@@ -85,21 +99,21 @@ export function Header({
               exit="exit"
               transition={smoothTransition}
             >
-              <Input
-                type="search"
-                placeholder="Search..."
-                value={searchQuery}
-                onValueChange={setSearchQuery}
-                autoFocus
-                classNames={{
-                  inputWrapper: "h-9",
-                }}
-                startContent={<Search size={16} className="text-default-400" />}
-              />
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search anything..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                  className="pl-9 h-10 bg-muted/50 border-transparent focus:border-primary/50 focus:bg-background transition-colors"
+                />
+              </div>
               <IconButton
                 icon={X}
                 aria-label="Close search"
-                variant="light"
+                variant="ghost"
                 size="sm"
                 onPress={() => {
                   setIsSearchOpen(false);
@@ -110,10 +124,23 @@ export function Header({
           ) : (
             <motion.div key="search-button">
               <Tooltip content="Search" shortcut="⌘K">
+                <button
+                  onClick={() => setIsSearchOpen(true)}
+                  className="hidden md:flex items-center gap-2 h-9 px-3 text-sm text-muted-foreground bg-muted/50 hover:bg-muted border border-transparent hover:border-border/50 rounded-lg transition-all duration-200"
+                >
+                  <Search size={15} />
+                  <span>Search...</span>
+                  <kbd className="ml-2 flex items-center gap-0.5 text-[10px] text-muted-foreground/70 bg-background px-1.5 py-0.5 rounded border border-border/50">
+                    <Command size={10} />K
+                  </kbd>
+                </button>
+              </Tooltip>
+              <Tooltip content="Search" shortcut="⌘K">
                 <IconButton
                   icon={Search}
                   aria-label="Search"
-                  variant="light"
+                  variant="ghost"
+                  className="md:hidden"
                   onPress={() => setIsSearchOpen(true)}
                 />
               </Tooltip>
@@ -122,18 +149,28 @@ export function Header({
         </AnimatePresence>
       )}
 
-      {/* Help */}
-      {showHelp && (
-        <Tooltip content="Help & Support">
-          <IconButton icon={HelpCircle} aria-label="Help" variant="light" />
-        </Tooltip>
-      )}
+      <div className="flex items-center gap-1">
+        {/* Help */}
+        {showHelp && (
+          <Tooltip content="Help & Support">
+            <IconButton
+              icon={HelpCircle}
+              aria-label="Help"
+              variant="ghost"
+              className="text-muted-foreground hover:text-foreground"
+            />
+          </Tooltip>
+        )}
 
-      {/* Notifications */}
-      {showNotifications && <NotificationDropdown />}
+        {/* Notifications */}
+        {showNotifications && <NotificationDropdown />}
 
-      {/* User menu */}
-      <UserMenu />
+        {/* Divider */}
+        <div className="w-px h-6 bg-border/50 mx-2" />
+
+        {/* User menu */}
+        <UserMenu />
+      </div>
     </header>
   );
 }

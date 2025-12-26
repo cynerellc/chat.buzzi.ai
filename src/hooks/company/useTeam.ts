@@ -24,7 +24,7 @@ export function useTeam() {
 // Invite Team Member Mutation
 async function sendInvitation(
   url: string,
-  { arg }: { arg: { email: string; role: "company_admin" | "support_agent" } }
+  { arg }: { arg: { email: string; role: "chatapp.company_admin" | "chatapp.support_agent" } }
 ) {
   const response = await fetch(url, {
     method: "POST",

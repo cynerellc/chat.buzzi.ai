@@ -2,6 +2,7 @@
 
 import { useState, useMemo, type Key } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   MoreHorizontal,
   Pencil,
@@ -11,6 +12,9 @@ import {
   BarChart3,
   Trash2,
   Bot,
+  MessageSquare,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -22,7 +26,7 @@ import {
   CardFooter,
   Badge,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
   ConfirmationDialog,
 } from "@/components/ui";
 
@@ -35,17 +39,17 @@ interface AgentCardProps {
   onStatusChange: (agentId: string, status: "active" | "paused") => void;
 }
 
-const statusConfig: Record<string, { label: string; variant: "success" | "warning" | "default"; dot: string }> = {
-  active: { label: "Active", variant: "success", dot: "bg-success" },
-  paused: { label: "Paused", variant: "warning", dot: "bg-warning" },
-  draft: { label: "Draft", variant: "default", dot: "bg-default-400" },
+const statusConfig: Record<string, { label: string; variant: "success" | "warning" | "default"; dot: string; bg: string }> = {
+  active: { label: "Active", variant: "success", dot: "bg-success", bg: "bg-success/10" },
+  paused: { label: "Paused", variant: "warning", dot: "bg-warning", bg: "bg-warning/10" },
+  draft: { label: "Draft", variant: "default", dot: "bg-muted-foreground", bg: "bg-muted" },
 };
 
-const typeLabels: Record<string, string> = {
-  support: "Support",
-  sales: "Sales",
-  general: "General",
-  custom: "Custom",
+const typeConfig: Record<string, { label: string; color: string }> = {
+  support: { label: "Support", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  sales: { label: "Sales", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  general: { label: "General", color: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+  custom: { label: "Custom", color: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
 };
 
 export function AgentCard({
@@ -55,11 +59,12 @@ export function AgentCard({
   onStatusChange,
 }: AgentCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const defaultStatus = { label: "Draft", variant: "default" as const, dot: "bg-default-400" };
+  const defaultStatus = { label: "Draft", variant: "default" as const, dot: "bg-muted-foreground", bg: "bg-muted" };
   const status = statusConfig[agent.status] ?? defaultStatus;
+  const typeInfo = typeConfig[agent.type] ?? { label: agent.type, color: "bg-muted text-muted-foreground" };
 
-  const dropdownItems: DropdownMenuItem[] = useMemo(() => {
-    const items: DropdownMenuItem[] = [
+  const dropdownItems: DropdownMenuItemData[] = useMemo(() => {
+    const items: DropdownMenuItemData[] = [
       { key: "edit", label: "Edit", icon: Pencil, href: `/agents/${agent.id}` },
       { key: "duplicate", label: "Duplicate", icon: Copy },
     ];
@@ -96,66 +101,106 @@ export function AgentCard({
 
   return (
     <>
-      <Card className="flex flex-col">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between w-full">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                {agent.avatarUrl ? (
-                  <img
-                    src={agent.avatarUrl}
-                    alt={agent.name}
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <Bot className="h-6 w-6 text-primary" />
-                )}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Card className="group flex flex-col h-full hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 transition-all duration-300">
+          <CardHeader className="pb-4">
+            <div className="flex items-start justify-between w-full">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "relative flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-300",
+                  "bg-gradient-to-br from-primary/15 to-primary/5",
+                  "group-hover:shadow-lg group-hover:shadow-primary/20 group-hover:scale-105"
+                )}>
+                  {agent.avatarUrl ? (
+                    <img
+                      src={agent.avatarUrl}
+                      alt={agent.name}
+                      className="h-14 w-14 rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <Bot className="h-7 w-7 text-primary" />
+                  )}
+                  {agent.status === "active" && (
+                    <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-success border-2 border-card" />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">
+                    {agent.name}
+                  </h3>
+                  <span className={cn(
+                    "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium",
+                    typeInfo.color
+                  )}>
+                    {typeInfo.label}
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold leading-none">{agent.name}</h3>
-                <Badge variant="default" className="mt-1 text-xs">
-                  {typeLabels[agent.type] || agent.type}
-                </Badge>
+              <Dropdown
+                trigger={
+                  <Button variant="ghost" size="icon" aria-label="Actions" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <MoreHorizontal size={16} />
+                  </Button>
+                }
+                items={dropdownItems}
+                onAction={handleDropdownAction}
+              />
+            </div>
+          </CardHeader>
+
+          <CardBody className="flex-1 pt-0 pb-4">
+            <div className={cn(
+              "inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium mb-4",
+              status.bg
+            )}>
+              <span className={cn("h-1.5 w-1.5 rounded-full animate-pulse", status.dot)} />
+              <span className="text-foreground/80">{status.label}</span>
+            </div>
+
+            {agent.status === "active" || agent.status === "paused" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-muted/50">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <MessageSquare size={12} />
+                    <span className="text-xs">This week</span>
+                  </div>
+                  <p className="text-lg font-semibold">{agent.weeklyConversations.toLocaleString()}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-muted/50">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <Sparkles size={12} />
+                    <span className="text-xs">AI Resolved</span>
+                  </div>
+                  <p className="text-lg font-semibold">{agent.aiResolutionRate}%</p>
+                </div>
               </div>
-            </div>
-            <Dropdown
-              trigger={
-                <Button variant="light" isIconOnly size="sm" aria-label="Actions">
-                  <MoreHorizontal size={16} />
-                </Button>
-              }
-              items={dropdownItems}
-              onAction={handleDropdownAction}
-            />
-          </div>
-        </CardHeader>
-        <CardBody className="flex-1 pb-3 pt-0">
-          <div className="flex items-center gap-2 mb-3">
-            <span className={cn("h-2 w-2 rounded-full", status.dot)} />
-            <span className="text-sm text-default-500">{status.label}</span>
-          </div>
-          {agent.status === "active" || agent.status === "paused" ? (
-            <div className="space-y-1 text-sm text-default-500">
-              <p>This week: {agent.weeklyConversations.toLocaleString()} convos</p>
-              <p>{agent.aiResolutionRate}% AI resolved</p>
-            </div>
-          ) : (
-            <p className="text-sm text-default-500">Not deployed</p>
-          )}
-        </CardBody>
-        <CardFooter className="pt-0">
-          <Button
-            as={Link}
-            href={`/agents/${agent.id}`}
-            variant="bordered"
-            size="sm"
-            className="w-full"
-            leftIcon={Pencil}
-          >
-            Edit
-          </Button>
-        </CardFooter>
-      </Card>
+            ) : (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/50 text-muted-foreground">
+                <TrendingUp size={14} />
+                <span className="text-sm">Deploy to start tracking</span>
+              </div>
+            )}
+          </CardBody>
+
+          <CardFooter className="pt-0 pb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors"
+              asChild
+            >
+              <Link href={`/agents/${agent.id}`}>
+                <Pencil size={14} />
+                Configure Agent
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </motion.div>
 
       <ConfirmationDialog
         isOpen={showDeleteDialog}

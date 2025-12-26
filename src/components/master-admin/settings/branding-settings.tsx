@@ -1,9 +1,21 @@
 "use client";
 
-import { ImagePlus, Palette } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  ImagePlus,
+  Palette,
+  Type,
+  Image,
+  Code,
+  Moon,
+  Trash2,
+  Upload,
+  Sparkles,
+} from "lucide-react";
 import { useState } from "react";
 
-import { Button, Card, Input, Switch } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import { Button, Card, CardHeader, CardBody, Input, Switch } from "@/components/ui";
 
 export interface BrandingSettingsData {
   platformName: string;
@@ -24,239 +36,288 @@ interface BrandingSettingsProps {
   onChange: (updates: Partial<BrandingSettingsData>) => void;
 }
 
-export function BrandingSettings({ settings, onChange }: BrandingSettingsProps) {
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
+interface ColorPickerProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  description?: string;
+}
 
-  const handleLogoChange = (url: string) => {
-    onChange({ logoUrl: url });
-    setLogoPreview(url);
-  };
-
-  const handleFaviconChange = (url: string) => {
-    onChange({ faviconUrl: url });
-    setFaviconPreview(url);
-  };
-
+function ColorPicker({ label, value, onChange, description }: ColorPickerProps) {
   return (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="font-semibold mb-4">Platform Identity</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Input
-            label="Platform Name"
-            value={settings.platformName}
-            onValueChange={(v) => onChange({ platformName: v })}
-            description="The name displayed throughout the platform"
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-foreground block">
+        {label}
+      </label>
+      <div className="flex items-center gap-3">
+        <div className="relative group">
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-12 h-12 rounded-xl cursor-pointer border-2 border-border/50 transition-all duration-200 hover:border-primary/50 hover:scale-105"
           />
-          <Input
-            label="Platform Tagline"
-            value={settings.platformTagline}
-            onValueChange={(v) => onChange({ platformTagline: v })}
-            description="A short description or slogan"
+          <div
+            className="absolute inset-0 rounded-xl pointer-events-none ring-2 ring-inset ring-white/20"
+            style={{ backgroundColor: value }}
           />
         </div>
         <Input
-          label="Footer Text"
-          value={settings.footerText}
-          onValueChange={(v) => onChange({ footerText: v })}
-          className="mt-4"
-          description="Text displayed in the footer of all pages"
+          value={value}
+          onValueChange={onChange}
+          placeholder="#000000"
+          size="sm"
+          className="flex-1"
         />
-        <div className="mt-4">
-          <Switch
-            isSelected={settings.showPoweredBy}
-            onValueChange={(v) => onChange({ showPoweredBy: v })}
-          >
-            Show &quot;Powered by&quot; branding
-          </Switch>
-        </div>
+      </div>
+      {description && (
+        <p className="text-xs text-muted-foreground">{description}</p>
+      )}
+    </div>
+  );
+}
+
+interface ImageUploadProps {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (value: string) => void;
+  previewSize?: "sm" | "md";
+}
+
+function ImageUpload({ label, description, value, onChange, previewSize = "md" }: ImageUploadProps) {
+  return (
+    <div className="space-y-3">
+      <label className="text-sm font-medium text-foreground block">
+        {label}
+      </label>
+      <div
+        className={cn(
+          "border-2 border-dashed rounded-xl transition-all duration-200",
+          value
+            ? "border-primary/30 bg-primary/5"
+            : "border-border/50 hover:border-primary/30 hover:bg-muted/30"
+        )}
+      >
+        {value ? (
+          <div className="p-6 flex flex-col items-center gap-4">
+            <div className={cn(
+              "relative rounded-xl overflow-hidden bg-muted/50",
+              previewSize === "sm" ? "w-12 h-12" : "h-20 px-4"
+            )}>
+              <img
+                src={value}
+                alt={`${label} preview`}
+                className={cn(
+                  "object-contain",
+                  previewSize === "sm" ? "w-full h-full" : "max-h-full w-auto"
+                )}
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onPress={() => onChange("")}
+            >
+              <Trash2 className="h-4 w-4" />
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <div className="p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
+              <Upload className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+        )}
+      </div>
+      <Input
+        placeholder="Or enter image URL"
+        value={value}
+        onValueChange={onChange}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+export function BrandingSettings({ settings, onChange }: BrandingSettingsProps) {
+  return (
+    <div className="space-y-6">
+      {/* Platform Identity */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5">
+              <Type className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Platform Identity</h3>
+              <p className="text-sm text-muted-foreground">Name and branding text</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody className="pt-0 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input
+              label="Platform Name"
+              value={settings.platformName}
+              onValueChange={(v) => onChange({ platformName: v })}
+              description="The name displayed throughout the platform"
+            />
+            <Input
+              label="Platform Tagline"
+              value={settings.platformTagline}
+              onValueChange={(v) => onChange({ platformTagline: v })}
+              description="A short description or slogan"
+            />
+          </div>
+          <Input
+            label="Footer Text"
+            value={settings.footerText}
+            onValueChange={(v) => onChange({ footerText: v })}
+            description="Text displayed in the footer of all pages"
+          />
+          <div className="pt-2">
+            <Switch
+              isSelected={settings.showPoweredBy}
+              onValueChange={(v) => onChange({ showPoweredBy: v })}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                Show &quot;Powered by&quot; branding
+              </div>
+            </Switch>
+          </div>
+        </CardBody>
       </Card>
 
-      <Card className="p-6">
-        <h3 className="font-semibold mb-4">Logo & Favicon</h3>
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-default-700 block mb-2">
-              Platform Logo
-            </label>
-            <div className="border-2 border-dashed border-divider rounded-lg p-6 text-center">
-              {logoPreview || settings.logoUrl ? (
-                <div className="space-y-3">
-                  <img
-                    src={logoPreview || settings.logoUrl}
-                    alt="Logo preview"
-                    className="max-h-16 mx-auto"
-                  />
-                  <Button
-                    variant="flat"
-                    size="sm"
-                    onPress={() => {
-                      setLogoPreview(null);
-                      onChange({ logoUrl: "" });
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <ImagePlus
-                    size={32}
-                    className="mx-auto text-default-400"
-                  />
-                  <p className="text-sm text-default-500">
-                    Upload a logo image
-                  </p>
-                </div>
-              )}
+      {/* Logo & Favicon */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/15 to-blue-600/5">
+              <Image className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <Input
-              className="mt-2"
-              placeholder="Or enter logo URL"
+            <div>
+              <h3 className="font-semibold">Logo & Favicon</h3>
+              <p className="text-sm text-muted-foreground">Brand imagery</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody className="pt-0">
+          <div className="grid gap-6 md:grid-cols-2">
+            <ImageUpload
+              label="Platform Logo"
+              description="Upload a logo image (PNG, SVG recommended)"
               value={settings.logoUrl}
-              onValueChange={handleLogoChange}
-              size="sm"
+              onChange={(v) => onChange({ logoUrl: v })}
+              previewSize="md"
             />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-default-700 block mb-2">
-              Favicon
-            </label>
-            <div className="border-2 border-dashed border-divider rounded-lg p-6 text-center">
-              {faviconPreview || settings.faviconUrl ? (
-                <div className="space-y-3">
-                  <img
-                    src={faviconPreview || settings.faviconUrl}
-                    alt="Favicon preview"
-                    className="w-8 h-8 mx-auto"
-                  />
-                  <Button
-                    variant="flat"
-                    size="sm"
-                    onPress={() => {
-                      setFaviconPreview(null);
-                      onChange({ faviconUrl: "" });
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <ImagePlus
-                    size={32}
-                    className="mx-auto text-default-400"
-                  />
-                  <p className="text-sm text-default-500">
-                    Upload a favicon (32x32 recommended)
-                  </p>
-                </div>
-              )}
-            </div>
-            <Input
-              className="mt-2"
-              placeholder="Or enter favicon URL"
+            <ImageUpload
+              label="Favicon"
+              description="Upload a favicon (32x32 recommended)"
               value={settings.faviconUrl}
-              onValueChange={handleFaviconChange}
-              size="sm"
+              onChange={(v) => onChange({ faviconUrl: v })}
+              previewSize="sm"
             />
           </div>
-        </div>
+        </CardBody>
       </Card>
 
-      <Card className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Palette size={20} />
-          <h3 className="font-semibold">Colors</h3>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div>
-            <label className="text-sm font-medium text-default-700 block mb-2">
-              Primary Color
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.primaryColor}
-                onChange={(e) => onChange({ primaryColor: e.target.value })}
-                className="w-10 h-10 rounded cursor-pointer border border-divider"
-              />
-              <Input
-                value={settings.primaryColor}
-                onValueChange={(v) => onChange({ primaryColor: v })}
-                placeholder="#000000"
-                size="sm"
-                className="flex-1"
-              />
+      {/* Colors */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/15 to-violet-600/5">
+              <Palette className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Color Palette</h3>
+              <p className="text-sm text-muted-foreground">Brand colors and theme</p>
             </div>
           </div>
-
-          <div>
-            <label className="text-sm font-medium text-default-700 block mb-2">
-              Secondary Color
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.secondaryColor}
-                onChange={(e) => onChange({ secondaryColor: e.target.value })}
-                className="w-10 h-10 rounded cursor-pointer border border-divider"
-              />
-              <Input
-                value={settings.secondaryColor}
-                onValueChange={(v) => onChange({ secondaryColor: v })}
-                placeholder="#000000"
-                size="sm"
-                className="flex-1"
-              />
-            </div>
+        </CardHeader>
+        <CardBody className="pt-0 space-y-6">
+          {/* Color Preview Bar */}
+          <div className="flex h-10 rounded-xl overflow-hidden shadow-sm">
+            <div className="flex-1" style={{ backgroundColor: settings.primaryColor }} />
+            <div className="flex-1" style={{ backgroundColor: settings.secondaryColor }} />
+            <div className="flex-1" style={{ backgroundColor: settings.accentColor }} />
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-default-700 block mb-2">
-              Accent Color
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.accentColor}
-                onChange={(e) => onChange({ accentColor: e.target.value })}
-                className="w-10 h-10 rounded cursor-pointer border border-divider"
-              />
-              <Input
-                value={settings.accentColor}
-                onValueChange={(v) => onChange({ accentColor: v })}
-                placeholder="#000000"
-                size="sm"
-                className="flex-1"
-              />
-            </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            <ColorPicker
+              label="Primary Color"
+              value={settings.primaryColor}
+              onChange={(v) => onChange({ primaryColor: v })}
+              description="Main brand color"
+            />
+            <ColorPicker
+              label="Secondary Color"
+              value={settings.secondaryColor}
+              onChange={(v) => onChange({ secondaryColor: v })}
+              description="Supporting color"
+            />
+            <ColorPicker
+              label="Accent Color"
+              value={settings.accentColor}
+              onChange={(v) => onChange({ accentColor: v })}
+              description="Highlight elements"
+            />
           </div>
-        </div>
 
-        <div className="mt-4">
-          <Switch
-            isSelected={settings.darkModeEnabled}
-            onValueChange={(v) => onChange({ darkModeEnabled: v })}
-          >
-            Enable dark mode option for users
-          </Switch>
-        </div>
+          <div className="pt-2 border-t border-border/50">
+            <Switch
+              isSelected={settings.darkModeEnabled}
+              onValueChange={(v) => onChange({ darkModeEnabled: v })}
+            >
+              <div className="flex items-center gap-2">
+                <Moon className="h-4 w-4 text-muted-foreground" />
+                Enable dark mode option for users
+              </div>
+            </Switch>
+          </div>
+        </CardBody>
       </Card>
 
-      <Card className="p-6">
-        <h3 className="font-semibold mb-4">Custom CSS</h3>
-        <p className="text-sm text-default-500 mb-3">
-          Add custom CSS to override default styles. Use with caution.
-        </p>
-        <textarea
-          value={settings.customCss}
-          onChange={(e) => onChange({ customCss: e.target.value })}
-          className="w-full h-40 font-mono text-sm p-3 rounded-lg border border-divider bg-default-50 focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="/* Custom CSS */"
-        />
+      {/* Custom CSS */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/15 to-amber-600/5">
+              <Code className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Custom CSS</h3>
+              <p className="text-sm text-muted-foreground">Advanced styling overrides</p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody className="pt-0">
+          <div className="p-3 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm mb-4 flex items-start gap-2">
+            <Code className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>Custom CSS can override default styles. Use with caution as improper styles may break the UI.</span>
+          </div>
+          <textarea
+            value={settings.customCss}
+            onChange={(e) => onChange({ customCss: e.target.value })}
+            className={cn(
+              "w-full h-48 font-mono text-sm p-4 rounded-xl",
+              "border border-border/50 bg-muted/30",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary",
+              "placeholder:text-muted-foreground/50",
+              "transition-all duration-200"
+            )}
+            placeholder="/* Custom CSS styles */
+
+.my-custom-class {
+  color: var(--primary);
+}"
+          />
+        </CardBody>
       </Card>
     </div>
   );

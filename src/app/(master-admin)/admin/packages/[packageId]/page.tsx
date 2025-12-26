@@ -1,11 +1,10 @@
 "use client";
 
-import { Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2, Users, User, Bot, Variable, Lock, Unlock } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, useCallback } from "react";
 
 import { PageHeader } from "@/components/layouts";
-import { SystemPromptEditor } from "@/components/master-admin/packages";
 import {
   Button,
   Card,
@@ -13,7 +12,9 @@ import {
   Input,
   Select,
   Skeleton,
+  Slider,
   Switch,
+  Tabs,
   Textarea,
 } from "@/components/ui";
 import {
@@ -21,32 +22,70 @@ import {
   deletePackage,
   updatePackage,
   usePackage,
+  type PackageAgentData,
 } from "@/hooks/master-admin";
 
 interface PackageEditorPageProps {
   params: Promise<{ packageId: string }>;
 }
 
+// Package variable definition (matches schema)
+interface PackageVariableData {
+  name: string;
+  displayName: string;
+  description?: string;
+  variableType: "variable" | "secured_variable";
+  dataType: "string" | "number" | "boolean" | "json";
+  defaultValue?: string;
+  required: boolean;
+  validationPattern?: string;
+  placeholder?: string;
+}
+
 interface FormData {
   name: string;
   description: string;
   category: string;
-  defaultSystemPrompt: string;
-  defaultModelId: string;
-  defaultTemperature: number;
+  packageType: "single_agent" | "multi_agent";
   isActive: boolean;
   isPublic: boolean;
+  agents: PackageAgentData[];
+  variables: PackageVariableData[];
 }
+
+const defaultAgentData: PackageAgentData = {
+  agentIdentifier: "",
+  name: "New Agent",
+  designation: "",
+  agentType: "worker",
+  systemPrompt: "",
+  modelId: "gpt-4o-mini",
+  temperature: 70,
+  tools: [],
+  managedAgentIds: [],
+  sortOrder: 0,
+};
+
+const defaultVariableData: PackageVariableData = {
+  name: "",
+  displayName: "",
+  description: "",
+  variableType: "variable",
+  dataType: "string",
+  defaultValue: "",
+  required: true,
+  placeholder: "",
+};
 
 const defaultFormData: FormData = {
   name: "",
   description: "",
   category: "support",
-  defaultSystemPrompt: "",
-  defaultModelId: "gpt-4o-mini",
-  defaultTemperature: 70,
+  packageType: "single_agent",
   isActive: true,
   isPublic: true,
+  agents: [{ ...defaultAgentData, agentIdentifier: crypto.randomUUID().slice(0, 8) }],
+  variables: [],
 };
 
 const categoryOptions = [
@@ -60,8 +99,14 @@ const modelOptions = [
   { value: "gpt-4o-mini", label: "GPT-4o Mini" },
   { value: "gpt-4o", label: "GPT-4o" },
   { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-  { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
-  { value: "claude-3-opus", label: "Claude 3 Opus" },
+  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
+  { value: "claude-3-5-haiku", label: "Claude 3.5 Haiku" },
+  { value: "claude-opus-4", label: "Claude Opus 4" },
+];
+
+const agentTypeOptions = [
+  { value: "worker", label: "Worker" },
+  { value: "supervisor", label: "Supervisor" },
 ];
 
 export default function PackageEditorPage({ params }: PackageEditorPageProps) {
@@ -71,30 +116,60 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
   const { package: pkg, isLoading } = usePackage(isNewPackage ? null : packageId);
 
   const [formData, setFormData] = useState<FormData>(defaultFormData);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeAgentTab, setActiveAgentTab] = useState("0");
 
   // Load package data when available
   useEffect(() => {
     if (pkg) {
+      const packageAgents: PackageAgentData[] = pkg.packageAgents?.length
+        ? pkg.packageAgents.map((pa) => ({
+            id: pa.id,
+            agentIdentifier: pa.agentIdentifier,
+            name: pa.name,
+            designation: pa.designation ?? "",
+            agentType: pa.agentType as "worker" | "supervisor",
+            systemPrompt: pa.systemPrompt,
+            modelId: pa.modelId,
+            temperature: pa.temperature,
+            tools: (pa.tools as string[]) ?? [],
+            managedAgentIds: (pa.managedAgentIds as string[]) ?? [],
+            sortOrder: pa.sortOrder,
+          }))
+        : [{ ...defaultAgentData, agentIdentifier: crypto.randomUUID().slice(0, 8) }];
+
+      // Load variables from package
+      const packageVariables: PackageVariableData[] = (pkg.variables || []).map((v) => ({
+        name: v.name,
+        displayName: v.displayName,
+        description: v.description ?? "",
+        variableType: v.variableType as "variable" | "secured_variable",
+        dataType: v.dataType as "string" | "number" | "boolean" | "json",
+        defaultValue: v.defaultValue ?? "",
+        required: v.required ?? true,
+        validationPattern: v.validationPattern ?? "",
+        placeholder: v.placeholder ?? "",
+      }));
+
       setFormData({
         name: pkg.name,
         description: pkg.description ?? "",
         category: pkg.category ?? "custom",
-        defaultSystemPrompt: pkg.defaultSystemPrompt,
-        defaultModelId: pkg.defaultModelId,
-        defaultTemperature: pkg.defaultTemperature,
+        packageType: (pkg.packageType as "single_agent" | "multi_agent") ?? "single_agent",
         isActive: pkg.isActive,
         isPublic: pkg.isPublic,
+        agents: packageAgents,
+        variables: packageVariables,
       });
     }
   }, [pkg]);
 
-  const validate = (): boolean => {
-    const newErrors: Partial<Record<keyof FormData, string>> = {};
+  const validate = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
       newErrors.name = "Package name is required";
@@ -102,13 +177,31 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
       newErrors.name = "Package name must be at least 2 characters";
     }
 
-    if (!formData.defaultSystemPrompt.trim()) {
-      newErrors.defaultSystemPrompt = "System prompt is required";
-    }
+    // Validate each agent
+    formData.agents.forEach((agent, index) => {
+      if (!agent.name.trim()) {
+        newErrors[`agent_${index}_name`] = "Agent name is required";
+      }
+      if (!agent.systemPrompt.trim()) {
+        newErrors[`agent_${index}_systemPrompt`] = "System prompt is required";
+      }
+    });
+
+    // Validate each variable
+    formData.variables.forEach((variable, index) => {
+      if (!variable.name.trim()) {
+        newErrors[`variable_${index}_name`] = "Variable name is required";
+      } else if (!/^[A-Z][A-Z0-9_]*$/.test(variable.name)) {
+        newErrors[`variable_${index}_name`] = "Must be UPPERCASE with underscores only";
+      }
+      if (!variable.displayName.trim()) {
+        newErrors[`variable_${index}_displayName`] = "Display name is required";
+      }
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [formData]);
 
   const handleSubmit = async () => {
     if (!validate()) return;
@@ -121,11 +214,25 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
         name: formData.name,
         description: formData.description || undefined,
         category: formData.category,
-        defaultSystemPrompt: formData.defaultSystemPrompt,
-        defaultModelId: formData.defaultModelId,
-        defaultTemperature: formData.defaultTemperature,
+        packageType: formData.packageType,
         isActive: formData.isActive,
         isPublic: formData.isPublic,
+        packageAgents: formData.agents.map((agent, index) => ({
+          ...agent,
+          sortOrder: index,
+        })),
+        // Variables stored as JSONB array
+        variables: formData.variables.map((v) => ({
+          name: v.name,
+          displayName: v.displayName,
+          description: v.description || undefined,
+          variableType: v.variableType,
+          dataType: v.dataType,
+          defaultValue: v.variableType === "secured_variable" ? undefined : (v.defaultValue || undefined),
+          required: v.required,
+          validationPattern: v.validationPattern || undefined,
+          placeholder: v.placeholder || undefined,
+        })),
       };
 
       if (isNewPackage) {
@@ -166,6 +273,91 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const updateAgentField = <K extends keyof PackageAgentData>(
+    agentIndex: number,
+    field: K,
+    value: PackageAgentData[K]
+  ) => {
+    setFormData((prev) => {
+      const newAgents = [...prev.agents];
+      const existingAgent = newAgents[agentIndex];
+      if (existingAgent) {
+        newAgents[agentIndex] = { ...existingAgent, [field]: value };
+      }
+      return { ...prev, agents: newAgents };
+    });
+  };
+
+  const addAgent = () => {
+    const newAgent: PackageAgentData = {
+      ...defaultAgentData,
+      agentIdentifier: crypto.randomUUID().slice(0, 8),
+      name: `Agent ${formData.agents.length + 1}`,
+      sortOrder: formData.agents.length,
+    };
+    setFormData((prev) => ({
+      ...prev,
+      agents: [...prev.agents, newAgent],
+    }));
+    setActiveAgentTab(String(formData.agents.length));
+  };
+
+  const removeAgent = (index: number) => {
+    if (formData.agents.length <= 1) return;
+    setFormData((prev) => ({
+      ...prev,
+      agents: prev.agents.filter((_, i) => i !== index),
+    }));
+    if (parseInt(activeAgentTab) >= formData.agents.length - 1) {
+      setActiveAgentTab(String(Math.max(0, formData.agents.length - 2)));
+    }
+  };
+
+  const handlePackageTypeChange = (type: "single_agent" | "multi_agent") => {
+    updateField("packageType", type);
+    if (type === "single_agent" && formData.agents.length > 1) {
+      // Keep only the first agent for single-agent mode
+      setFormData((prev) => {
+        const firstAgent = prev.agents[0];
+        return {
+          ...prev,
+          agents: firstAgent ? [firstAgent] : prev.agents,
+        };
+      });
+      setActiveAgentTab("0");
+    }
+  };
+
+  // Variable management functions
+  const addVariable = () => {
+    setFormData((prev) => ({
+      ...prev,
+      variables: [...prev.variables, { ...defaultVariableData }],
+    }));
+  };
+
+  const removeVariable = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      variables: prev.variables.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateVariableField = <K extends keyof PackageVariableData>(
+    varIndex: number,
+    field: K,
+    value: PackageVariableData[K]
+  ) => {
+    setFormData((prev) => {
+      const newVariables = [...prev.variables];
+      const existingVar = newVariables[varIndex];
+      if (existingVar) {
+        newVariables[varIndex] = { ...existingVar, [field]: value };
+      }
+      return { ...prev, variables: newVariables };
+    });
+  };
+
   if (!isNewPackage && isLoading) {
     return (
       <div className="p-6">
@@ -185,13 +377,20 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
       <div className="p-6">
         <Card className="p-12 text-center">
           <h2 className="text-xl font-semibold mb-2">Package Not Found</h2>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             The package you&apos;re looking for doesn&apos;t exist or has been deleted.
           </p>
         </Card>
       </div>
     );
   }
+
+  const getAgentTabs = () =>
+    formData.agents.map((agent, index) => ({
+      key: String(index),
+      label: agent.name || `Agent ${index + 1}`,
+      content: <div className="pt-4">{renderAgentForm(index)}</div>,
+    }));
 
   return (
     <div className="p-6">
@@ -207,10 +406,10 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
           <div className="flex items-center gap-2">
             {!isNewPackage && (
               <Button
-                variant="flat"
+                variant="secondary"
                 color="danger"
                 startContent={<Trash2 size={16} />}
-                onPress={() => setIsDeleteDialogOpen(true)}
+                onClick={() => setIsDeleteDialogOpen(true)}
               >
                 Delete
               </Button>
@@ -218,7 +417,7 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
             <Button
               color="primary"
               startContent={<Save size={16} />}
-              onPress={handleSubmit}
+              onClick={handleSubmit}
               isLoading={isSubmitting}
             >
               {isNewPackage ? "Create Package" : "Save Changes"}
@@ -265,50 +464,239 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
             className="mt-4"
             minRows={2}
           />
+
+          {/* Package ID (read-only for existing packages) */}
+          {!isNewPackage && pkg && (
+            <div className="mt-4">
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Package ID
+              </label>
+              <code className="text-sm bg-default-100 px-3 py-2 rounded-lg block">
+                {pkg.id}
+              </code>
+              <p className="text-xs text-muted-foreground mt-1">
+                Use this ID in your agent package code: <code>createAgentPackage(&quot;{pkg.id}&quot;, ...)</code>
+              </p>
+            </div>
+          )}
         </Card>
 
-        {/* System Prompt */}
-        <SystemPromptEditor
-          value={formData.defaultSystemPrompt}
-          onChange={(v) => updateField("defaultSystemPrompt", v)}
-        />
-        {errors.defaultSystemPrompt && (
-          <p className="text-sm text-danger -mt-4">{errors.defaultSystemPrompt}</p>
-        )}
-
-        {/* Default Settings */}
+        {/* Package Type Selection */}
         <Card className="p-6">
-          <h4 className="font-medium mb-4">Default Settings</h4>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select
-              label="Default Model"
-              selectedKeys={new Set([formData.defaultModelId])}
-              onSelectionChange={(keys) => {
-                const selected = Array.from(keys)[0] as string;
-                updateField("defaultModelId", selected ?? "gpt-4o-mini");
-              }}
-              options={modelOptions}
-            />
-            <div>
-              <label className="text-sm font-medium text-default-700 block mb-2">
-                Temperature: {formData.defaultTemperature}%
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={formData.defaultTemperature}
-                onChange={(e) =>
-                  updateField("defaultTemperature", parseInt(e.target.value))
-                }
-                className="w-full accent-primary"
-              />
-              <div className="flex justify-between text-xs text-default-400 mt-1">
-                <span>Precise</span>
-                <span>Creative</span>
+          <h4 className="font-medium mb-4">Package Type</h4>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => handlePackageTypeChange("single_agent")}
+              className={`flex-1 p-4 rounded-xl border-2 transition-all ${
+                formData.packageType === "single_agent"
+                  ? "border-primary bg-primary-50"
+                  : "border-default-200 hover:border-default-300"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  formData.packageType === "single_agent" ? "bg-primary-100" : "bg-default-100"
+                }`}>
+                  <User size={24} className={formData.packageType === "single_agent" ? "text-primary" : "text-default-500"} />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">Single Agent</p>
+                  <p className="text-sm text-muted-foreground">One AI agent handles all interactions</p>
+                </div>
               </div>
-            </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handlePackageTypeChange("multi_agent")}
+              className={`flex-1 p-4 rounded-xl border-2 transition-all ${
+                formData.packageType === "multi_agent"
+                  ? "border-primary bg-primary-50"
+                  : "border-default-200 hover:border-default-300"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  formData.packageType === "multi_agent" ? "bg-primary-100" : "bg-default-100"
+                }`}>
+                  <Users size={24} className={formData.packageType === "multi_agent" ? "text-primary" : "text-default-500"} />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">Multi-Agent</p>
+                  <p className="text-sm text-muted-foreground">Multiple specialized agents with orchestration</p>
+                </div>
+              </div>
+            </button>
           </div>
+        </Card>
+
+        {/* Agents Configuration */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Bot size={20} />
+              <h4 className="font-medium">
+                {formData.packageType === "single_agent" ? "Agent Configuration" : "Agents Configuration"}
+              </h4>
+            </div>
+            {formData.packageType === "multi_agent" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                startContent={<Plus size={16} />}
+                onClick={addAgent}
+              >
+                Add Agent
+              </Button>
+            )}
+          </div>
+
+          {formData.packageType === "multi_agent" && formData.agents.length > 1 ? (
+            <Tabs
+              selectedKey={activeAgentTab}
+              onSelectionChange={(key) => setActiveAgentTab(key)}
+              items={getAgentTabs()}
+              className="mb-4"
+            />
+          ) : (
+            renderAgentForm(0)
+          )}
+        </Card>
+
+        {/* Package Variables */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Variable size={20} />
+              <h4 className="font-medium">Package Variables</h4>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              startContent={<Plus size={16} />}
+              onClick={addVariable}
+            >
+              Add Variable
+            </Button>
+          </div>
+
+          <p className="text-sm text-muted-foreground mb-4">
+            Define configuration variables that can be customized per-agent when deploying this package.
+            Secured variables (API keys, secrets) will be encrypted and masked in the UI.
+          </p>
+
+          {formData.variables.length === 0 ? (
+            <div className="text-center py-8 border-2 border-dashed border-default-200 rounded-lg">
+              <Variable className="mx-auto mb-2 text-muted-foreground" size={32} />
+              <p className="text-sm text-muted-foreground">No variables defined</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Add variables for API keys, configuration values, or other settings
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {formData.variables.map((variable, index) => (
+                <div key={index} className="p-4 border border-default-200 rounded-lg">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-4">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Input
+                          label="Variable Name"
+                          placeholder="e.g., API_KEY"
+                          value={variable.name}
+                          onValueChange={(v) => updateVariableField(index, "name", v.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
+                          isInvalid={!!errors[`variable_${index}_name`]}
+                          errorMessage={errors[`variable_${index}_name`]}
+                          description="UPPERCASE with underscores only"
+                          isRequired
+                        />
+                        <Input
+                          label="Display Name"
+                          placeholder="e.g., API Key"
+                          value={variable.displayName}
+                          onValueChange={(v) => updateVariableField(index, "displayName", v)}
+                          isInvalid={!!errors[`variable_${index}_displayName`]}
+                          errorMessage={errors[`variable_${index}_displayName`]}
+                          isRequired
+                        />
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <Select
+                          label="Variable Type"
+                          selectedKeys={new Set([variable.variableType])}
+                          onSelectionChange={(keys) => {
+                            const selected = Array.from(keys)[0] as "variable" | "secured_variable";
+                            updateVariableField(index, "variableType", selected);
+                          }}
+                          options={[
+                            { value: "variable", label: "Variable" },
+                            { value: "secured_variable", label: "Secured (Secret)" },
+                          ]}
+                        />
+                        <Select
+                          label="Data Type"
+                          selectedKeys={new Set([variable.dataType])}
+                          onSelectionChange={(keys) => {
+                            const selected = Array.from(keys)[0] as "string" | "number" | "boolean" | "json";
+                            updateVariableField(index, "dataType", selected);
+                          }}
+                          options={[
+                            { value: "string", label: "String" },
+                            { value: "number", label: "Number" },
+                            { value: "boolean", label: "Boolean" },
+                            { value: "json", label: "JSON" },
+                          ]}
+                        />
+                        <div className="flex items-end">
+                          <Switch
+                            isSelected={variable.required}
+                            onValueChange={(v) => updateVariableField(index, "required", v)}
+                          >
+                            Required
+                          </Switch>
+                        </div>
+                      </div>
+
+                      <Input
+                        label="Description"
+                        placeholder="Brief description of this variable"
+                        value={variable.description ?? ""}
+                        onValueChange={(v) => updateVariableField(index, "description", v)}
+                      />
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {variable.variableType !== "secured_variable" && (
+                          <Input
+                            label="Default Value"
+                            placeholder="Optional default value"
+                            value={variable.defaultValue ?? ""}
+                            onValueChange={(v) => updateVariableField(index, "defaultValue", v)}
+                          />
+                        )}
+                        <Input
+                          label="Placeholder"
+                          placeholder="Input placeholder text"
+                          value={variable.placeholder ?? ""}
+                          onValueChange={(v) => updateVariableField(index, "placeholder", v)}
+                        />
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      color="danger"
+                      size="sm"
+                      onClick={() => removeVariable(index)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         {/* Status */}
@@ -344,4 +732,133 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
       />
     </div>
   );
+
+  function renderAgentForm(agentIndex: number) {
+    const agent = formData.agents[agentIndex];
+    if (!agent) return null;
+
+    const showSupervisorOptions = formData.packageType === "multi_agent";
+    const workerAgents = formData.agents
+      .filter((a, i) => i !== agentIndex && a.agentType === "worker")
+      .map((a) => ({ value: a.agentIdentifier, label: a.name }));
+
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Input
+            label="Agent Name"
+            placeholder="e.g., Sales Specialist"
+            value={agent.name}
+            onValueChange={(v) => updateAgentField(agentIndex, "name", v)}
+            isInvalid={!!errors[`agent_${agentIndex}_name`]}
+            errorMessage={errors[`agent_${agentIndex}_name`]}
+            isRequired
+            description="This name will appear in the tab above"
+          />
+          <Input
+            label="Designation"
+            placeholder="e.g., Senior Support Agent"
+            value={agent.designation ?? ""}
+            onValueChange={(v) => updateAgentField(agentIndex, "designation", v)}
+          />
+        </div>
+
+        {showSupervisorOptions && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Select
+              label="Agent Type"
+              selectedKeys={new Set([agent.agentType])}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as "worker" | "supervisor";
+                updateAgentField(agentIndex, "agentType", selected);
+              }}
+              options={agentTypeOptions}
+              description="Supervisors can delegate tasks to worker agents"
+            />
+            {agent.agentType === "supervisor" && workerAgents.length > 0 && (
+              <Select
+                label="Managed Workers"
+                selectedKeys={new Set(agent.managedAgentIds ?? [])}
+                onSelectionChange={(keys) => {
+                  updateAgentField(agentIndex, "managedAgentIds", Array.from(keys) as string[]);
+                }}
+                options={workerAgents}
+                description="Select worker agents this supervisor manages"
+              />
+            )}
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Select
+            label="Model"
+            selectedKeys={new Set([agent.modelId])}
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0] as string;
+              updateAgentField(agentIndex, "modelId", selected ?? "gpt-4o-mini");
+            }}
+            options={modelOptions}
+          />
+          <div>
+            <Slider
+              label={`Temperature: ${agent.temperature}%`}
+              min={0}
+              max={100}
+              step={1}
+              value={[agent.temperature]}
+              onValueChange={(values) =>
+                updateAgentField(agentIndex, "temperature", values[0] ?? 0)
+              }
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>Precise</span>
+              <span>Creative</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-foreground block mb-2">
+            System Prompt <span className="text-danger">*</span>
+          </label>
+          <Textarea
+            placeholder="Enter the system prompt for this agent..."
+            value={agent.systemPrompt}
+            onValueChange={(v) => updateAgentField(agentIndex, "systemPrompt", v)}
+            minRows={6}
+            isInvalid={!!errors[`agent_${agentIndex}_systemPrompt`]}
+            errorMessage={errors[`agent_${agentIndex}_systemPrompt`]}
+          />
+        </div>
+
+        {/* Agent Identifier (read-only) */}
+        <div>
+          <label className="text-sm font-medium text-foreground block mb-2">
+            Agent Identifier
+          </label>
+          <code className="text-sm bg-default-100 px-3 py-2 rounded-lg block">
+            {agent.agentIdentifier}
+          </code>
+          <p className="text-xs text-muted-foreground mt-1">
+            Use this ID in your code: <code>createBuzziAgent({"{"} agentId: &quot;{agent.agentIdentifier}&quot; {"}"})</code>
+          </p>
+        </div>
+
+        {/* Remove Agent Button (only for multi-agent with more than 1 agent) */}
+        {formData.packageType === "multi_agent" && formData.agents.length > 1 && (
+          <div className="pt-4 border-t border-divider">
+            <Button
+              variant="secondary"
+              color="danger"
+              size="sm"
+              startContent={<Trash2 size={14} />}
+              onClick={() => removeAgent(agentIndex)}
+            >
+              Remove this Agent
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
 }

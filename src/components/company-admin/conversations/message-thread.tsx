@@ -2,8 +2,8 @@
 
 import { useRef, useEffect } from "react";
 import { Bot, User as UserIcon, Wrench, Info } from "lucide-react";
-import { ScrollShadow } from "@heroui/react";
 
+import { ScrollArea } from "@/components/ui";
 import type { MessageItem } from "@/app/api/company/conversations/[conversationId]/messages/route";
 
 interface MessageThreadProps {
@@ -53,7 +53,7 @@ function getRoleConfig(role: string) {
       return {
         icon: Bot,
         label: "AI Agent",
-        bgColor: "bg-default-100",
+        bgColor: "bg-muted",
         textColor: "text-foreground",
         align: "" as const,
       };
@@ -69,8 +69,8 @@ function getRoleConfig(role: string) {
       return {
         icon: Wrench,
         label: "Tool",
-        bgColor: "bg-default-50",
-        textColor: "text-default-500",
+        bgColor: "bg-muted/50",
+        textColor: "text-muted-foreground",
         align: "" as const,
       };
     case "system":
@@ -85,7 +85,7 @@ function getRoleConfig(role: string) {
       return {
         icon: Bot,
         label: "Unknown",
-        bgColor: "bg-default-100",
+        bgColor: "bg-muted",
         textColor: "text-foreground",
         align: "" as const,
       };
@@ -120,7 +120,7 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
   if (isLoading && messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-default-500">Loading messages...</div>
+        <div className="text-muted-foreground">Loading messages...</div>
       </div>
     );
   }
@@ -128,9 +128,9 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-        <Bot className="h-12 w-12 text-default-300 mb-4" />
-        <p className="text-default-500 font-medium">No messages yet</p>
-        <p className="text-default-400 text-sm">
+        <Bot className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground font-medium">No messages yet</p>
+        <p className="text-muted-foreground text-sm">
           Messages will appear here when the conversation starts
         </p>
       </div>
@@ -138,17 +138,17 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
   }
 
   return (
-    <ScrollShadow className="flex-1 p-4 overflow-y-auto" ref={scrollRef}>
+    <ScrollArea className="flex-1 p-4" ref={scrollRef}>
       <div className="space-y-6 max-w-3xl mx-auto">
         {Array.from(messageGroups.entries()).map(([dateKey, dayMessages]) => (
           <div key={dateKey}>
             {/* Date Separator */}
             <div className="flex items-center gap-4 my-4">
-              <div className="flex-1 h-px bg-divider" />
-              <span className="text-xs text-default-400 font-medium">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground font-medium">
                 {formatDate(dayMessages[0]?.createdAt ?? "")}
               </span>
-              <div className="flex-1 h-px bg-divider" />
+              <div className="flex-1 h-px bg-border" />
             </div>
 
             {/* Messages for this day */}
@@ -168,7 +168,7 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
                     {/* Avatar */}
                     <div
                       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        message.role === "user" ? "bg-primary" : "bg-default-100"
+                        message.role === "user" ? "bg-primary" : "bg-muted"
                       }`}
                     >
                       <Icon
@@ -186,7 +186,7 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
                         }`}
                       >
                         <span className="text-xs font-medium">{displayName}</span>
-                        <span className="text-xs text-default-400">
+                        <span className="text-xs text-muted-foreground">
                           {formatTime(message.createdAt)}
                         </span>
                       </div>
@@ -203,7 +203,7 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
 
                       {/* Tool calls indicator */}
                       {message.toolCalls && (message.toolCalls as unknown[]).length > 0 && (
-                        <div className="mt-1 text-xs text-default-400">
+                        <div className="mt-1 text-xs text-muted-foreground">
                           <Wrench className="inline h-3 w-3 mr-1" />
                           Used {(message.toolCalls as unknown[]).length} tool(s)
                         </div>
@@ -211,7 +211,7 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
 
                       {/* Token usage for AI messages */}
                       {message.role === "assistant" && message.tokenCount && (
-                        <div className="mt-1 text-xs text-default-400">
+                        <div className="mt-1 text-xs text-muted-foreground">
                           {message.tokenCount} tokens
                           {message.processingTimeMs && ` · ${message.processingTimeMs}ms`}
                         </div>
@@ -224,6 +224,6 @@ export function MessageThread({ messages, isLoading, customerName }: MessageThre
           </div>
         ))}
       </div>
-    </ScrollShadow>
+    </ScrollArea>
   );
 }

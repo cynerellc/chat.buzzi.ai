@@ -48,9 +48,9 @@ export const ROUTES = {
 
 // User Roles
 export const USER_ROLES = {
-  MASTER_ADMIN: "master_admin",
-  COMPANY_ADMIN: "company_admin",
-  SUPPORT_AGENT: "support_agent",
+  MASTER_ADMIN: "chatapp.master_admin",
+  COMPANY_ADMIN: "chatapp.company_admin",
+  SUPPORT_AGENT: "chatapp.support_agent",
 } as const;
 
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];

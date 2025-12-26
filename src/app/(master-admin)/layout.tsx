@@ -15,7 +15,7 @@ export default async function MasterAdminRouteLayout({
     redirect("/login");
   }
 
-  if (session.user.role !== "master_admin") {
+  if (session.user.role !== "chatapp.master_admin") {
     redirect("/unauthorized");
   }
 

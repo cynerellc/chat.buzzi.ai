@@ -16,7 +16,6 @@ import {
   Eye,
   FolderOpen,
 } from "lucide-react";
-import { Input as HeroInput, addToast } from "@heroui/react";
 import useSWR, { mutate } from "swr";
 
 import {
@@ -26,8 +25,10 @@ import {
   Select,
   Badge,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
   Skeleton,
+  Input,
+  addToast,
 } from "@/components/ui";
 import { UploadModal } from "@/components/company-admin/knowledge/upload-modal";
 
@@ -170,7 +171,7 @@ export default function FilesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">File Manager</h1>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             Upload and manage files for your knowledge base and widget
           </p>
         </div>
@@ -188,11 +189,11 @@ export default function FilesPage() {
         <CardBody>
           <div className="flex flex-wrap gap-4">
             <div className="flex-1 min-w-[200px]">
-              <HeroInput
+              <Input
                 placeholder="Search files..."
                 value={searchValue}
                 onValueChange={setSearchValue}
-                startContent={<Search className="h-4 w-4 text-default-400" />}
+                startContent={<Search className="h-4 w-4 text-muted-foreground" />}
                 isClearable
                 onClear={() => setSearchValue("")}
               />
@@ -238,9 +239,9 @@ export default function FilesPage() {
             </div>
           ) : files.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <FolderOpen className="h-12 w-12 text-default-300 mb-4" />
-              <p className="text-default-500 font-medium">No files found</p>
-              <p className="text-default-400 text-sm mb-4">
+              <FolderOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground font-medium">No files found</p>
+              <p className="text-muted-foreground text-sm mb-4">
                 Upload files to get started
               </p>
               <Button
@@ -256,17 +257,17 @@ export default function FilesPage() {
               {files.map((file) => {
                 const FileIcon = getFileIcon(file.mimeType);
 
-                const dropdownItems: DropdownMenuItem[] = [
+                const dropdownItems: DropdownMenuItemData[] = [
                   { key: "preview", label: "Preview", icon: Eye },
                   { key: "download", label: "Download", icon: Download },
                   { key: "delete", label: "Delete", icon: Trash2, isDanger: true },
                 ];
 
                 return (
-                  <div key={file.id} className="p-4 hover:bg-default-50 transition-colors">
+                  <div key={file.id} className="p-4 hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-4">
                       {/* Icon */}
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-default-100">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                         <FileIcon className="h-5 w-5" />
                       </div>
 
@@ -276,7 +277,7 @@ export default function FilesPage() {
                           <span className="font-medium truncate">{file.name}</span>
                           <Badge variant="default">{file.category}</Badge>
                         </div>
-                        <div className="flex items-center gap-4 mt-1 text-xs text-default-400">
+                        <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                           <span>{formatFileSize(file.size)}</span>
                           <span>Uploaded {formatDate(file.createdAt)}</span>
                           <span>
@@ -288,7 +289,7 @@ export default function FilesPage() {
                       {/* Actions */}
                       <Dropdown
                         trigger={
-                          <Button variant="light" isIconOnly size="sm">
+                          <Button variant="ghost" size="icon">
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         }
@@ -313,24 +314,24 @@ export default function FilesPage() {
       {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
             {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
             {pagination.total} files
           </p>
           <div className="flex gap-2">
             <Button
-              variant="bordered"
+              variant="outline"
               size="sm"
-              isDisabled={pagination.page <= 1}
+              disabled={pagination.page <= 1}
               onPress={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
             >
               Previous
             </Button>
             <Button
-              variant="bordered"
+              variant="outline"
               size="sm"
-              isDisabled={pagination.page >= pagination.totalPages}
+              disabled={pagination.page >= pagination.totalPages}
               onPress={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
             >
               Next

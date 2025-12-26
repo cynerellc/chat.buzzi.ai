@@ -1,9 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Input, Link } from "@heroui/react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowLeft, CheckCircle2, UserPlus } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, UserPlus, Users, Mail, Shield } from "lucide-react";
+
+import { Button, Input } from "@/components/ui";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -132,9 +134,9 @@ export function AcceptInvitationForm() {
     return (
       <div className="w-full max-w-md text-center">
         <div className="animate-pulse">
-          <div className="w-16 h-16 bg-default-200 rounded-full mx-auto mb-6" />
-          <div className="h-6 bg-default-200 rounded w-3/4 mx-auto mb-2" />
-          <div className="h-4 bg-default-200 rounded w-1/2 mx-auto" />
+          <div className="w-16 h-16 bg-muted rounded-full mx-auto mb-6" />
+          <div className="h-6 bg-muted rounded w-3/4 mx-auto mb-2" />
+          <div className="h-4 bg-muted rounded w-1/2 mx-auto" />
         </div>
       </div>
     );
@@ -145,16 +147,21 @@ export function AcceptInvitationForm() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
         className="w-full max-w-md text-center"
       >
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-danger/10 mb-6">
-          <AlertCircle className="w-8 h-8 text-danger" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2">Invalid Invitation</h1>
-        <p className="text-default-500 mb-6">{error}</p>
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10 mb-6"
+        >
+          <AlertCircle className="w-8 h-8 text-destructive" />
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight mb-2">Invalid Invitation</h1>
+        <p className="text-muted-foreground mb-6">{error}</p>
         <Link href="/login">
-          <Button color="primary">Go to Login</Button>
+          <Button color="primary" className="font-medium">Go to Login</Button>
         </Link>
       </motion.div>
     );
@@ -165,18 +172,23 @@ export function AcceptInvitationForm() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
         className="w-full max-w-md text-center"
       >
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-6">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-6"
+        >
           <CheckCircle2 className="w-8 h-8 text-success" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2">Welcome to the Team!</h1>
-        <p className="text-default-500 mb-6">
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight mb-2">Welcome to the Team!</h1>
+        <p className="text-muted-foreground mb-6">
           Your account has been created. You can now sign in to start using the
           platform.
         </p>
-        <Button color="primary" onClick={() => router.push("/login")}>
+        <Button color="primary" className="font-medium" onClick={() => router.push("/login")}>
           Sign In
         </Button>
       </motion.div>
@@ -187,45 +199,69 @@ export function AcceptInvitationForm() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className="w-full max-w-md"
     >
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
+      <div className="text-center mb-6">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+          className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4"
+        >
           <UserPlus className="w-6 h-6 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold">Accept Invitation</h1>
-        <p className="text-default-500 mt-2">
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight">Accept Invitation</h1>
+        <p className="text-muted-foreground mt-2">
           You&apos;ve been invited to join{" "}
           <span className="font-medium text-foreground">{invitation?.companyName}</span>
         </p>
       </div>
 
       {invitation && (
-        <div className="mb-6 p-4 rounded-lg bg-default-100">
-          <p className="text-sm text-default-500">
-            <span className="font-medium text-foreground">{invitation.inviterName}</span>{" "}
-            has invited you as a{" "}
-            <span className="font-medium text-foreground">
-              {invitation.role.replace("_", " ")}
-            </span>
-          </p>
-          <p className="text-sm text-default-400 mt-1">{invitation.email}</p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-6 p-4 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Users className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                {invitation.inviterName} invited you
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground capitalize">
+                  {invitation.role.replace("_", " ")}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground truncate">
+                  {invitation.email}
+                </span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       )}
 
       {error && (
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="mb-4 p-3 rounded-lg bg-danger-50 border border-danger-200 flex items-center gap-2 text-danger"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-destructive"
         >
           <AlertCircle size={18} />
           <span className="text-sm">{error}</span>
         </motion.div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input
           {...register("fullName")}
           label="Full Name"
@@ -260,7 +296,7 @@ export function AcceptInvitationForm() {
         <Button
           type="submit"
           color="primary"
-          className="w-full"
+          className="w-full font-medium"
           isLoading={isLoading}
           size="lg"
         >
@@ -271,7 +307,7 @@ export function AcceptInvitationForm() {
       <div className="text-center mt-6">
         <Link
           href="/login"
-          className="inline-flex items-center gap-1 text-sm text-default-500 hover:text-primary"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
         >
           <ArrowLeft size={16} />
           Already have an account? Sign in

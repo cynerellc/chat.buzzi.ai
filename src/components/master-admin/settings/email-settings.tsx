@@ -111,7 +111,7 @@ export function EmailSettings({ settings, onChange }: EmailSettingsProps) {
           </div>
           <Button
             color="primary"
-            variant="flat"
+            variant="secondary"
             startContent={<Send size={16} />}
             onPress={handleTestEmail}
             isLoading={isTesting}

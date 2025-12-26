@@ -10,14 +10,14 @@ import {
   Ticket,
   Settings,
 } from "lucide-react";
-import { Switch } from "@heroui/react";
 
 import {
   Button,
   Card,
   CardHeader,
   CardBody,
-  Chip,
+  Badge,
+  Switch,
 } from "@/components/ui";
 
 import type { AgentDetail } from "@/hooks/company/useAgents";
@@ -142,13 +142,13 @@ export function ToolsTab({ agent, onSave, isSaving }: ToolsTabProps) {
           <h2 className="text-lg font-semibold">Agent Tools</h2>
         </CardHeader>
         <CardBody className="space-y-6">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Enable tools that your agent can use during conversations.
           </p>
 
           {Object.entries(toolsByCategory).map(([category, tools]) => (
             <div key={category} className="space-y-4">
-              <h3 className="font-medium border-b border-divider pb-2">
+              <h3 className="font-medium border-b pb-2">
                 {CATEGORY_LABELS[category]}
               </h3>
               <div className="space-y-4">
@@ -157,26 +157,26 @@ export function ToolsTab({ agent, onSave, isSaving }: ToolsTabProps) {
                   return (
                     <div
                       key={tool.id}
-                      className="flex items-start justify-between rounded-lg border border-divider p-4"
+                      className="flex items-start justify-between rounded-lg border p-4"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-default-100">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
                           <Icon className="h-5 w-5" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{tool.name}</span>
                             {tool.requiresIntegration && (
-                              <Chip size="sm" variant="bordered">
+                              <Badge variant="secondary">
                                 Requires integration
-                              </Chip>
+                              </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-default-500">
+                          <p className="text-sm text-muted-foreground">
                             {tool.description}
                           </p>
                           {tool.requiresIntegration && (
-                            <p className="text-xs text-default-400 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                               Requires: {tool.requiresIntegration}
                             </p>
                           )}
@@ -191,9 +191,8 @@ export function ToolsTab({ agent, onSave, isSaving }: ToolsTabProps) {
                           isDisabled={!!tool.requiresIntegration}
                         />
                         <Button
-                          variant="light"
-                          isIconOnly
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
                           isDisabled
                         >
                           <Settings className="h-4 w-4" />

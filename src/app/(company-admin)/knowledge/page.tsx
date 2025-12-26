@@ -17,8 +17,6 @@ import {
   Eye,
   MessageSquareText,
 } from "lucide-react";
-import { Input as HeroInput, Tabs, Tab } from "@heroui/react";
-import { addToast } from "@heroui/react";
 
 import {
   Button,
@@ -27,7 +25,11 @@ import {
   Select,
   Badge,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
+  Tabs,
+  type TabItem,
+  Input,
+  addToast,
 } from "@/components/ui";
 import { useKnowledgeSources, useFaqs } from "@/hooks/company";
 import type { KnowledgeFilters } from "@/hooks/company/useKnowledge";
@@ -146,19 +148,24 @@ export default function KnowledgePage() {
     }
   };
 
+  const tabItems: TabItem[] = [
+    { key: "sources", label: "Knowledge Sources" },
+    { key: "faqs", label: "FAQs" },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Knowledge Base</h1>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             Manage documents, URLs, and FAQs that power your AI agents
           </p>
         </div>
         <div className="flex gap-2">
           <Button
-            variant="bordered"
+            variant="outline"
             leftIcon={MessageSquareText}
             onPress={() => router.push("/knowledge/new?type=faq")}
           >
@@ -176,12 +183,10 @@ export default function KnowledgePage() {
 
       {/* Tabs */}
       <Tabs
+        items={tabItems}
         selectedKey={activeTab}
         onSelectionChange={(key) => setActiveTab(key as string)}
-      >
-        <Tab key="sources" title="Knowledge Sources" />
-        <Tab key="faqs" title="FAQs" />
-      </Tabs>
+      />
 
       {activeTab === "sources" ? (
         <>
@@ -190,11 +195,11 @@ export default function KnowledgePage() {
             <CardBody>
               <div className="flex flex-wrap gap-4">
                 <div className="flex-1 min-w-[200px]">
-                  <HeroInput
+                  <Input
                     placeholder="Search sources..."
                     value={searchValue}
                     onValueChange={setSearchValue}
-                    startContent={<Search className="h-4 w-4 text-default-400" />}
+                    startContent={<Search className="h-4 w-4 text-muted-foreground" />}
                     isClearable
                     onClear={() => setSearchValue("")}
                   />
@@ -228,13 +233,13 @@ export default function KnowledgePage() {
             <CardBody className="p-0">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="text-default-500">Loading sources...</div>
+                  <div className="text-muted-foreground">Loading sources...</div>
                 </div>
               ) : sources.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-12 w-12 text-default-300 mb-4" />
-                  <p className="text-default-500 font-medium">No knowledge sources</p>
-                  <p className="text-default-400 text-sm mb-4">
+                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground font-medium">No knowledge sources</p>
+                  <p className="text-muted-foreground text-sm mb-4">
                     Add documents, URLs, or text to train your AI agents
                   </p>
                   <Button
@@ -252,7 +257,7 @@ export default function KnowledgePage() {
                     const StatusIcon = status.icon;
                     const TypeIcon = typeIcons[source.type] || FileText;
 
-                    const dropdownItems: DropdownMenuItem[] = [
+                    const dropdownItems: DropdownMenuItemData[] = [
                       { key: "view", label: "View Details", icon: Eye },
                       { key: "delete", label: "Delete", icon: Trash2, isDanger: true },
                     ];
@@ -260,11 +265,11 @@ export default function KnowledgePage() {
                     return (
                       <div
                         key={source.id}
-                        className="p-4 hover:bg-default-50 transition-colors"
+                        className="p-4 hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex items-center gap-4">
                           {/* Icon */}
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-default-100">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                             <TypeIcon className="h-5 w-5" />
                           </div>
 
@@ -281,11 +286,11 @@ export default function KnowledgePage() {
                               </Badge>
                             </div>
                             {source.description && (
-                              <p className="text-sm text-default-500 truncate mt-1">
+                              <p className="text-sm text-muted-foreground truncate mt-1">
                                 {source.description}
                               </p>
                             )}
-                            <div className="flex items-center gap-4 mt-2 text-xs text-default-400">
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                               <span className="capitalize">{source.type}</span>
                               <span>{source.chunkCount} chunks</span>
                               <span>{formatTokenCount(source.tokenCount)} tokens</span>
@@ -296,7 +301,7 @@ export default function KnowledgePage() {
                           {/* Actions */}
                           <Dropdown
                             trigger={
-                              <Button variant="light" isIconOnly size="sm">
+                              <Button variant="ghost" size="icon">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             }
@@ -332,13 +337,13 @@ export default function KnowledgePage() {
             <CardBody className="p-0">
               {isLoadingFaqs ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="text-default-500">Loading FAQs...</div>
+                  <div className="text-muted-foreground">Loading FAQs...</div>
                 </div>
               ) : faqs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <MessageSquareText className="h-12 w-12 text-default-300 mb-4" />
-                  <p className="text-default-500 font-medium">No FAQs yet</p>
-                  <p className="text-default-400 text-sm mb-4">
+                  <MessageSquareText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground font-medium">No FAQs yet</p>
+                  <p className="text-muted-foreground text-sm mb-4">
                     Add frequently asked questions for quick, accurate responses
                   </p>
                   <Button
@@ -352,7 +357,7 @@ export default function KnowledgePage() {
               ) : (
                 <div className="divide-y divide-divider">
                   {faqs.map((faq) => {
-                    const dropdownItems: DropdownMenuItem[] = [
+                    const dropdownItems: DropdownMenuItemData[] = [
                       { key: "edit", label: "Edit", icon: Eye },
                       { key: "delete", label: "Delete", icon: Trash2, isDanger: true },
                     ];
@@ -360,7 +365,7 @@ export default function KnowledgePage() {
                     return (
                       <div
                         key={faq.id}
-                        className="p-4 hover:bg-default-50 transition-colors"
+                        className="p-4 hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex items-start gap-4">
                           {/* Content */}
@@ -371,10 +376,10 @@ export default function KnowledgePage() {
                                 <Badge variant="default">{faq.category}</Badge>
                               )}
                             </div>
-                            <p className="text-sm text-default-500 mt-1 line-clamp-2">
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                               {faq.answer}
                             </p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-default-400">
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                               <span>Used {faq.usageCount} times</span>
                               <span>
                                 {faq.helpfulCount} helpful / {faq.notHelpfulCount} not helpful
@@ -386,7 +391,7 @@ export default function KnowledgePage() {
                           {/* Actions */}
                           <Dropdown
                             trigger={
-                              <Button variant="light" isIconOnly size="sm">
+                              <Button variant="ghost" size="icon">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             }
@@ -413,24 +418,24 @@ export default function KnowledgePage() {
       {/* Pagination for sources */}
       {activeTab === "sources" && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
             {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
             {pagination.total} sources
           </p>
           <div className="flex gap-2">
             <Button
-              variant="bordered"
+              variant="outline"
               size="sm"
-              isDisabled={pagination.page <= 1}
+              disabled={pagination.page <= 1}
               onPress={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) - 1 }))}
             >
               Previous
             </Button>
             <Button
-              variant="bordered"
+              variant="outline"
               size="sm"
-              isDisabled={pagination.page >= pagination.totalPages}
+              disabled={pagination.page >= pagination.totalPages}
               onPress={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
             >
               Next

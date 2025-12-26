@@ -1,139 +1,138 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Info, XCircle, X } from "lucide-react";
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { toast as sonnerToast, Toaster as SonnerToaster } from "sonner";
 
-import { cn } from "@/lib/utils";
+// Re-export Sonner's Toaster with our default configuration
+export function Toaster() {
+  return (
+    <SonnerToaster
+      position="bottom-right"
+      richColors
+      closeButton
+      toastOptions={{
+        classNames: {
+          toast: "group border-border",
+          description: "text-muted-foreground",
+          actionButton: "bg-primary text-primary-foreground",
+          cancelButton: "bg-muted text-muted-foreground",
+        },
+      }}
+    />
+  );
+}
 
-type ToastType = "default" | "info" | "success" | "warning" | "error";
-
-interface Toast {
-  id: string;
-  type: ToastType;
+// Legacy interface for backwards compatibility
+interface ToastOptions {
+  type?: "default" | "info" | "success" | "warning" | "error";
+  // HeroUI uses 'color' instead of 'type'
+  color?: "default" | "primary" | "secondary" | "success" | "warning" | "danger";
   title?: string;
-  message: string;
+  message?: string;
+  description?: string;
   duration?: number;
 }
 
-interface ToastContextValue {
-  toasts: Toast[];
-  addToast: (toast: Omit<Toast, "id">) => void;
-  removeToast: (id: string) => void;
-  toast: {
-    default: (message: string, title?: string) => void;
-    info: (message: string, title?: string) => void;
-    success: (message: string, title?: string) => void;
-    warning: (message: string, title?: string) => void;
-    error: (message: string, title?: string) => void;
-  };
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
-
-const typeStyles: Record<ToastType, string> = {
-  default: "bg-content1 text-foreground border-default-200",
-  info: "bg-primary-50 text-primary-800 border-primary-200",
-  success: "bg-success-50 text-success-800 border-success-200",
-  warning: "bg-warning-50 text-warning-800 border-warning-200",
-  error: "bg-danger-50 text-danger-800 border-danger-200",
-};
-
-const typeIcons: Record<ToastType, typeof Info> = {
-  default: Info,
-  info: Info,
-  success: CheckCircle2,
-  warning: AlertCircle,
-  error: XCircle,
-};
-
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const addToast = useCallback((toast: Omit<Toast, "id">) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    const newToast = { ...toast, id };
-    setToasts((prev) => [...prev, newToast]);
-
-    // Auto-remove after duration
-    const duration = toast.duration ?? 5000;
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, duration);
-    }
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const toast = {
-    default: (message: string, title?: string) => addToast({ type: "default", message, title }),
-    info: (message: string, title?: string) => addToast({ type: "info", message, title }),
-    success: (message: string, title?: string) => addToast({ type: "success", message, title }),
-    warning: (message: string, title?: string) => addToast({ type: "warning", message, title }),
-    error: (message: string, title?: string) => addToast({ type: "error", message, title }),
-  };
-
-  return (
-    <ToastContext.Provider value={{ toasts, addToast, removeToast, toast }}>
-      {children}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
-    </ToastContext.Provider>
-  );
-}
-
-function ToastContainer({
-  toasts,
-  removeToast,
-}: {
-  toasts: Toast[];
-  removeToast: (id: string) => void;
-}) {
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-      <AnimatePresence mode="popLayout">
-        {toasts.map((toast) => {
-          const Icon = typeIcons[toast.type];
-          return (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: 50, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-              className={cn(
-                "pointer-events-auto flex items-start gap-3 rounded-lg border p-4 shadow-lg min-w-[300px] max-w-[400px]",
-                typeStyles[toast.type]
-              )}
-            >
-              <Icon className="h-5 w-5 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                {toast.title && (
-                  <p className="font-medium mb-0.5">{toast.title}</p>
-                )}
-                <p className="text-sm">{toast.message}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeToast(toast.id)}
-                className="flex-shrink-0 rounded-md p-1 hover:bg-black/5 transition-colors"
-                aria-label="Dismiss"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-export function useToast() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error("useToast must be used within a ToastProvider");
+// Map HeroUI color to toast type
+function mapColorToType(
+  color?: ToastOptions["color"]
+): "default" | "info" | "success" | "warning" | "error" {
+  switch (color) {
+    case "success":
+      return "success";
+    case "danger":
+      return "error";
+    case "warning":
+      return "warning";
+    case "primary":
+    case "secondary":
+      return "info";
+    default:
+      return "default";
   }
-  return context;
+}
+
+/**
+ * Legacy addToast function for backwards compatibility
+ * Maps to sonner's toast API
+ * Supports both old API (type) and HeroUI API (color)
+ */
+export function addToast(options: ToastOptions) {
+  const { type, color, title, message, description, duration } = options;
+
+  // Determine the toast type from either 'type' or 'color' prop
+  const resolvedType = type || mapColorToType(color);
+  const resolvedDescription = description || message;
+
+  const toastOptions = {
+    description: resolvedDescription,
+    duration,
+  };
+
+  switch (resolvedType) {
+    case "success":
+      sonnerToast.success(title || "Success", toastOptions);
+      break;
+    case "error":
+      sonnerToast.error(title || "Error", toastOptions);
+      break;
+    case "warning":
+      sonnerToast.warning(title || "Warning", toastOptions);
+      break;
+    case "info":
+      sonnerToast.info(title || "Info", toastOptions);
+      break;
+    default:
+      if (title) {
+        sonnerToast(title, toastOptions);
+      } else if (resolvedDescription) {
+        sonnerToast(resolvedDescription, { duration });
+      }
+  }
+}
+
+/**
+ * Legacy useToast hook for backwards compatibility
+ * Returns an object matching the old API shape
+ */
+export function useToast() {
+  return {
+    toasts: [], // Not used in sonner
+    addToast,
+    removeToast: (id: string) => sonnerToast.dismiss(id),
+    toast: {
+      default: (message: string, title?: string) =>
+        title ? sonnerToast(title, { description: message }) : sonnerToast(message),
+      info: (message: string, title?: string) =>
+        sonnerToast.info(title || message, title ? { description: message } : undefined),
+      success: (message: string, title?: string) =>
+        sonnerToast.success(title || message, title ? { description: message } : undefined),
+      warning: (message: string, title?: string) =>
+        sonnerToast.warning(title || message, title ? { description: message } : undefined),
+      error: (message: string, title?: string) =>
+        sonnerToast.error(title || message, title ? { description: message } : undefined),
+    },
+  };
+}
+
+// Direct toast API (preferred for new code)
+export const toast = {
+  default: (message: string, options?: { description?: string; duration?: number }) =>
+    sonnerToast(message, options),
+  info: (message: string, options?: { description?: string; duration?: number }) =>
+    sonnerToast.info(message, options),
+  success: (message: string, options?: { description?: string; duration?: number }) =>
+    sonnerToast.success(message, options),
+  warning: (message: string, options?: { description?: string; duration?: number }) =>
+    sonnerToast.warning(message, options),
+  error: (message: string, options?: { description?: string; duration?: number }) =>
+    sonnerToast.error(message, options),
+  promise: sonnerToast.promise,
+  loading: sonnerToast.loading,
+  dismiss: sonnerToast.dismiss,
+  custom: sonnerToast.custom,
+};
+
+// Legacy ToastProvider - now a no-op since Sonner handles its own state
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }

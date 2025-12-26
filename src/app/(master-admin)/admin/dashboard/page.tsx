@@ -30,10 +30,10 @@ export default function MasterAdminDashboard() {
         description="Platform overview and key metrics"
         actions={
           <Button
-            variant="bordered"
+            variant="outline"
             size="sm"
             leftIcon={RefreshCw}
-            onPress={handleRefresh}
+            onClick={handleRefresh}
             isLoading={isLoading}
           >
             Refresh

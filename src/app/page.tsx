@@ -1,6 +1,7 @@
-import { Button, Card, CardBody } from "@heroui/react";
 import { MessageSquare, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
+
+import { Button, Card, CardBody } from "@/components/ui";
 
 export default function HomePage() {
   return (
@@ -21,23 +22,11 @@ export default function HomePage() {
               support, and real-time analytics.
             </p>
             <div className="mt-10 flex items-center justify-center gap-4">
-              <Button
-                as={Link}
-                href="/login"
-                color="primary"
-                size="lg"
-                className="font-semibold"
-              >
-                Get Started
+              <Button color="primary" size="lg" className="font-semibold" asChild>
+                <Link href="/login">Get Started</Link>
               </Button>
-              <Button
-                as={Link}
-                href="/register"
-                variant="bordered"
-                size="lg"
-                className="font-semibold"
-              >
-                Create Account
+              <Button variant="outline" size="lg" className="font-semibold" asChild>
+                <Link href="/register">Create Account</Link>
               </Button>
             </div>
           </div>

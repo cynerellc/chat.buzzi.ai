@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import {
   agents,
   companies,
+  companyPermissions,
   companySubscriptions,
   conversations,
   messages,
@@ -99,7 +100,7 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    // Get admin user
+    // Get admin user (first company_admin for this company)
     const [admin] = await db
       .select({
         id: users.id,
@@ -107,10 +108,11 @@ export async function GET(request: Request, context: RouteContext) {
         email: users.email,
       })
       .from(users)
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
       .where(
         and(
-          eq(users.companyId, companyId),
-          eq(users.role, "company_admin"),
+          eq(companyPermissions.companyId, companyId),
+          eq(companyPermissions.role, "chatapp.company_admin"),
           sql`${users.deletedAt} IS NULL`
         )
       )
@@ -119,10 +121,11 @@ export async function GET(request: Request, context: RouteContext) {
     // Get stats
     const [usersCount] = await db
       .select({ count: count() })
-      .from(users)
+      .from(companyPermissions)
+      .innerJoin(users, eq(companyPermissions.userId, users.id))
       .where(
         and(
-          eq(users.companyId, companyId),
+          eq(companyPermissions.companyId, companyId),
           sql`${users.deletedAt} IS NULL`
         )
       );
@@ -334,14 +337,22 @@ export async function DELETE(request: Request, context: RouteContext) {
       .where(eq(companies.id, companyId));
 
     // Also soft delete all users in the company
-    await db
-      .update(users)
-      .set({
-        deletedAt: now,
-        updatedAt: now,
-        isActive: false,
-      })
-      .where(eq(users.companyId, companyId));
+    const companyUserIds = await db
+      .select({ userId: companyPermissions.userId })
+      .from(companyPermissions)
+      .where(eq(companyPermissions.companyId, companyId));
+
+    if (companyUserIds.length > 0) {
+      const { inArray } = await import("drizzle-orm");
+      await db
+        .update(users)
+        .set({
+          deletedAt: now,
+          updatedAt: now,
+          isActive: false,
+        })
+        .where(inArray(users.id, companyUserIds.map(u => u.userId)));
+    }
 
     return NextResponse.json({
       message: "Company deleted successfully",

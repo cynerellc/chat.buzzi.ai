@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { integrations, webhooks } from "@/lib/db/schema";
 
@@ -79,12 +78,7 @@ const availableIntegrationTypes = [
 
 export async function GET() {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     // Get integrations
     const companyIntegrations = await db
@@ -152,12 +146,7 @@ interface CreateWebhookRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body: CreateWebhookRequest = await request.json();
 

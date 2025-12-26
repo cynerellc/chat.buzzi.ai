@@ -147,7 +147,7 @@ export default function CompaniesPage() {
           <Button
             color="primary"
             startContent={<Plus size={18} />}
-            onPress={() => setIsAddModalOpen(true)}
+            onClick={() => setIsAddModalOpen(true)}
           >
             Add Company
           </Button>

@@ -1,7 +1,5 @@
 "use client";
 
-import { Skeleton as HeroSkeleton } from "@heroui/react";
-
 import { cn } from "@/lib/utils";
 
 export interface SkeletonProps {
@@ -11,10 +9,16 @@ export interface SkeletonProps {
 }
 
 export function Skeleton({ className, isLoaded, children }: SkeletonProps) {
+  if (isLoaded) {
+    return <>{children}</>;
+  }
+
   return (
-    <HeroSkeleton isLoaded={isLoaded} className={cn("rounded-lg", className)}>
-      {children ?? <div className="h-full w-full" />}
-    </HeroSkeleton>
+    <div
+      className={cn("animate-pulse rounded-md bg-muted", className)}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -31,7 +35,7 @@ export function SkeletonText({ lines = 3, className }: { lines?: number; classNa
 
 export function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className={cn("p-4 space-y-4 rounded-xl border border-default-200", className)}>
+    <div className={cn("p-4 space-y-4 rounded-xl border border-border", className)}>
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-8 w-1/2" />
       <Skeleton className="h-4 w-2/3" />

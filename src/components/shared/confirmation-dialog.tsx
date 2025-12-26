@@ -1,11 +1,9 @@
 "use client";
 
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { AlertTriangle, Info, CheckCircle, type LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-
-import { Button } from "../ui";
+import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@/components/ui";
 
 export type ConfirmationVariant = "default" | "danger" | "warning" | "success";
 
@@ -24,7 +22,7 @@ export interface ConfirmationDialogProps {
 
 const variantConfig: Record<ConfirmationVariant, { icon: LucideIcon; color: string; bgColor: string; buttonColor: "default" | "primary" | "secondary" | "success" | "warning" | "danger" }> = {
   default: { icon: Info, color: "text-primary", bgColor: "bg-primary/10", buttonColor: "primary" },
-  danger: { icon: AlertTriangle, color: "text-danger", bgColor: "bg-danger/10", buttonColor: "danger" },
+  danger: { icon: AlertTriangle, color: "text-destructive", bgColor: "bg-destructive/10", buttonColor: "danger" },
   warning: { icon: AlertTriangle, color: "text-warning", bgColor: "bg-warning/10", buttonColor: "warning" },
   success: { icon: CheckCircle, color: "text-success", bgColor: "bg-success/10", buttonColor: "success" },
 };
@@ -55,13 +53,13 @@ export function ConfirmationDialog({
         </ModalHeader>
         <ModalBody>
           {typeof message === "string" ? (
-            <p className="text-default-600">{message}</p>
+            <p className="text-muted-foreground">{message}</p>
           ) : (
             message
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="bordered" onPress={onClose} isDisabled={isLoading}>
+          <Button variant="outline" onPress={onClose} isDisabled={isLoading}>
             {cancelLabel}
           </Button>
           <Button

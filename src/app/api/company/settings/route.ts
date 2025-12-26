@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema";
 
@@ -65,12 +64,7 @@ const defaultSecuritySettings = {
 
 export async function GET() {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const settings = company.settings as Record<string, unknown> | null;
 
@@ -144,12 +138,7 @@ interface UpdateSettingsRequest {
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body: UpdateSettingsRequest = await request.json();
     const currentSettings = (company.settings as Record<string, unknown>) || {};
@@ -275,12 +264,7 @@ export async function PATCH(request: NextRequest) {
 // Generate new API key
 export async function POST(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const action = searchParams.get("action");

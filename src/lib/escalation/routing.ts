@@ -10,6 +10,7 @@
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema/users";
+import { companyPermissions } from "@/lib/db/schema/company-permissions";
 import { supportAgentStatus } from "@/lib/db/schema/conversations";
 import { escalations } from "@/lib/db/schema/conversations";
 import { eq, and, lt, asc, desc, sql, isNull } from "drizzle-orm";
@@ -99,6 +100,7 @@ export class RoutingService {
 
   /**
    * Get all available agents for a company
+   * Uses company_permissions to find users with access to the company
    */
   async getAvailableAgents(companyId: string): Promise<AvailableAgent[]> {
     const results = await db
@@ -110,10 +112,11 @@ export class RoutingService {
         maxConcurrentChats: supportAgentStatus.maxConcurrentChats,
       })
       .from(users)
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
       .innerJoin(supportAgentStatus, eq(users.id, supportAgentStatus.userId))
       .where(
         and(
-          eq(users.companyId, companyId),
+          eq(companyPermissions.companyId, companyId),
           eq(supportAgentStatus.status, "online"),
           lt(
             supportAgentStatus.currentChatCount,
@@ -374,21 +377,22 @@ export class RoutingService {
       .where(eq(supportAgentStatus.userId, agentId));
 
     // Check if there are pending escalations to assign
-    const [agent] = await db
-      .select({ companyId: users.companyId })
-      .from(users)
-      .where(eq(users.id, agentId))
-      .limit(1);
+    // Get all companies this agent belongs to via company_permissions
+    const agentCompanies = await db
+      .select({ companyId: companyPermissions.companyId })
+      .from(companyPermissions)
+      .where(eq(companyPermissions.userId, agentId));
 
-    if (agent?.companyId) {
-      // Try to assign next pending escalation to this agent
-      const pending = await this.getPendingQueue(agent.companyId, 1);
+    // Try to assign pending escalations from each company
+    for (const { companyId } of agentCompanies) {
+      const pending = await this.getPendingQueue(companyId, 1);
       if (pending.length > 0 && pending[0]) {
         await this.routeEscalation(pending[0].id, {
-          companyId: agent.companyId,
+          companyId,
           preferredAgentId: agentId,
           strategy: "preferred",
         });
+        break; // Only assign one pending escalation per release
       }
     }
   }

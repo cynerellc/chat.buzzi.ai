@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { faqItems } from "@/lib/db/schema";
 
@@ -11,8 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ faqId: string }> }
 ) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { faqId } = await params;
 
     if (!company) {
@@ -59,8 +57,7 @@ export async function PATCH(
   { params }: { params: Promise<{ faqId: string }> }
 ) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { faqId } = await params;
 
     if (!company) {
@@ -138,8 +135,7 @@ export async function DELETE(
   { params }: { params: Promise<{ faqId: string }> }
 ) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { faqId } = await params;
 
     if (!company) {

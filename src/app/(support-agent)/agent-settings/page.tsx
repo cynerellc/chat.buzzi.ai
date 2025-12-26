@@ -182,7 +182,7 @@ export default function AgentSettingsPage() {
             leftIcon={Save}
             onClick={handleSave}
             isLoading={saving}
-            isDisabled={!hasChanges}
+            disabled={!hasChanges}
           >
             Save Changes
           </Button>
@@ -198,7 +198,7 @@ export default function AgentSettingsPage() {
       {/* Profile Section */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <User size={20} className="text-default-500" />
+          <User size={20} className="text-muted-foreground" />
           <h2 className="text-lg font-semibold">Profile</h2>
         </div>
 
@@ -208,14 +208,14 @@ export default function AgentSettingsPage() {
             placeholder="Your name"
             value={profile.name ?? ""}
             onChange={(e) => updateProfile("name", e.target.value)}
-            startContent={<User size={16} className="text-default-400" />}
+            startContent={<User size={16} className="text-muted-foreground" />}
           />
 
           <Input
             label="Email"
             value={profile.email}
             isDisabled
-            startContent={<Mail size={16} className="text-default-400" />}
+            startContent={<Mail size={16} className="text-muted-foreground" />}
           />
 
           <Input
@@ -223,7 +223,7 @@ export default function AgentSettingsPage() {
             placeholder="Your phone number"
             value={profile.phone ?? ""}
             onChange={(e) => updateProfile("phone", e.target.value)}
-            startContent={<Phone size={16} className="text-default-400" />}
+            startContent={<Phone size={16} className="text-muted-foreground" />}
           />
         </div>
       </Card>
@@ -231,7 +231,7 @@ export default function AgentSettingsPage() {
       {/* Notifications Section */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Bell size={20} className="text-default-500" />
+          <Bell size={20} className="text-muted-foreground" />
           <h2 className="text-lg font-semibold">Notifications</h2>
         </div>
 
@@ -239,7 +239,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Sound notifications</p>
-              <p className="text-sm text-default-500">Play sound for new messages</p>
+              <p className="text-sm text-muted-foreground">Play sound for new messages</p>
             </div>
             <Toggle
               isSelected={settings.notifications.sound}
@@ -250,7 +250,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Desktop notifications</p>
-              <p className="text-sm text-default-500">Show browser notifications</p>
+              <p className="text-sm text-muted-foreground">Show browser notifications</p>
             </div>
             <Toggle
               isSelected={settings.notifications.desktop}
@@ -261,7 +261,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Email notifications</p>
-              <p className="text-sm text-default-500">Receive email for missed messages</p>
+              <p className="text-sm text-muted-foreground">Receive email for missed messages</p>
             </div>
             <Toggle
               isSelected={settings.notifications.email}
@@ -270,7 +270,7 @@ export default function AgentSettingsPage() {
           </div>
 
           <div className="border-t pt-4 mt-4">
-            <p className="text-sm font-medium text-default-600 mb-3">Notify me about:</p>
+            <p className="text-sm font-medium text-foreground mb-3">Notify me about:</p>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm">New conversations assigned to me</span>
@@ -312,7 +312,7 @@ export default function AgentSettingsPage() {
       {/* Chat Section */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <MessageSquare size={20} className="text-default-500" />
+          <MessageSquare size={20} className="text-muted-foreground" />
           <h2 className="text-lg font-semibold">Chat</h2>
         </div>
 
@@ -320,7 +320,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Enter to send</p>
-              <p className="text-sm text-default-500">Press Enter to send messages (Shift+Enter for new line)</p>
+              <p className="text-sm text-muted-foreground">Press Enter to send messages (Shift+Enter for new line)</p>
             </div>
             <Toggle
               isSelected={settings.chat.enterToSend}
@@ -331,7 +331,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Show typing indicator</p>
-              <p className="text-sm text-default-500">Let customers see when you&apos;re typing</p>
+              <p className="text-sm text-muted-foreground">Let customers see when you&apos;re typing</p>
             </div>
             <Toggle
               isSelected={settings.chat.showTypingIndicator}
@@ -342,7 +342,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Auto-away after</p>
-              <p className="text-sm text-default-500">Set status to away after inactivity (0 to disable)</p>
+              <p className="text-sm text-muted-foreground">Set status to away after inactivity (0 to disable)</p>
             </div>
             <div className="flex items-center gap-2">
               <Input
@@ -352,9 +352,8 @@ export default function AgentSettingsPage() {
                 value={settings.chat.autoAwayMinutes.toString()}
                 onChange={(e) => updateSettings("chat", "autoAwayMinutes", parseInt(e.target.value) || 0)}
                 className="w-20"
-                size="sm"
               />
-              <span className="text-sm text-default-500">minutes</span>
+              <span className="text-sm text-muted-foreground">minutes</span>
             </div>
           </div>
         </div>
@@ -363,7 +362,7 @@ export default function AgentSettingsPage() {
       {/* Display Section */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Palette size={20} className="text-default-500" />
+          <Palette size={20} className="text-muted-foreground" />
           <h2 className="text-lg font-semibold">Display</h2>
         </div>
 
@@ -371,7 +370,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Theme</p>
-              <p className="text-sm text-default-500">Choose your preferred color scheme</p>
+              <p className="text-sm text-muted-foreground">Choose your preferred color scheme</p>
             </div>
             <div className="flex gap-2">
               {(["light", "dark", "system"] as const).map((theme) => (
@@ -382,7 +381,7 @@ export default function AgentSettingsPage() {
                     "px-3 py-1.5 text-sm rounded-md capitalize transition-colors",
                     settings.display.theme === theme
                       ? "bg-primary text-primary-foreground"
-                      : "bg-default-100 hover:bg-default-200"
+                      : "bg-muted hover:bg-muted/80"
                   )}
                 >
                   {theme}
@@ -394,7 +393,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Compact mode</p>
-              <p className="text-sm text-default-500">Reduce spacing for more content</p>
+              <p className="text-sm text-muted-foreground">Reduce spacing for more content</p>
             </div>
             <Toggle
               isSelected={settings.display.compactMode}
@@ -405,7 +404,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Show avatars</p>
-              <p className="text-sm text-default-500">Display user avatars in conversations</p>
+              <p className="text-sm text-muted-foreground">Display user avatars in conversations</p>
             </div>
             <Toggle
               isSelected={settings.display.showAvatars}
@@ -416,7 +415,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Font size</p>
-              <p className="text-sm text-default-500">Adjust text size in conversations</p>
+              <p className="text-sm text-muted-foreground">Adjust text size in conversations</p>
             </div>
             <div className="flex gap-2">
               {(["small", "medium", "large"] as const).map((size) => (
@@ -427,7 +426,7 @@ export default function AgentSettingsPage() {
                     "px-3 py-1.5 text-sm rounded-md capitalize transition-colors",
                     settings.display.fontSize === size
                       ? "bg-primary text-primary-foreground"
-                      : "bg-default-100 hover:bg-default-200"
+                      : "bg-muted hover:bg-muted/80"
                   )}
                 >
                   {size}
@@ -441,7 +440,7 @@ export default function AgentSettingsPage() {
       {/* Shortcuts Section */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Keyboard size={20} className="text-default-500" />
+          <Keyboard size={20} className="text-muted-foreground" />
           <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
         </div>
 
@@ -449,7 +448,7 @@ export default function AgentSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Enable keyboard shortcuts</p>
-              <p className="text-sm text-default-500">Use keyboard shortcuts for quick actions</p>
+              <p className="text-sm text-muted-foreground">Use keyboard shortcuts for quick actions</p>
             </div>
             <Toggle
               isSelected={settings.shortcuts.enabled}
@@ -459,23 +458,23 @@ export default function AgentSettingsPage() {
 
           {settings.shortcuts.enabled && (
             <div className="border-t pt-4 mt-4">
-              <p className="text-sm font-medium text-default-600 mb-3">Available shortcuts:</p>
+              <p className="text-sm font-medium text-foreground mb-3">Available shortcuts:</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <div className="flex justify-between py-1">
-                  <span className="text-default-600">Send message</span>
-                  <kbd className="bg-default-100 px-2 py-0.5 rounded text-xs">Enter</kbd>
+                  <span className="text-foreground">Send message</span>
+                  <kbd className="bg-muted px-2 py-0.5 rounded text-xs">Enter</kbd>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-default-600">New line</span>
-                  <kbd className="bg-default-100 px-2 py-0.5 rounded text-xs">Shift + Enter</kbd>
+                  <span className="text-foreground">New line</span>
+                  <kbd className="bg-muted px-2 py-0.5 rounded text-xs">Shift + Enter</kbd>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-default-600">Canned responses</span>
-                  <kbd className="bg-default-100 px-2 py-0.5 rounded text-xs">Cmd/Ctrl + K</kbd>
+                  <span className="text-foreground">Canned responses</span>
+                  <kbd className="bg-muted px-2 py-0.5 rounded text-xs">Cmd/Ctrl + K</kbd>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-default-600">Resolve conversation</span>
-                  <kbd className="bg-default-100 px-2 py-0.5 rounded text-xs">Cmd/Ctrl + Shift + R</kbd>
+                  <span className="text-foreground">Resolve conversation</span>
+                  <kbd className="bg-muted px-2 py-0.5 rounded text-xs">Cmd/Ctrl + Shift + R</kbd>
                 </div>
               </div>
             </div>

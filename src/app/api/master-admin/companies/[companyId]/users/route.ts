@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { companies, users } from "@/lib/db/schema";
+import { companies, companyPermissions, users } from "@/lib/db/schema";
+import type { CompanyPermissionRole } from "@/lib/db/schema/company-permissions";
 
 // User list item interface
 export interface CompanyUserItem {
@@ -22,7 +23,7 @@ export interface CompanyUserItem {
 const addUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2).max(255),
-  role: z.enum(["company_admin", "support_agent"]),
+  role: z.enum(["chatapp.company_admin", "chatapp.support_agent"]),
   sendInvite: z.boolean().default(true),
 });
 
@@ -56,22 +57,23 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    // Get users
+    // Get users via company_permissions
     const companyUsers = await db
       .select({
         id: users.id,
         email: users.email,
         name: users.name,
-        role: users.role,
+        role: companyPermissions.role, // Company role from permissions
         status: users.status,
         isActive: users.isActive,
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
       })
       .from(users)
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
       .where(
         and(
-          eq(users.companyId, companyId),
+          eq(companyPermissions.companyId, companyId),
           sql`${users.deletedAt} IS NULL`
         )
       )
@@ -129,23 +131,36 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    // Create user
+    // Create user with base role
     const [newUser] = await db
       .insert(users)
       .values({
         email: data.email,
         name: data.name,
-        companyId,
-        role: data.role,
+        role: "chatapp.user",
         status: "pending",
       })
       .returning();
+
+    if (!newUser) {
+      throw new Error("Failed to create user");
+    }
+
+    // Create company permission for the user
+    await db.insert(companyPermissions).values({
+      companyId,
+      userId: newUser.id,
+      role: data.role as CompanyPermissionRole,
+    });
 
     // TODO: Send invite email if data.sendInvite is true
 
     return NextResponse.json(
       {
-        user: newUser,
+        user: {
+          ...newUser,
+          role: data.role, // Return company role instead of base role
+        },
         message: "User added successfully",
       },
       { status: 201 }

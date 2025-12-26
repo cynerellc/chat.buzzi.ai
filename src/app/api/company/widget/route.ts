@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { widgetConfigs } from "@/lib/db/schema";
 
@@ -78,12 +77,7 @@ function generateEmbedCode(companySlug: string): string {
 
 export async function GET() {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     // Get or create widget config
     let [config] = await db
@@ -223,12 +217,7 @@ interface UpdateWidgetConfigRequest {
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body: UpdateWidgetConfigRequest = await request.json();
 

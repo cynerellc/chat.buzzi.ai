@@ -7,9 +7,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { conversations, messages, escalations } from "@/lib/db/schema/conversations";
+import { companyPermissions } from "@/lib/db/schema/company-permissions";
 import { users } from "@/lib/db/schema/users";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
@@ -30,17 +30,8 @@ export async function POST(
   try {
     const { conversationId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    // Authenticate user and get company context
+    const { user, company } = await requireSupportAgent();
 
     // Parse and validate body
     const body = await request.json();
@@ -73,20 +64,22 @@ export async function POST(
       );
     }
 
-    // Verify target user exists and belongs to the same company
+    // Verify target user exists and belongs to the same company (via company_permissions)
     const [targetUser] = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
-        role: users.role,
+        role: companyPermissions.role,
       })
       .from(users)
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
       .where(
         and(
           eq(users.id, data.targetUserId),
-          eq(users.companyId, company.id),
-          eq(users.isActive, true)
+          eq(companyPermissions.companyId, company.id),
+          eq(users.isActive, true),
+          sql`${users.deletedAt} IS NULL`
         )
       )
       .limit(1);
@@ -99,7 +92,7 @@ export async function POST(
     }
 
     // Cannot transfer to self
-    if (data.targetUserId === session.user.id) {
+    if (data.targetUserId === user.id) {
       return NextResponse.json(
         { error: "Cannot transfer to yourself" },
         { status: 400 }
@@ -110,7 +103,7 @@ export async function POST(
     const [currentUser] = await db
       .select({ name: users.name })
       .from(users)
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, user.id))
       .limit(1);
 
     const currentUserName = currentUser?.name || "Agent";
@@ -158,7 +151,7 @@ export async function POST(
       success: true,
       transfer: {
         conversationId,
-        fromUserId: session.user.id,
+        fromUserId: user.id,
         fromUserName: currentUserName,
         toUserId: data.targetUserId,
         toUserName: targetUserName,
@@ -188,41 +181,33 @@ export async function GET(
   { params }: { params: Promise<RouteParams> }
 ) {
   try {
-    const { conversationId } = await params;
-
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    // Authenticate user and get company context
+    const { user, company } = await requireSupportAgent();
 
     // Get all active support agents in the company (excluding current user)
+    // via company_permissions table
     const availableAgents = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
         avatarUrl: users.avatarUrl,
-        role: users.role,
+        role: companyPermissions.role,
       })
       .from(users)
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
       .where(
         and(
-          eq(users.companyId, company.id),
+          eq(companyPermissions.companyId, company.id),
           eq(users.isActive, true),
-          ne(users.id, session.user.id)
+          ne(users.id, user.id),
+          sql`${users.deletedAt} IS NULL`
         )
       );
 
     // Filter to only support agents and company admins
     const agents = availableAgents.filter(
-      (agent) => agent.role === "support_agent" || agent.role === "company_admin"
+      (agent) => agent.role === "chatapp.support_agent" || agent.role === "chatapp.company_admin"
     );
 
     return NextResponse.json({

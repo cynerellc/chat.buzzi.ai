@@ -9,7 +9,6 @@ import { db } from "@/lib/db";
 import { escalations, conversations } from "@/lib/db/schema/conversations";
 import { eq, and } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { getEscalationService } from "@/lib/escalation";
 
 interface RouteParams {
@@ -23,11 +22,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { escalationId } = await params;
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     // Verify escalation belongs to company
     const [escalation] = await db
@@ -70,11 +65,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { escalationId } = await params;
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body = await request.json();
     const { priority, assignedUserId, status } = body;
@@ -146,11 +137,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { escalationId } = await params;
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     // Verify escalation belongs to company
     const [existing] = await db

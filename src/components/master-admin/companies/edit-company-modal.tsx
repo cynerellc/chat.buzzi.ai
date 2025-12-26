@@ -165,7 +165,7 @@ export function EditCompanyModal({
           />
         </ModalBody>
         <ModalFooter>
-          <Button variant="flat" onPress={handleClose} isDisabled={isSubmitting}>
+          <Button variant="secondary" onPress={handleClose} isDisabled={isSubmitting}>
             Cancel
           </Button>
           <Button

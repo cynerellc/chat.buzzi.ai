@@ -58,9 +58,9 @@ export default function AuditLogsPage() {
         ]}
         actions={
           <Button
-            variant="flat"
+            variant="secondary"
             startContent={<Download size={16} />}
-            onPress={handleExport}
+            onClick={handleExport}
           >
             Export Logs
           </Button>
@@ -93,7 +93,7 @@ export default function AuditLogsPage() {
         </div>
       )}
 
-      <p className="text-sm text-default-500 text-center mt-2">
+      <p className="text-sm text-muted-foreground text-center mt-2">
         Showing {logs.length} of {pagination?.total ?? 0} logs
       </p>
 

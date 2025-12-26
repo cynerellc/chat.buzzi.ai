@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema/users";
-import { auth } from "@/lib/auth";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { eq } from "drizzle-orm";
 import { z } from "zod/v4";
 
@@ -76,14 +76,10 @@ const DEFAULT_SETTINGS: AgentSettings = {
 
 export async function GET() {
   try {
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user: authUser } = await requireSupportAgent();
 
     // Get user with settings
-    const [user] = await db
+    const [userData] = await db
       .select({
         id: users.id,
         name: users.name,
@@ -93,15 +89,15 @@ export async function GET() {
         settings: users.settings,
       })
       .from(users)
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, authUser.id))
       .limit(1);
 
-    if (!user) {
+    if (!userData) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Merge with defaults
-    const userSettings = user.settings as AgentSettings | null;
+    const userSettings = userData.settings as AgentSettings | null;
     const settings = {
       ...DEFAULT_SETTINGS,
       ...userSettings,
@@ -125,11 +121,11 @@ export async function GET() {
 
     return NextResponse.json({
       profile: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatarUrl: user.avatarUrl,
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        avatarUrl: userData.avatarUrl,
       },
       settings,
     });
@@ -144,11 +140,7 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user: authUser } = await requireSupportAgent();
 
     // Parse and validate body
     const body = await request.json();
@@ -169,7 +161,7 @@ export async function PATCH(request: NextRequest) {
     const [currentUser] = await db
       .select({ settings: users.settings })
       .from(users)
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, authUser.id))
       .limit(1);
 
     if (!currentUser) {
@@ -201,14 +193,14 @@ export async function PATCH(request: NextRequest) {
     };
 
     // Update user
-    const [user] = await db
+    const [updatedUser] = await db
       .update(users)
       .set({
         ...profileUpdates,
         settings: mergedSettings,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, authUser.id))
       .returning({
         id: users.id,
         name: users.name,
@@ -218,17 +210,17 @@ export async function PATCH(request: NextRequest) {
         settings: users.settings,
       });
 
-    if (!user) {
+    if (!updatedUser) {
       return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
     }
 
     return NextResponse.json({
       profile: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatarUrl: user.avatarUrl,
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        avatarUrl: updatedUser.avatarUrl,
       },
       settings: mergedSettings,
     });

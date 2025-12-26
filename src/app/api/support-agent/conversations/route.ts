@@ -9,9 +9,8 @@ import { db } from "@/lib/db";
 import { conversations, endUsers, messages, escalations } from "@/lib/db/schema/conversations";
 import { agents } from "@/lib/db/schema/agents";
 import { users } from "@/lib/db/schema/users";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
-import { and, eq, or, desc, sql, isNull, isNotNull, inArray, ilike } from "drizzle-orm";
+import { requireSupportAgent } from "@/lib/auth/guards";
+import { and, eq, or, desc, sql, isNull, inArray } from "drizzle-orm";
 
 type ConversationStatus = "active" | "waiting_human" | "with_human" | "resolved" | "abandoned";
 
@@ -26,17 +25,8 @@ interface ConversationListParams {
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    // Authenticate user and get company context
+    const { user, company } = await requireSupportAgent();
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -63,7 +53,7 @@ export async function GET(request: NextRequest) {
       );
     } else if (params.filter !== "all") {
       // For other filters, show only assigned to current user
-      conditions.push(eq(conversations.assignedUserId, session.user.id));
+      conditions.push(eq(conversations.assignedUserId, user.id));
     }
 
     // Filter by status
@@ -231,7 +221,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get stats for the current user
-    const stats = await getAgentStats(company.id, session.user.id);
+    const stats = await getAgentStats(company.id, user.id);
 
     return NextResponse.json({
       conversations: formattedConversations,

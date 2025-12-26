@@ -7,7 +7,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
-  Divider,
+  Separator,
   Input,
   Modal,
   ModalBody,
@@ -15,14 +15,13 @@ import {
   ModalFooter,
   ModalHeader,
   Select,
-  SelectItem,
   Skeleton,
   Switch,
-  Tab,
   Tabs,
+  type TabItem,
   Textarea,
-  useDisclosure,
-} from "@heroui/react";
+} from "@/components/ui";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   AlertTriangle,
   Bell,
@@ -308,513 +307,397 @@ export default function SettingsPage() {
         description="Manage your company settings"
         actions={
           hasChanges && (
-            <Button color="primary" isLoading={isUpdating} onPress={handleSave}>
+            <Button color="primary" isLoading={isUpdating} onClick={handleSave}>
               Save Changes
             </Button>
           )
         }
       />
 
-      <Tabs aria-label="Settings tabs" color="primary" variant="underlined">
-        {/* General Settings */}
-        <Tab key="general" title={<div className="flex items-center gap-2"><Building2 className="w-4 h-4" />General</div>}>
-          <Card className="mt-4">
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Company Information</h3>
-            </CardHeader>
-            <CardBody className="space-y-4">
-              <Input
-                label="Company Name"
-                placeholder="Your Company Name"
-                value={formData.name}
-                onValueChange={(value) => updateFormField("name", value)}
-              />
-              <Textarea
-                label="Description"
-                placeholder="Brief description of your company"
-                value={formData.description}
-                onValueChange={(value) => updateFormField("description", value)}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Select
-                  label="Timezone"
-                  placeholder="Select timezone"
-                  selectedKeys={[formData.timezone]}
-                  onSelectionChange={(keys) => {
-                    const selected = Array.from(keys)[0] as string;
-                    if (selected) updateFormField("timezone", selected);
-                  }}
-                >
-                  {timezones.map((tz) => (
-                    <SelectItem key={tz.key}>{tz.label}</SelectItem>
-                  ))}
-                </Select>
-                <Select
-                  label="Language"
-                  placeholder="Select language"
-                  selectedKeys={[formData.locale]}
-                  onSelectionChange={(keys) => {
-                    const selected = Array.from(keys)[0] as string;
-                    if (selected) updateFormField("locale", selected);
-                  }}
-                >
-                  {locales.map((locale) => (
-                    <SelectItem key={locale.key}>{locale.label}</SelectItem>
-                  ))}
-                </Select>
-              </div>
-            </CardBody>
-          </Card>
-        </Tab>
-
-        {/* Branding */}
-        <Tab key="branding" title={<div className="flex items-center gap-2"><Palette className="w-4 h-4" />Branding</div>}>
-          <Card className="mt-4">
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Brand Customization</h3>
-            </CardHeader>
-            <CardBody className="space-y-6">
-              <Input
-                label="Logo URL"
-                placeholder="https://example.com/logo.png"
-                value={formData.logoUrl}
-                onValueChange={(value) => updateFormField("logoUrl", value)}
-                description="URL to your company logo (recommended: 200x50px)"
-              />
-
-              <Divider />
-
-              <div>
-                <h4 className="text-sm font-medium mb-4">Brand Colors</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm text-default-600">Primary Color</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={formData.primaryColor}
-                        onChange={(e) => updateFormField("primaryColor", e.target.value)}
-                        className="w-12 h-12 rounded-lg cursor-pointer border-2 border-default-200"
-                      />
-                      <Input
-                        value={formData.primaryColor}
-                        onValueChange={(value) => updateFormField("primaryColor", value)}
-                        className="flex-1"
-                        placeholder="#6437F3"
-                      />
-                    </div>
-                    <p className="text-xs text-default-400">Used for buttons and key UI elements</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm text-default-600">Secondary Color</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={formData.secondaryColor}
-                        onChange={(e) => updateFormField("secondaryColor", e.target.value)}
-                        className="w-12 h-12 rounded-lg cursor-pointer border-2 border-default-200"
-                      />
-                      <Input
-                        value={formData.secondaryColor}
-                        onValueChange={(value) => updateFormField("secondaryColor", value)}
-                        className="flex-1"
-                        placeholder="#2b3dd8"
-                      />
-                    </div>
-                    <p className="text-xs text-default-400">Used for accents and highlights</p>
-                  </div>
-                </div>
-              </div>
-
-              <Divider />
-
-              <div className="flex items-center gap-4 p-4 bg-default-100 rounded-lg">
-                <div
-                  className="w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold text-xl"
-                  style={{ backgroundColor: formData.primaryColor }}
-                >
-                  {formData.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-medium">{formData.name || "Company Name"}</p>
-                  <p className="text-sm text-default-500">Preview of your brand colors</p>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
-        </Tab>
-
-        {/* Notifications */}
-        <Tab key="notifications" title={<div className="flex items-center gap-2"><Bell className="w-4 h-4" />Notifications</div>}>
-          <Card className="mt-4">
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Notification Preferences</h3>
-            </CardHeader>
-            <CardBody className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Email Notifications</p>
-                    <p className="text-sm text-default-500">Receive email alerts for important events</p>
-                  </div>
-                  <Switch
-                    isSelected={formData.notificationSettings.emailNotifications}
-                    onValueChange={(value) => updateNotificationSetting("emailNotifications", value)}
-                  />
-                </div>
-
-                <Divider />
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Escalation Alerts</p>
-                    <p className="text-sm text-default-500">Get notified when conversations are escalated to humans</p>
-                  </div>
-                  <Switch
-                    isSelected={formData.notificationSettings.escalationAlerts}
-                    onValueChange={(value) => updateNotificationSetting("escalationAlerts", value)}
-                  />
-                </div>
-
-                <Divider />
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Daily Digest</p>
-                    <p className="text-sm text-default-500">Receive a daily summary of activity</p>
-                  </div>
-                  <Switch
-                    isSelected={formData.notificationSettings.dailyDigest}
-                    onValueChange={(value) => updateNotificationSetting("dailyDigest", value)}
-                  />
-                </div>
-
-                <Divider />
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Weekly Report</p>
-                    <p className="text-sm text-default-500">Receive weekly analytics and performance reports</p>
-                  </div>
-                  <Switch
-                    isSelected={formData.notificationSettings.weeklyReport}
-                    onValueChange={(value) => updateNotificationSetting("weeklyReport", value)}
-                  />
-                </div>
-              </div>
-            </CardBody>
-          </Card>
-        </Tab>
-
-        {/* Security */}
-        <Tab key="security" title={<div className="flex items-center gap-2"><Shield className="w-4 h-4" />Security</div>}>
-          <Card className="mt-4">
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Security Settings</h3>
-            </CardHeader>
-            <CardBody className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Require Two-Factor Authentication</p>
-                  <p className="text-sm text-default-500">Require 2FA for all team members</p>
-                </div>
-                <Switch
-                  isSelected={formData.securitySettings.requireTwoFactor}
-                  onValueChange={(value) => updateSecuritySetting("requireTwoFactor", value)}
-                />
-              </div>
-
-              <Divider />
-
-              <div>
-                <label className="text-sm font-medium">Session Timeout (minutes)</label>
-                <Input
-                  type="number"
-                  min={5}
-                  max={1440}
-                  value={formData.securitySettings.sessionTimeout.toString()}
-                  onValueChange={(value) => updateSecuritySetting("sessionTimeout", parseInt(value) || 60)}
-                  className="mt-2 max-w-xs"
-                  description="How long before inactive users are logged out"
-                />
-              </div>
-
-              <Divider />
-
-              <div>
-                <label className="text-sm font-medium">IP Whitelist</label>
-                <p className="text-sm text-default-500 mb-3">Restrict access to specific IP addresses</p>
-                <div className="flex gap-2 mb-3">
+      <Tabs
+        items={[
+          {
+            key: "general",
+            label: "General",
+            icon: Building2,
+            content: (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-lg font-semibold">Company Information</h3>
+                </CardHeader>
+                <CardBody className="space-y-4">
                   <Input
-                    placeholder="Enter IP address (e.g., 192.168.1.1)"
-                    value={ipInput}
-                    onValueChange={setIpInput}
-                    className="flex-1"
+                    label="Company Name"
+                    value={formData.name}
+                    onValueChange={(value) => updateFormField("name", value)}
+                    isRequired
                   />
-                  <Button color="primary" onPress={addIpToWhitelist}>
-                    Add
-                  </Button>
-                </div>
-                {formData.securitySettings.ipWhitelist.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {formData.securitySettings.ipWhitelist.map((ip) => (
-                      <Chip
-                        key={ip}
-                        onClose={() => removeIpFromWhitelist(ip)}
-                        variant="flat"
-                      >
-                        {ip}
-                      </Chip>
-                    ))}
+                  <Textarea
+                    label="Description"
+                    value={formData.description}
+                    onValueChange={(value) => updateFormField("description", value)}
+                    minRows={3}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select
+                      label="Timezone"
+                      options={timezones.map((tz) => ({ value: tz.key, label: tz.label }))}
+                      selectedKeys={new Set([formData.timezone])}
+                      onSelectionChange={(keys) => {
+                        const selected = Array.from(keys)[0];
+                        if (selected) updateFormField("timezone", selected as string);
+                      }}
+                    />
+                    <Select
+                      label="Language"
+                      options={locales.map((l) => ({ value: l.key, label: l.label }))}
+                      selectedKeys={new Set([formData.locale])}
+                      onSelectionChange={(keys) => {
+                        const selected = Array.from(keys)[0];
+                        if (selected) updateFormField("locale", selected as string);
+                      }}
+                    />
                   </div>
-                ) : (
-                  <p className="text-sm text-default-400">No IP restrictions - all IPs allowed</p>
-                )}
-              </div>
-
-              <Divider />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Allow Public API Access</p>
-                  <p className="text-sm text-default-500">Enable API access from external applications</p>
-                </div>
-                <Switch
-                  isSelected={formData.securitySettings.allowPublicApi}
-                  onValueChange={(value) => updateSecuritySetting("allowPublicApi", value)}
-                />
-              </div>
-            </CardBody>
-          </Card>
-        </Tab>
-
-        {/* API Access */}
-        <Tab key="api" title={<div className="flex items-center gap-2"><Key className="w-4 h-4" />API</div>}>
-          <Card className="mt-4">
-            <CardHeader>
-              <h3 className="text-lg font-semibold">API Access</h3>
-            </CardHeader>
-            <CardBody className="space-y-6">
-              <div className="p-4 bg-default-100 rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="font-medium">API Key</p>
-                    <p className="text-sm text-default-500">
-                      Use this key to authenticate API requests
-                    </p>
-                  </div>
-                  {settings?.hasApiKey ? (
-                    <Chip color="success" variant="flat" startContent={<Check className="w-3 h-3" />}>
-                      Active
-                    </Chip>
-                  ) : (
-                    <Chip color="default" variant="flat">
-                      Not configured
-                    </Chip>
-                  )}
-                </div>
-
-                {settings?.hasApiKey ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 p-3 bg-default-200 rounded-lg font-mono text-sm">
-                        {settings.apiKeyPrefix}••••••••••••••••••••••••
-                      </code>
-                      <Button
-                        color="danger"
-                        variant="flat"
-                        startContent={<Trash2 className="w-4 h-4" />}
-                        onPress={revokeModal.onOpen}
-                      >
-                        Revoke
-                      </Button>
-                    </div>
-                    <Button
-                      variant="flat"
-                      startContent={<RefreshCw className="w-4 h-4" />}
-                      onPress={apiKeyModal.onOpen}
-                    >
-                      Regenerate Key
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    color="primary"
-                    startContent={<Key className="w-4 h-4" />}
-                    isLoading={isGenerating}
-                    onPress={apiKeyModal.onOpen}
-                  >
-                    Generate API Key
-                  </Button>
-                )}
-              </div>
-
-              {newApiKey && (
-                <div className="p-4 border-2 border-warning rounded-lg bg-warning-50">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-medium text-warning-700">Save your API key</p>
-                      <p className="text-sm text-warning-600 mb-3">
-                        This key will only be shown once. Copy it now and store it securely.
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 p-3 bg-white rounded-lg font-mono text-sm break-all">
-                          {showApiKey ? newApiKey : "•".repeat(newApiKey.length)}
-                        </code>
-                        <Button
-                          isIconOnly
-                          variant="flat"
-                          onPress={() => setShowApiKey(!showApiKey)}
-                        >
-                          {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          isIconOnly
-                          color="primary"
-                          onPress={copyApiKey}
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <Divider />
-
-              <div>
-                <h4 className="font-medium mb-2">Custom Domain</h4>
-                <p className="text-sm text-default-500 mb-4">
-                  Configure a custom domain for your widget and API
-                </p>
-                <div className="flex gap-2">
+                </CardBody>
+              </Card>
+            ),
+          },
+          {
+            key: "branding",
+            label: "Branding",
+            icon: Palette,
+            content: (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-lg font-semibold">Brand Settings</h3>
+                </CardHeader>
+                <CardBody className="space-y-4">
                   <Input
-                    placeholder="widget.yourcompany.com"
+                    label="Logo URL"
+                    value={formData.logoUrl}
+                    onValueChange={(value) => updateFormField("logoUrl", value)}
+                    placeholder="https://..."
+                    description="URL to your company logo"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      type="color"
+                      label="Primary Color"
+                      value={formData.primaryColor}
+                      onValueChange={(value) => updateFormField("primaryColor", value)}
+                      className="h-10"
+                    />
+                    <Input
+                      type="color"
+                      label="Secondary Color"
+                      value={formData.secondaryColor}
+                      onValueChange={(value) => updateFormField("secondaryColor", value)}
+                      className="h-10"
+                    />
+                  </div>
+                  <Separator />
+                  <Input
+                    label="Custom Domain"
                     value={formData.customDomain}
                     onValueChange={(value) => updateFormField("customDomain", value)}
-                    startContent={<Globe className="w-4 h-4 text-default-400" />}
-                    className="flex-1"
+                    placeholder="support.yourcompany.com"
+                    startContent={<Globe className="w-4 h-4 text-muted-foreground" />}
+                    description="Custom domain for your support portal"
                   />
-                  {settings?.customDomainVerified ? (
-                    <Chip color="success" variant="flat" startContent={<Check className="w-3 h-3" />}>
-                      Verified
-                    </Chip>
-                  ) : settings?.customDomain ? (
-                    <Chip color="warning" variant="flat">
-                      Pending
-                    </Chip>
-                  ) : null}
-                </div>
-                {settings?.customDomain && !settings?.customDomainVerified && (
-                  <p className="text-xs text-default-400 mt-2">
-                    Add a CNAME record pointing to widget.buzzi.ai to verify your domain
+                </CardBody>
+              </Card>
+            ),
+          },
+          {
+            key: "notifications",
+            label: "Notifications",
+            icon: Bell,
+            content: (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-lg font-semibold">Notification Preferences</h3>
+                </CardHeader>
+                <CardBody className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border border-default-200 rounded-lg">
+                    <div>
+                      <p className="font-medium">Email Notifications</p>
+                      <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+                    </div>
+                    <Switch
+                      isSelected={formData.notificationSettings.emailNotifications}
+                      onValueChange={(value) => updateNotificationSetting("emailNotifications", value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 border border-default-200 rounded-lg">
+                    <div>
+                      <p className="font-medium">Escalation Alerts</p>
+                      <p className="text-sm text-muted-foreground">Get notified when conversations are escalated</p>
+                    </div>
+                    <Switch
+                      isSelected={formData.notificationSettings.escalationAlerts}
+                      onValueChange={(value) => updateNotificationSetting("escalationAlerts", value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 border border-default-200 rounded-lg">
+                    <div>
+                      <p className="font-medium">Daily Digest</p>
+                      <p className="text-sm text-muted-foreground">Receive a daily summary of activity</p>
+                    </div>
+                    <Switch
+                      isSelected={formData.notificationSettings.dailyDigest}
+                      onValueChange={(value) => updateNotificationSetting("dailyDigest", value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 border border-default-200 rounded-lg">
+                    <div>
+                      <p className="font-medium">Weekly Report</p>
+                      <p className="text-sm text-muted-foreground">Receive weekly analytics reports</p>
+                    </div>
+                    <Switch
+                      isSelected={formData.notificationSettings.weeklyReport}
+                      onValueChange={(value) => updateNotificationSetting("weeklyReport", value)}
+                    />
+                  </div>
+                </CardBody>
+              </Card>
+            ),
+          },
+          {
+            key: "security",
+            label: "Security",
+            icon: Shield,
+            content: (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-lg font-semibold">Security Settings</h3>
+                </CardHeader>
+                <CardBody className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border border-default-200 rounded-lg">
+                    <div>
+                      <p className="font-medium">Require Two-Factor Authentication</p>
+                      <p className="text-sm text-muted-foreground">Require 2FA for all team members</p>
+                    </div>
+                    <Switch
+                      isSelected={formData.securitySettings.requireTwoFactor}
+                      onValueChange={(value) => updateSecuritySetting("requireTwoFactor", value)}
+                    />
+                  </div>
+                  <Input
+                    type="number"
+                    label="Session Timeout (minutes)"
+                    value={String(formData.securitySettings.sessionTimeout)}
+                    onValueChange={(value) => updateSecuritySetting("sessionTimeout", parseInt(value) || 60)}
+                    min={5}
+                    max={480}
+                    description="Automatically log out after inactivity"
+                  />
+                  <Separator />
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">IP Whitelist</label>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Restrict access to specific IP addresses
+                    </p>
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        placeholder="Enter IP address"
+                        value={ipInput}
+                        onValueChange={setIpInput}
+                        className="flex-1"
+                      />
+                      <Button onClick={addIpToWhitelist}>Add</Button>
+                    </div>
+                    {formData.securitySettings.ipWhitelist.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {formData.securitySettings.ipWhitelist.map((ip) => (
+                          <Chip key={ip} onClose={() => removeIpFromWhitelist(ip)}>
+                            {ip}
+                          </Chip>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between p-4 border border-default-200 rounded-lg">
+                    <div>
+                      <p className="font-medium">Allow Public API Access</p>
+                      <p className="text-sm text-muted-foreground">Enable API access with API key authentication</p>
+                    </div>
+                    <Switch
+                      isSelected={formData.securitySettings.allowPublicApi}
+                      onValueChange={(value) => updateSecuritySetting("allowPublicApi", value)}
+                    />
+                  </div>
+                </CardBody>
+              </Card>
+            ),
+          },
+          {
+            key: "api",
+            title: (
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                API
+              </div>
+            ),
+            content: (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-lg font-semibold">API Access</h3>
+                </CardHeader>
+                <CardBody className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Use API keys to authenticate requests to the Buzzi API.
                   </p>
-                )}
-              </div>
-            </CardBody>
-          </Card>
-        </Tab>
-
-        {/* Sessions */}
-        <Tab key="sessions" title={<div className="flex items-center gap-2"><Laptop className="w-4 h-4" />Sessions</div>}>
-          <Card className="mt-4">
-            <CardHeader className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-semibold">Active Sessions</h3>
-                <p className="text-sm text-default-500">Manage your active login sessions and devices</p>
-              </div>
-              {sessions.length > 1 && (
-                <Button
-                  color="danger"
-                  variant="flat"
-                  startContent={<Trash2 className="w-4 h-4" />}
-                  onPress={revokeAllSessionsModal.onOpen}
-                  isLoading={isRevokingAll}
-                >
-                  Sign Out All Other Devices
-                </Button>
-              )}
-            </CardHeader>
-            <CardBody className="space-y-4">
-              {sessionsLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-20 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : sessions.length === 0 ? (
-                <div className="text-center py-8 text-default-500">
-                  <Laptop className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No active sessions found</p>
-                </div>
-              ) : (
-                sessions.map((deviceSession) => (
-                  <div
-                    key={deviceSession.id}
-                    className={`p-4 rounded-lg border ${
-                      deviceSession.isCurrent
-                        ? "border-primary bg-primary-50"
-                        : "border-default-200 bg-default-50"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
-                        <div className={`p-2 rounded-lg ${deviceSession.isCurrent ? "bg-primary-100" : "bg-default-100"}`}>
-                          {getDeviceIcon(deviceSession.deviceType)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">
-                              {deviceSession.deviceName || "Unknown Device"}
-                            </p>
-                            {deviceSession.isCurrent && (
-                              <Chip size="sm" color="primary" variant="flat">
-                                Current Session
-                              </Chip>
-                            )}
-                            {deviceSession.isTrusted && (
-                              <Chip size="sm" color="success" variant="flat">
-                                Trusted
-                              </Chip>
-                            )}
-                          </div>
-                          <p className="text-sm text-default-500">
-                            {deviceSession.browser} on {deviceSession.os}
-                          </p>
-                          <div className="flex items-center gap-4 mt-1 text-xs text-default-400">
-                            {deviceSession.ipAddress && (
-                              <span>IP: {deviceSession.ipAddress}</span>
-                            )}
-                            {deviceSession.location && (
-                              <span>{deviceSession.location}</span>
-                            )}
-                            <span>
-                              Last active: {new Date(deviceSession.lastActivity).toLocaleDateString()}
+                  {settings?.hasApiKey ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 p-4 bg-success-50 rounded-lg">
+                        <Check className="w-5 h-5 text-success" />
+                        <span className="text-sm text-success-700">API key is configured</span>
+                      </div>
+                      {newApiKey && (
+                        <div className="p-4 border border-warning-200 bg-warning-50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="w-4 h-4 text-warning" />
+                            <span className="text-sm font-medium text-warning-700">
+                              Save your API key now - it won&apos;t be shown again
                             </span>
                           </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={newApiKey}
+                              type={showApiKey ? "text" : "password"}
+                              readOnly
+                              className="font-mono text-sm"
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setShowApiKey(!showApiKey)}
+                            >
+                              {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={copyApiKey}>
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      {!deviceSession.isCurrent && (
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          leftIcon={RefreshCw}
+                          onClick={apiKeyModal.onOpen}
+                          isLoading={isGenerating}
+                        >
+                          Regenerate Key
+                        </Button>
                         <Button
                           color="danger"
-                          variant="light"
-                          size="sm"
-                          isLoading={revokingSessionId === deviceSession.id || isRevokingSession}
-                          onPress={() => handleRevokeDeviceSession(deviceSession.id)}
+                          variant="ghost"
+                          leftIcon={Trash2}
+                          onClick={revokeModal.onOpen}
                         >
-                          Sign Out
+                          Revoke Key
                         </Button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </CardBody>
-          </Card>
-        </Tab>
-      </Tabs>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
+                        <Key className="w-5 h-5 text-muted-foreground" />
+                        <span className="text-sm">No API key configured</span>
+                      </div>
+                      <Button
+                        color="primary"
+                        leftIcon={Key}
+                        onClick={apiKeyModal.onOpen}
+                        isLoading={isGenerating}
+                      >
+                        Generate API Key
+                      </Button>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            ),
+          },
+          {
+            key: "sessions",
+            title: (
+              <div className="flex items-center gap-2">
+                <Laptop className="w-4 h-4" />
+                Sessions
+              </div>
+            ),
+            content: (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  {sessions && sessions.length > 1 && (
+                    <Button
+                      color="danger"
+                      variant="ghost"
+                      size="sm"
+                      onClick={revokeAllSessionsModal.onOpen}
+                      isLoading={isRevokingAll}
+                    >
+                      Sign Out All Other Devices
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardBody>
+                  {sessionsLoading ? (
+                    <Skeleton className="h-32 w-full rounded-lg" />
+                  ) : sessions && sessions.length > 0 ? (
+                    <div className="space-y-3">
+                      {sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="flex items-center justify-between p-4 border border-default-200 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-muted rounded-lg">
+                              {getDeviceIcon(session.deviceType)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{session.deviceName || "Unknown Device"}</p>
+                                {session.isCurrent && (
+                                  <Chip color="success" size="sm">Current</Chip>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {session.browser} • {session.os}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Last active: {new Date(session.lastActivity).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          {!session.isCurrent && (
+                            <Button
+                              color="danger"
+                              variant="ghost"
+                              size="sm"
+                              isLoading={isRevokingSession && revokingSessionId === session.id}
+                              onClick={() => handleRevokeDeviceSession(session.id)}
+                            >
+                              Sign Out
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-center py-8">
+                      No active sessions found
+                    </p>
+                  )}
+                </CardBody>
+              </Card>
+            ),
+          },
+        ] as TabItem[]}
+      />
 
       {/* Generate API Key Modal */}
       <Modal isOpen={apiKeyModal.isOpen} onClose={apiKeyModal.onClose}>
@@ -839,13 +722,13 @@ export default function SettingsPage() {
             </p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={apiKeyModal.onClose}>
+            <Button variant="ghost" onClick={apiKeyModal.onClose}>
               Cancel
             </Button>
             <Button
               color="primary"
               isLoading={isGenerating}
-              onPress={() => {
+              onClick={() => {
                 handleGenerateApiKey();
                 apiKeyModal.onClose();
               }}
@@ -871,10 +754,10 @@ export default function SettingsPage() {
             <p>Are you sure you want to revoke your API key?</p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={revokeModal.onClose}>
+            <Button variant="ghost" onClick={revokeModal.onClose}>
               Cancel
             </Button>
-            <Button color="danger" isLoading={isRevoking} onPress={handleRevokeApiKey}>
+            <Button color="danger" isLoading={isRevoking} onClick={handleRevokeApiKey}>
               Revoke Key
             </Button>
           </ModalFooter>
@@ -896,10 +779,10 @@ export default function SettingsPage() {
             <p>Are you sure you want to sign out all other devices?</p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={revokeAllSessionsModal.onClose}>
+            <Button variant="ghost" onClick={revokeAllSessionsModal.onClose}>
               Cancel
             </Button>
-            <Button color="danger" isLoading={isRevokingAll} onPress={handleRevokeAllDeviceSessions}>
+            <Button color="danger" isLoading={isRevokingAll} onClick={handleRevokeAllDeviceSessions}>
               Sign Out All
             </Button>
           </ModalFooter>

@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { Save, Trash2, GripVertical, MessageSquareText } from "lucide-react";
-import { Textarea } from "@heroui/react";
-import { addToast } from "@heroui/react";
 
 import {
   Button,
@@ -17,6 +15,8 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Textarea,
+  addToast,
 } from "@/components/ui";
 
 interface FAQ {
@@ -109,7 +109,7 @@ function FAQEditorInner({
             </h2>
           </div>
           {faq && (
-            <div className="flex items-center gap-2 text-sm text-default-500">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>Used {faq.usageCount} times</span>
               <span>|</span>
               <span>{faq.helpfulCount} helpful</span>
@@ -169,16 +169,15 @@ function FAQEditorInner({
           <div className="flex items-center justify-between p-4 border rounded-lg">
             <div>
               <p className="font-medium">Active Status</p>
-              <p className="text-sm text-default-500">
+              <p className="text-sm text-muted-foreground">
                 {isActive
                   ? "This FAQ is active and will be used by the AI"
                   : "This FAQ is inactive and won't be used"}
               </p>
             </div>
             <Button
-              variant={isActive ? "solid" : "bordered"}
-              color={isActive ? "success" : "default"}
-              onPress={() => setIsActive(!isActive)}
+              variant={isActive ? "success" : "outline"}
+              onClick={() => setIsActive(!isActive)}
             >
               {isActive ? "Active" : "Inactive"}
             </Button>
@@ -188,10 +187,9 @@ function FAQEditorInner({
           <div className="flex items-center justify-between pt-4 border-t">
             {faq && onDelete ? (
               <Button
-                variant="bordered"
-                color="danger"
-                leftIcon={Trash2}
-                onPress={() => setShowDeleteModal(true)}
+                variant="destructive"
+                startContent={<Trash2 size={16} />}
+                onClick={() => setShowDeleteModal(true)}
               >
                 Delete FAQ
               </Button>
@@ -200,10 +198,10 @@ function FAQEditorInner({
             )}
             <Button
               color="primary"
-              leftIcon={Save}
-              onPress={handleSave}
+              startContent={<Save size={16} />}
+              onClick={handleSave}
               isLoading={isSaving}
-              isDisabled={!hasChanges || !question.trim() || !answer.trim()}
+              disabled={!hasChanges || !question.trim() || !answer.trim()}
             >
               {faq ? "Save Changes" : "Create FAQ"}
             </Button>
@@ -217,12 +215,12 @@ function FAQEditorInner({
           <ModalHeader className="text-danger">Delete FAQ</ModalHeader>
           <ModalBody>
             <p>Are you sure you want to delete this FAQ?</p>
-            <p className="text-sm text-default-500 mt-2">
+            <p className="text-sm text-muted-foreground mt-2">
               This action cannot be undone. The FAQ will be permanently removed.
             </p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setShowDeleteModal(false)}>
+            <Button variant="ghost" onPress={() => setShowDeleteModal(false)}>
               Cancel
             </Button>
             <Button color="danger" onPress={handleDelete}>
@@ -258,8 +256,8 @@ export function FAQList({ faqs, onEdit, onDelete, isLoading }: FAQListProps) {
           <Card key={i}>
             <CardBody className="p-4">
               <div className="animate-pulse space-y-2">
-                <div className="h-4 bg-default-200 rounded w-3/4" />
-                <div className="h-3 bg-default-200 rounded w-1/2" />
+                <div className="h-4 bg-muted rounded w-3/4" />
+                <div className="h-3 bg-muted rounded w-1/2" />
               </div>
             </CardBody>
           </Card>
@@ -272,9 +270,9 @@ export function FAQList({ faqs, onEdit, onDelete, isLoading }: FAQListProps) {
     return (
       <Card>
         <CardBody className="text-center py-12">
-          <MessageSquareText className="h-12 w-12 mx-auto mb-4 text-default-300" />
-          <p className="text-default-500 font-medium">No FAQs yet</p>
-          <p className="text-sm text-default-400">
+          <MessageSquareText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground font-medium">No FAQs yet</p>
+          <p className="text-sm text-muted-foreground">
             Create your first FAQ to help the AI answer common questions
           </p>
         </CardBody>
@@ -287,13 +285,12 @@ export function FAQList({ faqs, onEdit, onDelete, isLoading }: FAQListProps) {
       {faqs.map((faq) => (
         <Card
           key={faq.id}
-          isPressable
-          onPress={() => onEdit(faq)}
-          className="hover:bg-default-50 transition-colors"
+          onClick={() => onEdit(faq)}
+          className="cursor-pointer hover:bg-muted transition-colors"
         >
           <CardBody className="p-4">
             <div className="flex items-start gap-3">
-              <div className="mt-1 text-default-300 cursor-grab">
+              <div className="mt-1 text-muted-foreground cursor-grab">
                 <GripVertical className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
@@ -306,10 +303,10 @@ export function FAQList({ faqs, onEdit, onDelete, isLoading }: FAQListProps) {
                     <Badge variant="warning">Inactive</Badge>
                   )}
                 </div>
-                <p className="text-sm text-default-500 line-clamp-2">
+                <p className="text-sm text-muted-foreground line-clamp-2">
                   {faq.answer}
                 </p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-default-400">
+                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                   <span>Priority: {PRIORITY_OPTIONS.find((o) => o.value === String(faq.priority))?.label}</span>
                   <span>Used {faq.usageCount} times</span>
                   <span>{faq.helpfulCount} helpful</span>

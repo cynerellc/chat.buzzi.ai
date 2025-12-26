@@ -13,13 +13,15 @@ import {
   Clock,
   MessageSquare,
 } from "lucide-react";
-import { Input as HeroInput, Spinner, addToast } from "@heroui/react";
 
 import {
   Button,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
   Badge,
+  Spinner,
+  Input,
+  addToast,
 } from "@/components/ui";
 import {
   useConversation,
@@ -138,7 +140,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
     }
   };
 
-  const dropdownItems: DropdownMenuItem[] = [
+  const dropdownItems: DropdownMenuItemData[] = [
     {
       key: "take_over",
       label: "Take over conversation",
@@ -181,9 +183,9 @@ export default function ConversationDetailPage({ params }: PageProps) {
   if (!conversation) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
-        <MessageSquare className="h-12 w-12 text-default-300 mb-4" />
-        <p className="text-default-500 font-medium">Conversation not found</p>
-        <Button variant="bordered" className="mt-4" onPress={() => router.push("/conversations")}>
+        <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
+        <p className="text-muted-foreground font-medium">Conversation not found</p>
+        <Button variant="outline" className="mt-4" onPress={() => router.push("/conversations")}>
           Back to Conversations
         </Button>
       </div>
@@ -200,8 +202,8 @@ export default function ConversationDetailPage({ params }: PageProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-divider bg-background">
         <div className="flex items-center gap-4">
           <Button
-            variant="light"
-            isIconOnly
+            variant="ghost"
+            size="icon"
             onPress={() => router.push("/conversations")}
           >
             <ArrowLeft className="h-5 w-5" />
@@ -219,7 +221,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
                 {status.label}
               </Badge>
             </div>
-            <p className="text-sm text-default-500">
+            <p className="text-sm text-muted-foreground">
               {conversation.agent.name} · {conversation.messageCount} messages ·{" "}
               {conversation.channel}
             </p>
@@ -231,7 +233,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
             <>
               <Button
                 color="success"
-                variant="bordered"
+                variant="outline"
                 size="sm"
                 onPress={handleResolve}
                 isLoading={isUpdating}
@@ -242,7 +244,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
 
               <Dropdown
                 trigger={
-                  <Button variant="bordered" size="sm" isIconOnly>
+                  <Button variant="outline" size="icon">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 }
@@ -253,7 +255,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
           )}
 
           <Button
-            variant="light"
+            variant="ghost"
             size="sm"
             onPress={() => setShowSidebar(!showSidebar)}
           >
@@ -276,7 +278,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
           {!isResolved && (
             <div className="p-4 border-t border-divider bg-background">
               <div className="flex gap-2 max-w-3xl mx-auto">
-                <HeroInput
+                <Input
                   placeholder="Type a message as human agent..."
                   value={messageInput}
                   onValueChange={setMessageInput}
@@ -286,30 +288,28 @@ export default function ConversationDetailPage({ params }: PageProps) {
                       handleSendMessage();
                     }
                   }}
-                  isDisabled={isSending}
-                  classNames={{
-                    inputWrapper: "flex-1",
-                  }}
+                  disabled={isSending}
+                  className="flex-1"
                 />
                 <Button
                   color="primary"
-                  isIconOnly
+                  size="icon"
                   onPress={handleSendMessage}
                   isLoading={isSending}
-                  isDisabled={!messageInput.trim()}
+                  disabled={!messageInput.trim()}
                 >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-default-400 mt-2 text-center">
+              <p className="text-xs text-muted-foreground mt-2 text-center">
                 Messages you send will appear as from a human agent
               </p>
             </div>
           )}
 
           {isResolved && (
-            <div className="p-4 border-t border-divider bg-default-50 text-center">
-              <p className="text-sm text-default-500">
+            <div className="p-4 border-t border-divider bg-muted text-center">
+              <p className="text-sm text-muted-foreground">
                 This conversation has been {conversation.status}.
                 {conversation.resolvedAt && (
                   <span>

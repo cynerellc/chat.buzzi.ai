@@ -58,8 +58,8 @@ interface ImpersonationPageProps {
 }
 
 const roleBadgeVariants: Record<string, BadgeVariant> = {
-  company_admin: "info",
-  support_agent: "default",
+  "chatapp.company_admin": "info",
+  "chatapp.support_agent": "default",
 };
 
 export default function ImpersonationPage({ params }: ImpersonationPageProps) {
@@ -95,7 +95,7 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
 
       // Redirect based on role
       const redirectUrl =
-        selectedUser.role === "company_admin" ? "/company/dashboard" : "/chat";
+        selectedUser.role === "chatapp.company_admin" ? "/company/dashboard" : "/chat";
 
       window.location.href = redirectUrl;
     } catch (err) {
@@ -126,16 +126,16 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
     return (
       <div className="p-6">
         <Card className="p-12 text-center">
-          <Building2 size={48} className="mx-auto mb-4 text-default-300" />
+          <Building2 size={48} className="mx-auto mb-4 text-muted-foreground/50" />
           <h2 className="text-xl font-semibold mb-2">Company Not Found</h2>
-          <p className="text-default-500 mb-4">
+          <p className="text-muted-foreground mb-4">
             The company you&apos;re looking for doesn&apos;t exist or has been
             deleted.
           </p>
           <Button
-            variant="flat"
+            variant="secondary"
             startContent={<ArrowLeft size={16} />}
-            onPress={() => router.push("/admin/companies")}
+            onClick={() => router.push("/admin/companies")}
           >
             Back to Companies
           </Button>
@@ -191,7 +191,7 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
           />
           <div>
             <h2 className="text-xl font-semibold">{companyData.name}</h2>
-            <p className="text-default-500">{companyData.slug}</p>
+            <p className="text-muted-foreground">{companyData.slug}</p>
           </div>
           <div className="ml-auto">
             <Badge
@@ -217,8 +217,8 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
 
             {activeUsers.length === 0 ? (
               <div className="text-center py-8">
-                <User size={48} className="mx-auto mb-4 text-default-300" />
-                <p className="text-default-500">
+                <User size={48} className="mx-auto mb-4 text-muted-foreground/50" />
+                <p className="text-muted-foreground">
                   No active users found in this company.
                 </p>
               </div>
@@ -230,7 +230,7 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
                     className={`p-4 rounded-lg border cursor-pointer transition-all ${
                       selectedUser?.id === user.id
                         ? "border-primary bg-primary-50 ring-2 ring-primary"
-                        : "border-divider hover:bg-default-50"
+                        : "border-divider hover:bg-muted/50"
                     }`}
                     onClick={() => setSelectedUser(user)}
                     role="button"
@@ -255,12 +255,12 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
                             variant={roleBadgeVariants[user.role] ?? "default"}
                             size="sm"
                           >
-                            {user.role === "company_admin"
+                            {user.role === "chatapp.company_admin"
                               ? "Admin"
                               : "Support Agent"}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-default-500">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Mail size={14} />
                           <span className="truncate">{user.email}</span>
                         </div>
@@ -286,15 +286,15 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
 
             {selectedUser ? (
               <div className="space-y-4">
-                <div className="p-4 bg-default-50 rounded-lg">
-                  <p className="text-sm text-default-500 mb-1">Selected User</p>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Selected User</p>
                   <p className="font-medium">
                     {selectedUser.name ?? selectedUser.email}
                   </p>
-                  <p className="text-sm text-default-500">
+                  <p className="text-sm text-muted-foreground">
                     {selectedUser.email}
                   </p>
-                  <p className="text-xs text-default-400 mt-2">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Joined{" "}
                     {format(new Date(selectedUser.createdAt), "MMM d, yyyy")}
                   </p>
@@ -319,21 +319,21 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
                   color="warning"
                   className="w-full"
                   startContent={<UserCheck size={16} />}
-                  onPress={handleStartImpersonation}
+                  onClick={handleStartImpersonation}
                   isLoading={isStarting}
                 >
                   Start Impersonation
                 </Button>
 
-                <p className="text-xs text-default-400 text-center">
+                <p className="text-xs text-muted-foreground text-center">
                   You will be logged in as this user. Click the banner at the
                   top to end the session.
                 </p>
               </div>
             ) : (
               <div className="text-center py-8">
-                <User size={40} className="mx-auto mb-3 text-default-300" />
-                <p className="text-default-500 text-sm">
+                <User size={40} className="mx-auto mb-3 text-muted-foreground/50" />
+                <p className="text-muted-foreground text-sm">
                   Select a user from the list to impersonate them.
                 </p>
               </div>

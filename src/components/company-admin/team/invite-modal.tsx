@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Mail, Shield, ShieldCheck, UserPlus } from "lucide-react";
-import { Select, SelectItem } from "@heroui/react";
 
 import {
   Button,
@@ -12,24 +11,25 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Select,
 } from "@/components/ui";
 
 interface InviteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInvite: (email: string, role: "company_admin" | "support_agent") => Promise<void>;
+  onInvite: (email: string, role: "chatapp.company_admin" | "chatapp.support_agent") => Promise<void>;
   isInviting: boolean;
 }
 
 const roleOptions = [
   {
-    key: "support_agent",
+    key: "chatapp.support_agent",
     label: "Support Agent",
     description: "Handle conversations and support",
     icon: Shield,
   },
   {
-    key: "company_admin",
+    key: "chatapp.company_admin",
     label: "Admin",
     description: "Full access to company settings",
     icon: ShieldCheck,
@@ -43,7 +43,7 @@ export function InviteModal({
   isInviting,
 }: InviteModalProps) {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"company_admin" | "support_agent">("support_agent");
+  const [role, setRole] = useState<"chatapp.company_admin" | "chatapp.support_agent">("chatapp.support_agent");
   const [error, setError] = useState<string | null>(null);
 
   const handleInvite = async () => {
@@ -69,7 +69,7 @@ export function InviteModal({
 
   const handleClose = () => {
     setEmail("");
-    setRole("support_agent");
+    setRole("chatapp.support_agent");
     setError(null);
     onClose();
   };
@@ -78,7 +78,7 @@ export function InviteModal({
   const RoleIcon = selectedRole?.icon || Shield;
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={handleClose}>
+    <Modal isOpen={isOpen} onClose={handleClose}>
       <ModalContent>
         <ModalHeader className="flex items-center gap-2">
           <UserPlus className="h-5 w-5" />
@@ -91,49 +91,40 @@ export function InviteModal({
               placeholder="colleague@company.com"
               type="email"
               value={email}
-              onValueChange={(value) => {
-                setEmail(value);
+              onChange={(e) => {
+                setEmail(e.target.value);
                 setError(null);
               }}
-              startContent={<Mail className="w-4 h-4 text-default-400" />}
+              startContent={<Mail className="w-4 h-4 text-muted-foreground" />}
               isInvalid={!!error}
-              errorMessage={error}
+              errorMessage={error ?? undefined}
             />
 
             <Select
               label="Role"
               placeholder="Select a role"
-              selectedKeys={[role]}
+              options={roleOptions.map((option) => ({
+                value: option.key,
+                label: option.label,
+              }))}
+              selectedKeys={new Set([role])}
               onSelectionChange={(keys) => {
                 const selected = Array.from(keys)[0] as string;
-                if (selected) setRole(selected as "company_admin" | "support_agent");
+                if (selected) setRole(selected as "chatapp.company_admin" | "chatapp.support_agent");
               }}
-              startContent={<RoleIcon className="w-4 h-4" />}
-            >
-              {roleOptions.map((option) => (
-                <SelectItem key={option.key} textValue={option.label}>
-                  <div className="flex items-center gap-3">
-                    <option.icon className="w-4 h-4 text-default-500" />
-                    <div>
-                      <p className="font-medium">{option.label}</p>
-                      <p className="text-xs text-default-500">{option.description}</p>
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </Select>
+            />
 
-            <div className="p-4 bg-default-50 rounded-lg">
+            <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm font-medium mb-2">Role Permissions:</p>
-              {role === "company_admin" ? (
-                <ul className="text-sm text-default-500 space-y-1">
+              {role === "chatapp.company_admin" ? (
+                <ul className="text-sm text-muted-foreground space-y-1">
                   <li>- Full access to all features</li>
                   <li>- Manage team members and invitations</li>
                   <li>- Configure agents and settings</li>
                   <li>- Access billing and analytics</li>
                 </ul>
               ) : (
-                <ul className="text-sm text-default-500 space-y-1">
+                <ul className="text-sm text-muted-foreground space-y-1">
                   <li>- Handle customer conversations</li>
                   <li>- View assigned conversations</li>
                   <li>- Access knowledge base</li>
@@ -144,15 +135,15 @@ export function InviteModal({
           </div>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={handleClose}>
+          <Button variant="ghost" onClick={handleClose}>
             Cancel
           </Button>
           <Button
             color="primary"
             isLoading={isInviting}
-            isDisabled={!email}
-            onPress={handleInvite}
-            leftIcon={Mail}
+            disabled={!email}
+            onClick={handleInvite}
+            startContent={<Mail size={16} />}
           >
             Send Invitation
           </Button>
@@ -184,7 +175,7 @@ export function ResendInviteModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onClose}>
+    <Modal isOpen={isOpen} onClose={onClose}>
       <ModalContent>
         <ModalHeader>Resend Invitation</ModalHeader>
         <ModalBody>
@@ -192,19 +183,19 @@ export function ResendInviteModal({
             Are you sure you want to resend the invitation to{" "}
             <strong>{email}</strong>?
           </p>
-          <p className="text-sm text-default-500 mt-2">
+          <p className="text-sm text-muted-foreground mt-2">
             This will send a new invitation email and extend the expiration date.
           </p>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button
             color="primary"
             isLoading={isResending}
-            onPress={handleResend}
-            leftIcon={Mail}
+            onClick={handleResend}
+            startContent={<Mail size={16} />}
           >
             Resend Invitation
           </Button>

@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 
 import { db } from "@/lib/db";
-import { invitations, users } from "@/lib/db/schema";
+import { companyPermissions, invitations, users } from "@/lib/db/schema";
+import type { CompanyPermissionRole } from "@/lib/db/schema/company-permissions";
 
 const acceptInvitationSchema = z.object({
   token: z.string().min(1),
@@ -48,15 +49,14 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
+    // Create user with base role (company-specific role is via company_permissions)
     const userResult = await db
       .insert(users)
       .values({
         email: invitation.email,
         name: fullName,
         hashedPassword,
-        companyId: invitation.companyId,
-        role: invitation.role as "company_admin" | "support_agent",
+        role: "chatapp.user",
         status: "active",
         isActive: true,
       })
@@ -66,6 +66,13 @@ export async function POST(request: Request) {
     if (!user) {
       throw new Error("Failed to create user");
     }
+
+    // Create company permission for the user with the invited role
+    await db.insert(companyPermissions).values({
+      companyId: invitation.companyId,
+      userId: user.id,
+      role: invitation.role as CompanyPermissionRole,
+    });
 
     // Update invitation status
     await db

@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
-import { agents, agentPackages, agentVersions } from "@/lib/db/schema";
+import { agents, agentPackages, agentVersions, type PackageVariableDefinition } from "@/lib/db/schema";
 
 interface RouteParams {
   params: Promise<{ agentId: string }>;
@@ -12,13 +11,8 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { agentId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     const [agent] = await db
       .select({
@@ -37,6 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         escalationEnabled: agents.escalationEnabled,
         escalationTriggers: agents.escalationTriggers,
         knowledgeSourceIds: agents.knowledgeSourceIds,
+        variableValues: agents.variableValues,
         totalConversations: agents.totalConversations,
         avgResolutionTime: agents.avgResolutionTime,
         satisfactionScore: agents.satisfactionScore,
@@ -46,6 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           id: agentPackages.id,
           name: agentPackages.name,
           slug: agentPackages.slug,
+          variables: agentPackages.variables,
         },
       })
       .from(agents)
@@ -63,7 +59,33 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ agent });
+    // Combine package variable definitions with agent's variable values
+    const packageVariables = (agent.package?.variables as PackageVariableDefinition[]) || [];
+    const agentVariableValues = (agent.variableValues as Record<string, string>) || {};
+
+    // Build variable values with definitions for the response
+    const variableValuesWithDefinitions = packageVariables.map((pv) => ({
+      name: pv.name,
+      displayName: pv.displayName,
+      description: pv.description,
+      variableType: pv.variableType,
+      dataType: pv.dataType,
+      required: pv.required,
+      placeholder: pv.placeholder,
+      // Mask secured variable values
+      value: pv.variableType === "secured_variable" && agentVariableValues[pv.name]
+        ? "••••••••"
+        : agentVariableValues[pv.name] || null,
+    }));
+
+    return NextResponse.json({
+      agent: {
+        ...agent,
+        variableValues: variableValuesWithDefinitions,
+        // Also include the raw variable values for editing
+        rawVariableValues: agentVariableValues,
+      },
+    });
   } catch (error) {
     console.error("Error fetching agent:", error);
     return NextResponse.json(
@@ -86,17 +108,14 @@ interface UpdateAgentRequest {
   escalationEnabled?: boolean;
   escalationTriggers?: unknown[];
   knowledgeSourceIds?: string[];
+  // Variable values are now stored as a simple key-value object
+  variableValues?: Record<string, string>;
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { agentId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     // Verify agent belongs to company
     const [existingAgent] = await db
@@ -134,6 +153,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.escalationEnabled !== undefined) updateData.escalationEnabled = body.escalationEnabled;
     if (body.escalationTriggers !== undefined) updateData.escalationTriggers = body.escalationTriggers;
     if (body.knowledgeSourceIds !== undefined) updateData.knowledgeSourceIds = body.knowledgeSourceIds;
+    // Variable values are now stored directly in the agent as JSONB
+    if (body.variableValues !== undefined) {
+      // Merge with existing values (preserve values not being updated)
+      const existingValues = (existingAgent.variableValues as Record<string, string>) || {};
+      updateData.variableValues = { ...existingValues, ...body.variableValues };
+    }
 
     // If systemPrompt changed, create a version
     if (body.systemPrompt && body.systemPrompt !== existingAgent.systemPrompt) {
@@ -159,7 +184,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Update the agent
+    // Update the agent (variable values are now part of updateData if provided)
     const [updatedAgent] = await db
       .update(agents)
       .set(updateData)
@@ -178,13 +203,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { company } = await requireCompanyAdmin();
     const { agentId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     // Verify agent belongs to company
     const [existingAgent] = await db

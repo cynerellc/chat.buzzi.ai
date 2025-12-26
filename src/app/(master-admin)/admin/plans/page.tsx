@@ -47,7 +47,7 @@ export default function PlansPage() {
           <Button
             color="primary"
             startContent={<Plus size={16} />}
-            onPress={handleCreatePlan}
+            onClick={handleCreatePlan}
           >
             Create Plan
           </Button>

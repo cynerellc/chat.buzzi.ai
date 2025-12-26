@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
-import { Switch, RadioGroup, Radio } from "@heroui/react";
 
 import {
   Button,
@@ -11,7 +10,10 @@ import {
   Card,
   CardHeader,
   CardBody,
-  Chip,
+  Badge,
+  Switch,
+  RadioGroup,
+  Radio,
 } from "@/components/ui";
 
 import type { AgentDetail } from "@/hooks/company/useAgents";
@@ -117,20 +119,20 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
           <h2 className="text-lg font-semibold">Escalation Rules</h2>
         </CardHeader>
         <CardBody className="space-y-6">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Configure when conversations should be escalated to human agents.
           </p>
 
           <div className="space-y-4">
-            <h3 className="font-medium border-b border-divider pb-2">
+            <h3 className="font-medium border-b pb-2">
               Automatic Escalation Triggers
             </h3>
 
             {/* Customer Request */}
-            <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+            <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <span className="font-medium">Customer requests human agent</span>
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-muted-foreground">
                   When customer explicitly asks to speak to a human
                 </p>
               </div>
@@ -141,11 +143,11 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
             </div>
 
             {/* Negative Sentiment */}
-            <div className="rounded-lg border border-divider p-4 space-y-3">
+            <div className="rounded-lg border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-medium">Negative sentiment detected</span>
-                  <p className="text-sm text-default-500">
+                  <p className="text-sm text-muted-foreground">
                     Escalate when customer frustration is detected
                   </p>
                 </div>
@@ -171,11 +173,11 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
             </div>
 
             {/* Low Confidence */}
-            <div className="rounded-lg border border-divider p-4 space-y-3">
+            <div className="rounded-lg border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-medium">AI confidence too low</span>
-                  <p className="text-sm text-default-500">
+                  <p className="text-sm text-muted-foreground">
                     Escalate when AI is uncertain about the response
                   </p>
                 </div>
@@ -188,7 +190,7 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium">Confidence threshold</label>
-                    <span className="text-sm text-default-500">
+                    <span className="text-sm text-muted-foreground">
                       {config.confidenceThreshold}%
                     </span>
                   </div>
@@ -199,18 +201,18 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
                     min={40}
                     max={90}
                     step={5}
-                    className="w-full h-2 rounded-full bg-default-200 appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+                    className="w-full h-2 rounded-full bg-muted appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
                   />
                 </div>
               )}
             </div>
 
             {/* Max Messages */}
-            <div className="rounded-lg border border-divider p-4 space-y-3">
+            <div className="rounded-lg border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-medium">Max messages without resolution</span>
-                  <p className="text-sm text-default-500">
+                  <p className="text-sm text-muted-foreground">
                     Escalate after too many back-and-forth messages
                   </p>
                 </div>
@@ -235,22 +237,23 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
             </div>
 
             {/* Keywords */}
-            <div className="rounded-lg border border-divider p-4 space-y-3">
+            <div className="rounded-lg border p-4 space-y-3">
               <div>
                 <span className="font-medium">Specific keywords detected</span>
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-muted-foreground">
                   Escalate when sensitive keywords are mentioned
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {config.keywords.map((keyword) => (
-                  <Chip
+                  <Badge
                     key={keyword}
-                    variant="flat"
-                    onClose={() => removeKeyword(keyword)}
+                    variant="secondary"
+                    className="cursor-pointer"
+                    onClick={() => removeKeyword(keyword)}
                   >
-                    {keyword}
-                  </Chip>
+                    {keyword} x
+                  </Badge>
                 ))}
               </div>
               <div className="flex gap-2">
@@ -261,7 +264,7 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
                   onKeyDown={(e) => e.key === "Enter" && addKeyword()}
                   className="flex-1"
                 />
-                <Button variant="bordered" isIconOnly onPress={addKeyword}>
+                <Button variant="outline" size="icon" onClick={addKeyword}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -283,13 +286,13 @@ export function EscalationTab({ agent, onSave, isSaving }: EscalationTabProps) {
                 updateConfig("assignmentRule", v as EscalationConfig["assignmentRule"])
               }
             >
-              <Radio value="first_available">
+              <Radio value="first_available" id="first_available">
                 First available agent
               </Radio>
-              <Radio value="round_robin">
+              <Radio value="round_robin" id="round_robin">
                 Round robin
               </Radio>
-              <Radio value="specific_team">
+              <Radio value="specific_team" id="specific_team">
                 Specific team
               </Radio>
             </RadioGroup>

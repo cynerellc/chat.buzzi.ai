@@ -184,10 +184,10 @@ export default function UnassignedInboxPage() {
             </Button>
           </div>
         ) : conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-default-400">
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <InboxIcon size={64} className="opacity-30 mb-4" />
             <p className="text-sm font-medium">No unassigned conversations</p>
-            <p className="text-xs text-default-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               All conversations are currently assigned
             </p>
           </div>
@@ -221,7 +221,7 @@ export default function UnassignedInboxPage() {
                           </Badge>
                         )}
                       </div>
-                      <span className="text-xs text-default-400 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
                         {conversation.lastMessageAt
                           ? formatDistanceToNow(new Date(conversation.lastMessageAt), {
                               addSuffix: true,
@@ -232,7 +232,7 @@ export default function UnassignedInboxPage() {
 
                     {/* Last message preview */}
                     {conversation.lastMessage && (
-                      <p className="text-sm text-default-500 truncate mt-1">
+                      <p className="text-sm text-muted-foreground truncate mt-1">
                         {conversation.lastMessage.role === "user" && (
                           <User size={12} className="inline mr-1" />
                         )}
@@ -253,7 +253,7 @@ export default function UnassignedInboxPage() {
 
                     {/* Wait time and Agent */}
                     <div className="flex items-center gap-2 mt-2">
-                      <Chip size="sm" variant="flat" className="text-xs">
+                      <Chip size="sm"  className="text-xs">
                         <Clock size={12} className="mr-1" />
                         Waiting{" "}
                         {conversation.escalation
@@ -261,7 +261,7 @@ export default function UnassignedInboxPage() {
                           : formatDistanceToNow(new Date(conversation.createdAt))}
                       </Chip>
                       {conversation.agent && (
-                        <Chip size="sm" variant="bordered" className="text-xs">
+                        <Chip size="sm" chipVariant="faded" className="text-xs">
                           {conversation.agent.name}
                         </Chip>
                       )}
@@ -289,7 +289,7 @@ export default function UnassignedInboxPage() {
       <Card className="border-info bg-info/5">
         <div className="p-4">
           <h4 className="font-medium text-info-600 mb-1">About the Queue</h4>
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             These conversations have been escalated from the AI assistant and are waiting
             for a human agent. Conversations are sorted by wait time, with the longest
             waiting shown first.

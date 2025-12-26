@@ -8,8 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cannedResponses } from "@/lib/db/schema/conversations";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, or, isNull, desc, ilike, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
@@ -24,17 +23,7 @@ const createResponseSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -48,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Scope filtering
     // isShared=true means team/shared, isShared=false + userId means personal
     if (scope === "personal") {
-      conditions.push(eq(cannedResponses.userId, session.user.id));
+      conditions.push(eq(cannedResponses.userId, user.id));
       conditions.push(eq(cannedResponses.isShared, false));
     } else if (scope === "company") {
       conditions.push(eq(cannedResponses.isShared, true));
@@ -58,7 +47,7 @@ export async function GET(request: NextRequest) {
         or(
           eq(cannedResponses.isShared, true),
           and(
-            eq(cannedResponses.userId, session.user.id),
+            eq(cannedResponses.userId, user.id),
             eq(cannedResponses.isShared, false)
           )
         )!
@@ -109,7 +98,7 @@ export async function GET(request: NextRequest) {
           or(
             eq(cannedResponses.isShared, true),
             and(
-              eq(cannedResponses.userId, session.user.id),
+              eq(cannedResponses.userId, user.id),
               eq(cannedResponses.isShared, false)
             )
           )
@@ -133,17 +122,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Parse and validate body
     const body = await request.json();
@@ -175,7 +154,7 @@ export async function POST(request: NextRequest) {
       .insert(cannedResponses)
       .values({
         companyId: company.id,
-        userId: data.isPersonal ? session.user.id : null,
+        userId: data.isPersonal ? user.id : null,
         name: data.name,
         shortcut: data.shortcut || null,
         content: data.content,

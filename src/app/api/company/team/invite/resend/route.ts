@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { invitations } from "@/lib/db/schema";
 
@@ -13,12 +12,7 @@ interface ResendRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user: currentUser, company } = await requireCompanyAdmin();
 
     const body: ResendRequest = await request.json();
 

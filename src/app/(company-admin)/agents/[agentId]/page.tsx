@@ -12,16 +12,17 @@ import {
   Layout,
   BarChart3,
   Play,
+  Variable,
 } from "lucide-react";
-import { addToast } from "@heroui/react";
 
-import { Button, Badge, Skeleton, Tabs, type TabItem } from "@/components/ui";
+import { Button, Badge, Skeleton, Tabs, type TabItem, addToast } from "@/components/ui";
 import { GeneralTab } from "@/components/company-admin/agents/general-tab";
 import { PromptTab } from "@/components/company-admin/agents/prompt-tab";
 import { ToolsTab } from "@/components/company-admin/agents/tools-tab";
 import { EscalationTab } from "@/components/company-admin/agents/escalation-tab";
 import { WidgetTab } from "@/components/company-admin/agents/widget-tab";
 import { AnalyticsTab } from "@/components/company-admin/agents/analytics-tab";
+import { VariablesTab } from "@/components/company-admin/agents/variables-tab";
 import { TestChatModal } from "@/components/company-admin/agents/test-chat-modal";
 import { useAgent, type AgentDetail } from "@/hooks/company";
 
@@ -112,6 +113,14 @@ export default function AgentEditorPage({ params }: PageProps) {
       ) : null,
     },
     {
+      key: "variables",
+      label: "Variables",
+      icon: Variable,
+      content: agent ? (
+        <VariablesTab agent={agent} onSave={handleSave} isSaving={isSaving} />
+      ) : null,
+    },
+    {
       key: "analytics",
       label: "Analytics",
       icon: BarChart3,
@@ -138,9 +147,9 @@ export default function AgentEditorPage({ params }: PageProps) {
   if (!agent) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <p className="text-default-500">Agent not found</p>
-        <Button as={Link} href="/agents" variant="bordered">
-          Back to Agents
+        <p className="text-muted-foreground">Agent not found</p>
+        <Button asChild variant="outline">
+          <Link href="/agents">Back to Agents</Link>
         </Button>
       </div>
     );
@@ -155,22 +164,24 @@ export default function AgentEditorPage({ params }: PageProps) {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <Button as={Link} href="/agents" variant="light" isIconOnly aria-label="Back">
-              <ArrowLeft size={18} />
+            <Button asChild variant="ghost" size="icon" aria-label="Back">
+              <Link href="/agents">
+                <ArrowLeft size={18} />
+              </Link>
             </Button>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight">{agent.name}</h1>
                 <Badge variant={status.variant}>{status.label}</Badge>
               </div>
-              <p className="text-default-500">
+              <p className="text-muted-foreground">
                 {agent.type.charAt(0).toUpperCase() + agent.type.slice(1)} Agent
                 {agent.package && ` • ${agent.package.name}`}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="bordered" onPress={() => setShowTestChat(true)} leftIcon={Play}>
+            <Button variant="outline" onPress={() => setShowTestChat(true)} leftIcon={Play}>
               Test Agent
             </Button>
           </div>
@@ -182,9 +193,7 @@ export default function AgentEditorPage({ params }: PageProps) {
           selectedKey={activeTab}
           onSelectionChange={(key) => setActiveTab(String(key))}
           variant="underlined"
-          classNames={{
-            tabList: "gap-6",
-          }}
+          className="gap-6"
         />
       </div>
 

@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { and, eq, ne } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
-import { invitations, users } from "@/lib/db/schema";
+import { companyPermissions, invitations, users } from "@/lib/db/schema";
 
 export interface TeamMember {
   id: string;
@@ -38,30 +37,26 @@ export interface TeamResponse {
 
 export async function GET() {
   try {
-    const user = await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { user, company } = await requireCompanyAdmin();
 
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
-
-    // Get all team members (users belonging to this company)
+    // Get all team members (users belonging to this company via company_permissions)
     const teamMembers = await db
       .select({
         id: users.id,
         email: users.email,
         name: users.name,
-        role: users.role,
+        role: companyPermissions.role, // Company role from permissions
         status: users.status,
         avatarUrl: users.avatarUrl,
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
       })
       .from(users)
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
       .where(
         and(
-          eq(users.companyId, company.id),
-          ne(users.role, "master_admin") // Exclude master admins
+          eq(companyPermissions.companyId, company.id),
+          ne(users.role, "chatapp.master_admin") // Exclude master admins
         )
       )
       .orderBy(users.createdAt);

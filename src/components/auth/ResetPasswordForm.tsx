@@ -1,9 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Link } from "@heroui/react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowLeft, CheckCircle2, KeyRound } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, KeyRound, Lock } from "lucide-react";
+
+import { Button } from "@/components/ui";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -92,18 +94,23 @@ export function ResetPasswordForm() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
         className="w-full max-w-md text-center"
       >
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-danger/10 mb-6">
-          <AlertCircle className="w-8 h-8 text-danger" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2">Invalid Link</h1>
-        <p className="text-default-500 mb-6">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10 mb-6"
+        >
+          <AlertCircle className="w-8 h-8 text-destructive" />
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight mb-2">Invalid Link</h1>
+        <p className="text-muted-foreground mb-6">
           This password reset link is invalid or has expired.
         </p>
         <Link href="/forgot-password">
-          <Button color="primary">Request New Link</Button>
+          <Button color="primary" className="font-medium">Request New Link</Button>
         </Link>
       </motion.div>
     );
@@ -114,18 +121,23 @@ export function ResetPasswordForm() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
         className="w-full max-w-md text-center"
       >
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-6">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-6"
+        >
           <CheckCircle2 className="w-8 h-8 text-success" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2">Password Reset</h1>
-        <p className="text-default-500 mb-6">
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight mb-2">Password Reset</h1>
+        <p className="text-muted-foreground mb-6">
           Your password has been successfully reset. You can now sign in with your new
           password.
         </p>
-        <Button color="primary" onClick={() => router.push("/login")}>
+        <Button color="primary" className="font-medium" onClick={() => router.push("/login")}>
           Sign In
         </Button>
       </motion.div>
@@ -136,31 +148,36 @@ export function ResetPasswordForm() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className="w-full max-w-md"
     >
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+          className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4"
+        >
           <KeyRound className="w-6 h-6 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold">Set New Password</h1>
-        <p className="text-default-500 mt-2">
-          Enter your new password below
+        </motion.div>
+        <h1 className="text-2xl font-bold tracking-tight">Set New Password</h1>
+        <p className="text-muted-foreground mt-2">
+          Create a strong password for your account
         </p>
       </div>
 
       {error && (
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="mb-4 p-3 rounded-lg bg-danger-50 border border-danger-200 flex items-center gap-2 text-danger"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-destructive"
         >
           <AlertCircle size={18} />
           <span className="text-sm">{error}</span>
         </motion.div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <PasswordInput
           {...register("password")}
           value={password}
@@ -185,10 +202,11 @@ export function ResetPasswordForm() {
         <Button
           type="submit"
           color="primary"
-          className="w-full"
+          className="w-full font-medium gap-2"
           isLoading={isLoading}
           size="lg"
         >
+          <Lock size={18} />
           Reset Password
         </Button>
       </form>
@@ -196,7 +214,7 @@ export function ResetPasswordForm() {
       <div className="text-center mt-6">
         <Link
           href="/login"
-          className="inline-flex items-center gap-1 text-sm text-default-500 hover:text-primary"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
         >
           <ArrowLeft size={16} />
           Back to login

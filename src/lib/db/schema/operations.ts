@@ -4,7 +4,6 @@ import {
   index,
   integer,
   jsonb,
-  pgTable,
   text,
   timestamp,
   uuid,
@@ -13,12 +12,12 @@ import {
 
 import { agents } from "./agents";
 import { companies } from "./companies";
-import { channelTypeEnum } from "./enums";
+import { channelTypeEnum, chatappSchema } from "./enums";
 import { users } from "./users";
 
 // Channel Configs Table (per-channel settings for agents)
-export const channelConfigs = pgTable(
-  "chatapp_channel_configs",
+export const channelConfigs = chatappSchema.table(
+  "channel_configs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -65,8 +64,8 @@ export const channelConfigs = pgTable(
 );
 
 // API Keys Table (company API key management)
-export const apiKeys = pgTable(
-  "chatapp_api_keys",
+export const apiKeys = chatappSchema.table(
+  "api_keys",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -116,8 +115,8 @@ export const apiKeys = pgTable(
 );
 
 // Usage Records Table (detailed usage tracking for billing)
-export const usageRecords = pgTable(
-  "chatapp_usage_records",
+export const usageRecords = chatappSchema.table(
+  "usage_records",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -171,8 +170,8 @@ export const usageRecords = pgTable(
 );
 
 // Rate Limit Records Table (for tracking rate limit state)
-export const rateLimitRecords = pgTable(
-  "chatapp_rate_limit_records",
+export const rateLimitRecords = chatappSchema.table(
+  "rate_limit_records",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 

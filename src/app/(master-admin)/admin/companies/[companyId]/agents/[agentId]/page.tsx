@@ -265,16 +265,16 @@ export default function AgentConfigurationPage({
     return (
       <div className="p-6">
         <Card className="p-12 text-center">
-          <Bot size={48} className="mx-auto mb-4 text-default-300" />
+          <Bot size={48} className="mx-auto mb-4 text-muted-foreground/50" />
           <h2 className="text-xl font-semibold mb-2">Agent Not Found</h2>
-          <p className="text-default-500 mb-4">
+          <p className="text-muted-foreground mb-4">
             The agent you&apos;re looking for doesn&apos;t exist or has been
             deleted.
           </p>
           <Button
-            variant="flat"
+            variant="secondary"
             startContent={<ArrowLeft size={16} />}
-            onPress={() => router.push(`/admin/companies/${companyId}`)}
+            onClick={() => router.push(`/admin/companies/${companyId}`)}
           >
             Back to Company
           </Button>
@@ -312,13 +312,13 @@ export default function AgentConfigurationPage({
           <div className="flex items-center gap-2">
             {isEditing ? (
               <>
-                <Button variant="flat" onPress={handleCancel}>
+                <Button variant="secondary" onClick={handleCancel}>
                   Cancel
                 </Button>
                 <Button
                   color="primary"
                   startContent={<Save size={16} />}
-                  onPress={handleSave}
+                  onClick={handleSave}
                   isLoading={isSaving}
                 >
                   Save Changes
@@ -327,17 +327,17 @@ export default function AgentConfigurationPage({
             ) : (
               <>
                 <Button
-                  variant="flat"
+                  variant="secondary"
                   color="danger"
                   startContent={<Trash2 size={16} />}
-                  onPress={() => setIsDeleteDialogOpen(true)}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   Delete
                 </Button>
                 <Button
-                  variant="flat"
+                  variant="secondary"
                   startContent={<Pencil size={16} />}
-                  onPress={() => setIsEditing(true)}
+                  onClick={() => setIsEditing(true)}
                 >
                   Edit
                 </Button>
@@ -364,7 +364,7 @@ export default function AgentConfigurationPage({
               {agentData.isActive ? "Active" : "Inactive"}
             </Badge>
           </div>
-          <p className="text-default-500">
+          <p className="text-muted-foreground">
             {agentData.description ?? "No description"} &bull; Using{" "}
             {agentData.packageName}
           </p>
@@ -395,8 +395,8 @@ export default function AgentConfigurationPage({
                 label="Agent Name"
                 value={formData.name}
                 onValueChange={(v) => updateField("name", v)}
-                isReadOnly={!isEditing}
-                isRequired
+                readOnly={!isEditing}
+                required
               />
               <Select
                 label="Agent Package"
@@ -408,7 +408,7 @@ export default function AgentConfigurationPage({
                   updateField("packageId", selected ?? "");
                 }}
                 options={packageOptions}
-                isDisabled={!isEditing}
+                disabled={!isEditing}
               />
             </div>
             <Textarea
@@ -417,7 +417,7 @@ export default function AgentConfigurationPage({
               onValueChange={(v) => updateField("description", v)}
               className="mt-4"
               minRows={2}
-              isReadOnly={!isEditing}
+              readOnly={!isEditing}
             />
           </Card>
 
@@ -432,10 +432,10 @@ export default function AgentConfigurationPage({
                   updateField("modelId", selected ?? "gpt-4o-mini");
                 }}
                 options={modelOptions}
-                isDisabled={!isEditing}
+                disabled={!isEditing}
               />
               <div>
-                <label className="text-sm font-medium text-default-700 block mb-2">
+                <label className="text-sm font-medium text-foreground block mb-2">
                   Temperature: {formData.temperature}%
                 </label>
                 <input
@@ -449,7 +449,7 @@ export default function AgentConfigurationPage({
                   className="w-full accent-primary"
                   disabled={!isEditing}
                 />
-                <div className="flex justify-between text-xs text-default-400 mt-1">
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
                   <span>Precise</span>
                   <span>Creative</span>
                 </div>
@@ -462,7 +462,7 @@ export default function AgentConfigurationPage({
             <Switch
               isSelected={formData.isActive}
               onValueChange={(v) => updateField("isActive", v)}
-              isDisabled={!isEditing}
+              disabled={!isEditing}
             >
               Agent is active and can handle conversations
             </Switch>
@@ -473,7 +473,7 @@ export default function AgentConfigurationPage({
       {activeTab === "prompt" && (
         <Card className="p-6">
           <h3 className="font-semibold mb-4">System Prompt</h3>
-          <p className="text-sm text-default-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             This prompt defines the agent&apos;s behavior, personality, and
             capabilities.
           </p>
@@ -481,11 +481,8 @@ export default function AgentConfigurationPage({
             value={formData.systemPrompt}
             onValueChange={(v) => updateField("systemPrompt", v)}
             minRows={15}
-            maxRows={30}
-            isReadOnly={!isEditing}
-            classNames={{
-              input: "font-mono text-sm",
-            }}
+            readOnly={!isEditing}
+            className="font-mono text-sm"
           />
         </Card>
       )}
@@ -500,7 +497,7 @@ export default function AgentConfigurationPage({
                 label="Max Tokens"
                 value={String(formData.maxTokens)}
                 onValueChange={(v) => updateField("maxTokens", parseInt(v) || 2048)}
-                isReadOnly={!isEditing}
+                readOnly={!isEditing}
                 description="Maximum length of the agent's response"
               />
               <Select
@@ -515,14 +512,14 @@ export default function AgentConfigurationPage({
                   { value: "markdown", label: "Markdown" },
                   { value: "json", label: "JSON" },
                 ]}
-                isDisabled={!isEditing}
+                disabled={!isEditing}
               />
             </div>
           </Card>
 
           <Card className="p-6">
             <h3 className="font-semibold mb-4">Advanced Behavior</h3>
-            <p className="text-sm text-default-500">
+            <p className="text-sm text-muted-foreground">
               Additional behavior configuration options will be available in a
               future update.
             </p>
@@ -538,7 +535,7 @@ export default function AgentConfigurationPage({
                 <MessageSquare size={20} className="text-primary" />
               </div>
               <div>
-                <p className="text-sm text-default-500">Conversations</p>
+                <p className="text-sm text-muted-foreground">Conversations</p>
                 <p className="text-2xl font-bold">
                   {agentData.conversationCount.toLocaleString()}
                 </p>
@@ -552,7 +549,7 @@ export default function AgentConfigurationPage({
                 <Zap size={20} className="text-success" />
               </div>
               <div>
-                <p className="text-sm text-default-500">Messages</p>
+                <p className="text-sm text-muted-foreground">Messages</p>
                 <p className="text-2xl font-bold">
                   {agentData.messageCount.toLocaleString()}
                 </p>
@@ -566,7 +563,7 @@ export default function AgentConfigurationPage({
                 <Package size={20} className="text-warning" />
               </div>
               <div>
-                <p className="text-sm text-default-500">Package</p>
+                <p className="text-sm text-muted-foreground">Package</p>
                 <p className="text-lg font-semibold truncate">
                   {agentData.packageName}
                 </p>
@@ -580,7 +577,7 @@ export default function AgentConfigurationPage({
                 <Calendar size={20} className="text-info" />
               </div>
               <div>
-                <p className="text-sm text-default-500">Created</p>
+                <p className="text-sm text-muted-foreground">Created</p>
                 <p className="text-lg font-semibold">
                   {format(new Date(agentData.createdAt), "MMM d, yyyy")}
                 </p>

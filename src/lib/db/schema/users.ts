@@ -4,7 +4,6 @@ import {
   index,
   integer,
   jsonb,
-  pgTable,
   primaryKey,
   text,
   timestamp,
@@ -12,12 +11,11 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { companies } from "./companies";
-import { userRoleEnum, userStatusEnum } from "./enums";
+import { chatappSchema, userRoleEnum, userStatusEnum } from "./enums";
 
 // Users Table
-export const users = pgTable(
-  "chatapp_users",
+export const users = chatappSchema.table(
+  "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -28,9 +26,8 @@ export const users = pgTable(
     image: varchar("image", { length: 500 }),
     hashedPassword: varchar("hashed_password", { length: 255 }),
 
-    // Platform fields
-    companyId: uuid("company_id").references(() => companies.id),
-    role: userRoleEnum("role").notNull().default("support_agent"),
+    // Platform fields - companyId removed, users now link to companies via company_permissions
+    role: userRoleEnum("role").notNull().default("chatapp.user"),
     status: userStatusEnum("status").notNull().default("active"),
 
     // Profile
@@ -42,6 +39,9 @@ export const users = pgTable(
 
     // Settings
     settings: jsonb("settings").default({}),
+
+    // Active company - the company user is currently working in
+    activeCompanyId: uuid("active_company_id"),
 
     // Status
     isActive: boolean("is_active").default(true).notNull(),
@@ -57,15 +57,15 @@ export const users = pgTable(
     deletedAt: timestamp("deleted_at"),
   },
   (table) => [
-    index("users_company_idx").on(table.companyId),
     index("users_email_idx").on(table.email),
     index("users_role_idx").on(table.role),
+    index("users_active_company_idx").on(table.activeCompanyId),
   ]
 );
 
 // Auth.js Accounts Table
-export const accounts = pgTable(
-  "chatapp_accounts",
+export const accounts = chatappSchema.table(
+  "accounts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
@@ -89,8 +89,8 @@ export const accounts = pgTable(
 );
 
 // Auth.js Sessions Table
-export const sessions = pgTable(
-  "chatapp_sessions",
+export const sessions = chatappSchema.table(
+  "sessions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     sessionToken: varchar("session_token", { length: 255 }).notNull().unique(),
@@ -103,8 +103,8 @@ export const sessions = pgTable(
 );
 
 // Auth.js Verification Tokens Table
-export const verificationTokens = pgTable(
-  "chatapp_verification_tokens",
+export const verificationTokens = chatappSchema.table(
+  "verification_tokens",
   {
     identifier: varchar("identifier", { length: 255 }).notNull(),
     token: varchar("token", { length: 255 }).notNull().unique(),
@@ -114,8 +114,8 @@ export const verificationTokens = pgTable(
 );
 
 // Device Sessions Table - Track user devices/sessions
-export const deviceSessions = pgTable(
-  "chatapp_device_sessions",
+export const deviceSessions = chatappSchema.table(
+  "device_sessions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
@@ -148,8 +148,8 @@ export const deviceSessions = pgTable(
 );
 
 // Magic Link Tokens Table - for passwordless auth
-export const magicLinkTokens = pgTable(
-  "chatapp_magic_link_tokens",
+export const magicLinkTokens = chatappSchema.table(
+  "magic_link_tokens",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     email: varchar("email", { length: 255 }).notNull(),
@@ -164,14 +164,11 @@ export const magicLinkTokens = pgTable(
   ]
 );
 
-// Relations
-export const usersRelations = relations(users, ({ one, many }) => ({
-  company: one(companies, {
-    fields: [users.companyId],
-    references: [companies.id],
-  }),
+// Relations - company relation removed, users now link to companies via companyPermissions
+export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   sessions: many(sessions),
+  // companyPermissions relation is defined in company-permissions.ts to avoid circular imports
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({

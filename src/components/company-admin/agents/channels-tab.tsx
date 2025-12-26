@@ -13,7 +13,6 @@ import {
   Settings,
   ExternalLink,
 } from "lucide-react";
-import { Switch } from "@heroui/react";
 
 import {
   Button,
@@ -22,6 +21,7 @@ import {
   CardBody,
   Badge,
   Input,
+  Switch,
 } from "@/components/ui";
 
 import type { AgentDetail } from "@/hooks/company/useAgents";
@@ -184,13 +184,13 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardBody className="p-4">
-            <p className="text-sm text-default-500">Active Channels</p>
+            <p className="text-sm text-muted-foreground">Active Channels</p>
             <p className="text-2xl font-bold">{enabledCount}</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody className="p-4">
-            <p className="text-sm text-default-500">Available</p>
+            <p className="text-sm text-muted-foreground">Available</p>
             <p className="text-2xl font-bold">{channels.length}</p>
           </CardBody>
         </Card>
@@ -202,7 +202,7 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
           <h2 className="text-lg font-semibold">Communication Channels</h2>
         </CardHeader>
         <CardBody className="space-y-4">
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted-foreground">
             Enable channels to allow users to interact with this agent through different platforms.
           </p>
 
@@ -216,9 +216,9 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
                   <div className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-4">
                       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                        channel.enabled ? "bg-primary/10" : "bg-default-100"
+                        channel.enabled ? "bg-primary/10" : "bg-muted"
                       }`}>
-                        <Icon className={`h-5 w-5 ${channel.enabled ? "text-primary" : "text-default-500"}`} />
+                        <Icon className={`h-5 w-5 ${channel.enabled ? "text-primary" : "text-muted-foreground"}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -233,14 +233,14 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
                             <Badge variant="warning">Setup Required</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-default-500">{channel.description}</p>
+                        <p className="text-sm text-muted-foreground">{channel.description}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
                       {channel.setupRequired && channel.enabled && !channel.configured && (
                         <Button
-                          variant="bordered"
+                          variant="outline"
                           size="sm"
                           leftIcon={Settings}
                           onPress={() => setExpandedChannel(isExpanded ? null : channel.id)}
@@ -251,14 +251,14 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
                       <Switch
                         isSelected={channel.enabled}
                         onValueChange={() => handleToggleChannel(channel.id)}
-                        isDisabled={channel.setupRequired && !channel.configured && !channel.enabled}
+                        disabled={channel.setupRequired && !channel.configured && !channel.enabled}
                       />
                     </div>
                   </div>
 
                   {/* Configuration Panel */}
                   {isExpanded && channel.configFields && (
-                    <div className="px-4 pb-4 pt-2 border-t bg-default-50 space-y-4">
+                    <div className="px-4 pb-4 pt-2 border-t bg-muted space-y-4">
                       {channel.configFields.map((field) => (
                         <Input
                           key={field.key}
@@ -271,7 +271,7 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
                       ))}
                       <div className="flex justify-end gap-2">
                         <Button
-                          variant="bordered"
+                          variant="outline"
                           size="sm"
                           onPress={() => setExpandedChannel(null)}
                         >
@@ -293,20 +293,21 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
           </div>
 
           {/* Info Note */}
-          <div className="p-4 bg-default-50 rounded-lg">
-            <p className="text-sm text-default-500">
+          <div className="p-4 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground">
               <strong>Note:</strong> Some channels require additional setup in their respective platforms.
               Visit the integrations page for detailed setup instructions.
             </p>
             <Button
-              variant="light"
+              variant="ghost"
               size="sm"
               className="mt-2"
-              rightIcon={ExternalLink}
-              as="a"
-              href="/integrations"
+              asChild
             >
-              Go to Integrations
+              <a href="/integrations">
+                Go to Integrations
+                <ExternalLink size={16} />
+              </a>
             </Button>
           </div>
         </CardBody>
@@ -316,7 +317,7 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
       <div className="flex justify-end">
         <Button
           color="primary"
-          onPress={handleSave}
+          onClick={handleSave}
           isLoading={isSaving}
         >
           Save Changes

@@ -6,14 +6,14 @@ import { type Key } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { getRoleDisplayName } from "@/lib/auth/role-utils";
 
-import { Dropdown, UserAvatar, type DropdownMenuSection } from "../ui";
+import { Dropdown, UserAvatar, type DropdownMenuSectionData } from "../ui";
 
 export function UserMenu() {
   const { user, logout } = useAuth();
 
   if (!user) return null;
 
-  const sections: DropdownMenuSection[] = [
+  const sections: DropdownMenuSectionData[] = [
     {
       key: "profile",
       items: [

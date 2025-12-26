@@ -18,24 +18,22 @@ export default function NotFound() {
 
         <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
         <h2 className="text-2xl font-semibold mb-3">Page Not Found</h2>
-        <p className="text-default-500 mb-8">
+        <p className="text-muted-foreground mb-8">
           The page you are looking for does not exist or has been moved.
           Please check the URL or return to the home page.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button
-            as={Link}
-            href="/"
-            color="primary"
-            leftIcon={Home}
-          >
-            Go Home
+          <Button color="primary" asChild>
+            <Link href="/">
+              <Home size={16} />
+              Go Home
+            </Link>
           </Button>
           <Button
-            variant="bordered"
-            leftIcon={ArrowLeft}
-            onPress={() => router.back()}
+            variant="outline"
+            startContent={<ArrowLeft size={16} />}
+            onClick={() => router.back()}
           >
             Go Back
           </Button>

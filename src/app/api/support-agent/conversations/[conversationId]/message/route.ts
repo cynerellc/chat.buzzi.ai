@@ -7,8 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { conversations, messages } from "@/lib/db/schema/conversations";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq } from "drizzle-orm";
 import { getSSEManager, getConversationChannel } from "@/lib/realtime";
 
@@ -35,17 +34,7 @@ export async function POST(
   try {
     const { conversationId } = await params;
 
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     const body = (await request.json()) as SendMessageRequest;
     const { content, attachments, isNote } = body;
@@ -92,7 +81,7 @@ export async function POST(
         role: isNote ? "system" : "human_agent",
         type: isNote ? "system_event" : "text",
         content: content.trim(),
-        userId: session.user.id,
+        userId: user.id,
         attachments: attachments ?? [],
         metadata: isNote ? { isInternalNote: true, eventType: "note" } : {},
       })
@@ -125,8 +114,8 @@ export async function POST(
           role: "human_agent",
           content: content.trim(),
           attachments: attachments ?? [],
-          userId: session.user.id,
-          userName: session.user.name,
+          userId: user.id,
+          userName: user.name,
           createdAt: newMessage.createdAt.toISOString(),
         });
       } catch (sseError) {
@@ -144,8 +133,8 @@ export async function POST(
         content: newMessage.content,
         attachments: newMessage.attachments,
         createdAt: newMessage.createdAt,
-        userId: session.user.id,
-        userName: session.user.name,
+        userId: user.id,
+        userName: user.name,
       },
     });
   } catch (error) {

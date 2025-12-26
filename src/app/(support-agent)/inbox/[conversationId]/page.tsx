@@ -47,7 +47,7 @@ import {
   Divider,
   ScrollShadow,
 } from "@/components/ui";
-import type { DropdownMenuItem } from "@/components/ui";
+import type { DropdownMenuItemData } from "@/components/ui";
 import {
   CannedResponsesPicker,
   EmojiPicker,
@@ -442,7 +442,7 @@ export default function LiveChatPage() {
       <div className="h-full flex flex-col items-center justify-center text-danger">
         <AlertCircle size={48} className="opacity-50 mb-4" />
         <p className="text-lg font-medium">Failed to load conversation</p>
-        <p className="text-sm text-default-500 mt-1">{error}</p>
+        <p className="text-sm text-muted-foreground mt-1">{error}</p>
         <Button variant="ghost" onClick={() => router.push("/inbox")} className="mt-4">
           Back to Inbox
         </Button>
@@ -482,7 +482,7 @@ export default function LiveChatPage() {
                   {isResolved ? "Resolved" : "Active"}
                 </Badge>
               </div>
-              <p className="text-sm text-default-500">
+              <p className="text-sm text-muted-foreground">
                 Started {formatDistanceToNow(new Date(conversation.createdAt), { addSuffix: true })}
                 {conversation.agent && ` • via ${conversation.agent.name}`}
               </p>
@@ -518,7 +518,7 @@ export default function LiveChatPage() {
                 { key: "history", label: "View Full History" },
                 { key: "transfer", label: "Transfer to Agent" },
                 { key: "tag", label: "Add Tag" },
-              ] satisfies DropdownMenuItem[]}
+              ] satisfies DropdownMenuItemData[]}
               onAction={(key) => {
                 if (key === "profile") setShowCustomerInfo(!showCustomerInfo);
               }}
@@ -538,7 +538,7 @@ export default function LiveChatPage() {
               )}
             >
               {message.role === "system" ? (
-                <div className="text-xs text-default-400 bg-default-100 px-3 py-1 rounded-full">
+                <div className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
                   {message.content}
                 </div>
               ) : (
@@ -622,7 +622,7 @@ export default function LiveChatPage() {
           <div className="border-t border-divider p-4 bg-content1">
             {/* Pending Attachments */}
             {pendingAttachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3 p-2 bg-default-100 rounded-lg">
+              <div className="flex flex-wrap gap-2 mb-3 p-2 bg-muted rounded-lg">
                 {pendingAttachments.map((file, index) => (
                   <div
                     key={index}
@@ -632,7 +632,7 @@ export default function LiveChatPage() {
                     <span className="truncate max-w-[150px]">{file.name}</span>
                     <button
                       onClick={() => removePendingAttachment(index)}
-                      className="text-default-400 hover:text-danger"
+                      className="text-muted-foreground hover:text-danger"
                     >
                       <X size={14} />
                     </button>
@@ -674,7 +674,6 @@ export default function LiveChatPage() {
                 onKeyDown={handleKeyDown}
                 onBlur={stopTyping}
                 minRows={1}
-                maxRows={4}
                 className="flex-1"
               />
 
@@ -683,7 +682,7 @@ export default function LiveChatPage() {
                 size="sm"
                 onClick={sendMessage}
                 isLoading={sending}
-                isDisabled={!messageInput.trim() && pendingAttachments.length === 0}
+                disabled={!messageInput.trim() && pendingAttachments.length === 0}
                 className="flex-shrink-0"
               >
                 <Send size={20} />
@@ -694,7 +693,7 @@ export default function LiveChatPage() {
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-divider">
               <div className="flex gap-2">
                 <Button
-                  variant="flat"
+                  variant="secondary"
                   size="sm"
                   color="secondary"
                   onClick={returnToAi}
@@ -703,7 +702,7 @@ export default function LiveChatPage() {
                   Return to AI
                 </Button>
                 <Button
-                  variant="flat"
+                  variant="secondary"
                   size="sm"
                   onClick={() => setShowNoteModal(true)}
                 >
@@ -742,8 +741,8 @@ export default function LiveChatPage() {
 
         {/* Resolved Banner */}
         {isResolved && (
-          <div className="border-t border-divider p-4 bg-default-100 text-center">
-            <p className="text-default-500">
+          <div className="border-t border-divider p-4 bg-muted text-center">
+            <p className="text-muted-foreground">
               This conversation was resolved{" "}
               {conversation.resolvedAt &&
                 formatDistanceToNow(new Date(conversation.resolvedAt), { addSuffix: true })}
@@ -773,14 +772,14 @@ export default function LiveChatPage() {
               />
               <h4 className="font-medium">{conversation.endUser?.name ?? "Anonymous"}</h4>
               {conversation.endUser?.email && (
-                <p className="text-sm text-default-500">{conversation.endUser.email}</p>
+                <p className="text-sm text-muted-foreground">{conversation.endUser.email}</p>
               )}
 
               {/* Tags */}
               {(conversation.tags as string[])?.length > 0 && (
                 <div className="flex flex-wrap gap-1 justify-center mt-2">
                   {(conversation.tags as string[]).map((tag) => (
-                    <Chip key={tag} size="sm" variant="flat">
+                    <Chip key={tag} size="sm" >
                       {tag}
                     </Chip>
                   ))}
@@ -794,19 +793,19 @@ export default function LiveChatPage() {
             <div className="space-y-3">
               {conversation.endUser?.email && (
                 <div className="flex items-center gap-2 text-sm">
-                  <Mail size={16} className="text-default-400" />
+                  <Mail size={16} className="text-muted-foreground" />
                   <span>{conversation.endUser.email}</span>
                 </div>
               )}
               {conversation.endUser?.phone && (
                 <div className="flex items-center gap-2 text-sm">
-                  <Phone size={16} className="text-default-400" />
+                  <Phone size={16} className="text-muted-foreground" />
                   <span>{conversation.endUser.phone}</span>
                 </div>
               )}
               {conversation.pageUrl && (
                 <div className="flex items-center gap-2 text-sm">
-                  <Globe size={16} className="text-default-400" />
+                  <Globe size={16} className="text-muted-foreground" />
                   <a
                     href={conversation.pageUrl}
                     target="_blank"
@@ -819,7 +818,7 @@ export default function LiveChatPage() {
                 </div>
               )}
               <div className="flex items-center gap-2 text-sm">
-                <Calendar size={16} className="text-default-400" />
+                <Calendar size={16} className="text-muted-foreground" />
                 <span>
                   Customer since{" "}
                   {conversation.endUser?.createdAt &&
@@ -832,15 +831,15 @@ export default function LiveChatPage() {
 
             {/* Conversation Stats */}
             <div className="space-y-2">
-              <h5 className="text-sm font-medium text-default-500">Conversation Stats</h5>
+              <h5 className="text-sm font-medium text-muted-foreground">Conversation Stats</h5>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="bg-default-100 rounded-lg p-2 text-center">
+                <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="font-semibold">{conversation.messageCount}</p>
-                  <p className="text-xs text-default-500">Messages</p>
+                  <p className="text-xs text-muted-foreground">Messages</p>
                 </div>
-                <div className="bg-default-100 rounded-lg p-2 text-center">
+                <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="font-semibold">{conversation.endUser?.totalConversations ?? 1}</p>
-                  <p className="text-xs text-default-500">Total Chats</p>
+                  <p className="text-xs text-muted-foreground">Total Chats</p>
                 </div>
               </div>
             </div>
@@ -850,7 +849,7 @@ export default function LiveChatPage() {
               <>
                 <Divider className="my-4" />
                 <div>
-                  <h5 className="text-sm font-medium text-default-500 mb-2">
+                  <h5 className="text-sm font-medium text-muted-foreground mb-2">
                     Previous Conversations
                   </h5>
                   <div className="space-y-2">
@@ -858,7 +857,7 @@ export default function LiveChatPage() {
                       <button
                         key={prev.id}
                         onClick={() => router.push(`/inbox/${prev.id}`)}
-                        className="w-full text-left p-2 rounded-lg hover:bg-default-100 transition-colors text-sm"
+                        className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors text-sm"
                       >
                         <div className="flex items-center justify-between">
                           <span className="truncate">
@@ -871,7 +870,7 @@ export default function LiveChatPage() {
                             {prev.status}
                           </Badge>
                         </div>
-                        <p className="text-xs text-default-400 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {format(new Date(prev.createdAt), "MMM d, yyyy")}
                         </p>
                       </button>
@@ -937,7 +936,7 @@ export default function LiveChatPage() {
         <ModalContent>
           <ModalHeader>Resolve Conversation</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-default-500 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Send a closing message to the customer?
             </p>
             <Textarea
@@ -964,7 +963,7 @@ export default function LiveChatPage() {
         <ModalContent>
           <ModalHeader>Add Internal Note</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-default-500 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               This note is only visible to your team, not the customer.
             </p>
             <Textarea
@@ -979,7 +978,7 @@ export default function LiveChatPage() {
             <Button variant="ghost" onClick={() => setShowNoteModal(false)}>
               Cancel
             </Button>
-            <Button color="primary" onClick={addNote} isDisabled={!noteContent.trim()}>
+            <Button color="primary" onClick={addNote} disabled={!noteContent.trim()}>
               Add Note
             </Button>
           </ModalFooter>

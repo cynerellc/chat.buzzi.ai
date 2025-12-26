@@ -1,10 +1,9 @@
 "use client";
 
 import { Search, Filter, X, Calendar, SlidersHorizontal } from "lucide-react";
-import { Input as HeroInput, DateRangePicker, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { useState } from "react";
 
-import { Button, Select, Badge, Card, CardBody } from "@/components/ui";
+import { Button, Select, Badge, Card, CardBody, Input } from "@/components/ui";
 
 interface ConversationsFiltersProps {
   searchValue: string;
@@ -94,14 +93,13 @@ export function ConversationsFilters({
           return (
             <Button
               key={status.value}
-              variant={isActive ? "solid" : "bordered"}
-              color={isActive ? "primary" : "default"}
+              variant={isActive ? "default" : "outline"}
               size="sm"
-              onPress={() => onStatusFilterChange(status.value)}
+              onClick={() => onStatusFilterChange(status.value)}
             >
               {status.label}
               {count > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-default-200">
+                <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-muted">
                   {count}
                 </span>
               )}
@@ -115,14 +113,12 @@ export function ConversationsFilters({
         <CardBody>
           <div className="flex flex-wrap gap-4">
             <div className="flex-1 min-w-[200px]">
-              <HeroInput
+              <Input
                 placeholder="Search by name, email, or message..."
                 value={searchValue}
                 onValueChange={onSearchChange}
                 onKeyDown={(e) => e.key === "Enter" && onSearch()}
-                startContent={<Search className="h-4 w-4 text-default-400" />}
-                isClearable
-                onClear={() => onSearchChange("")}
+                startContent={<Search className="h-4 w-4 text-muted-foreground" />}
               />
             </div>
 
@@ -148,7 +144,7 @@ export function ConversationsFilters({
             />
 
             <Button
-              variant="bordered"
+              variant="outline"
               leftIcon={SlidersHorizontal}
               onPress={() => setShowAdvanced(!showAdvanced)}
             >
@@ -162,7 +158,7 @@ export function ConversationsFilters({
 
             {hasActiveFilters && (
               <Button
-                variant="light"
+                variant="ghost"
                 color="danger"
                 leftIcon={X}
                 onPress={onClearFilters}
@@ -181,7 +177,7 @@ export function ConversationsFilters({
                   <div>
                     <label className="text-sm font-medium mb-2 block">Date Range</label>
                     <div className="flex gap-2">
-                      <HeroInput
+                      <Input
                         type="date"
                         placeholder="Start date"
                         value={dateRange?.start?.toISOString().split("T")[0] || ""}
@@ -193,7 +189,7 @@ export function ConversationsFilters({
                           })
                         }
                       />
-                      <HeroInput
+                      <Input
                         type="date"
                         placeholder="End date"
                         value={dateRange?.end?.toISOString().split("T")[0] || ""}

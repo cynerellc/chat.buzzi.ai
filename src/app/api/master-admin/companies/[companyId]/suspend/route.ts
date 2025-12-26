@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { createAuditLog } from "@/lib/audit/logger";
 import { db } from "@/lib/db";
-import { companies, users } from "@/lib/db/schema";
+import { companies, companyPermissions, users } from "@/lib/db/schema";
 
 interface RouteContext {
   params: Promise<{ companyId: string }>;
@@ -86,18 +86,26 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // Optionally deactivate all users (they can't log in)
     if (data.notifyUsers) {
-      await db
-        .update(users)
-        .set({
-          isActive: false,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(users.companyId, companyId),
-            sql`${users.deletedAt} IS NULL`
-          )
-        );
+      const companyUserIds = await db
+        .select({ userId: companyPermissions.userId })
+        .from(companyPermissions)
+        .where(eq(companyPermissions.companyId, companyId));
+
+      if (companyUserIds.length > 0) {
+        const { inArray } = await import("drizzle-orm");
+        await db
+          .update(users)
+          .set({
+            isActive: false,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              inArray(users.id, companyUserIds.map(u => u.userId)),
+              sql`${users.deletedAt} IS NULL`
+            )
+          );
+      }
     }
 
     // Log the suspension
@@ -207,18 +215,26 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       .returning();
 
     // Reactivate all users
-    await db
-      .update(users)
-      .set({
-        isActive: true,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(users.companyId, companyId),
-          sql`${users.deletedAt} IS NULL`
-        )
-      );
+    const companyUserIds = await db
+      .select({ userId: companyPermissions.userId })
+      .from(companyPermissions)
+      .where(eq(companyPermissions.companyId, companyId));
+
+    if (companyUserIds.length > 0) {
+      const { inArray } = await import("drizzle-orm");
+      await db
+        .update(users)
+        .set({
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(users.id, companyUserIds.map(u => u.userId)),
+            sql`${users.deletedAt} IS NULL`
+          )
+        );
+    }
 
     // Log the unsuspension
     await createAuditLog({

@@ -11,7 +11,6 @@ import { agents } from "@/lib/db/schema/agents";
 import { users } from "@/lib/db/schema/users";
 import { eq, and, desc, asc, sql, or, isNull } from "drizzle-orm";
 import { requireSupportAgent } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { getEscalationService, getAvailableAgents } from "@/lib/escalation";
 
 /**
@@ -20,11 +19,7 @@ import { getEscalationService, getAvailableAgents } from "@/lib/escalation";
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireSupportAgent();
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     const { searchParams } = new URL(request.url);
     const view = searchParams.get("view") ?? "mine"; // mine, queue, all

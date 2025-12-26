@@ -208,13 +208,13 @@ export function CustomerSidebar({ conversation }: CustomerSidebarProps) {
                 <h4 className="font-medium text-sm text-default-500 uppercase tracking-wider">
                   Tags
                 </h4>
-                <Button variant="light" size="sm" isIconOnly isDisabled>
+                <Button variant="ghost" size="icon" disabled>
                   <Tag className="h-4 w-4" />
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {tags.map((tag) => (
-                  <Chip key={tag} variant="flat" size="sm">
+                  <Chip key={tag}  size="sm">
                     {tag}
                   </Chip>
                 ))}

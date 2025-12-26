@@ -3,23 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
-import { invitations, users } from "@/lib/db/schema";
+import { companyPermissions, invitations, users } from "@/lib/db/schema";
 
 interface InviteRequest {
   email: string;
-  role: "company_admin" | "support_agent";
+  role: "chatapp.company_admin" | "chatapp.support_agent";
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user: currentUser, company } = await requireCompanyAdmin();
 
     const body: InviteRequest = await request.json();
 
@@ -29,9 +23,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    if (!["company_admin", "support_agent"].includes(body.role)) {
+    if (!["chatapp.company_admin", "chatapp.support_agent"].includes(body.role)) {
       return NextResponse.json(
-        { error: "Role must be 'company_admin' or 'support_agent'" },
+        { error: "Role must be 'chatapp.company_admin' or 'chatapp.support_agent'" },
         { status: 400 }
       );
     }
@@ -42,7 +36,8 @@ export async function POST(request: NextRequest) {
     const [existingUser] = await db
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.email, email), eq(users.companyId, company.id)))
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
+      .where(and(eq(users.email, email), eq(companyPermissions.companyId, company.id)))
       .limit(1);
 
     if (existingUser) {
@@ -124,12 +119,7 @@ export async function POST(request: NextRequest) {
 // Revoke/cancel an invitation
 export async function DELETE(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const invitationId = searchParams.get("id");

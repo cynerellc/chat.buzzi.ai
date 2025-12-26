@@ -16,7 +16,7 @@ interface CompaniesFiltersProps {
 }
 
 const statusOptions = [
-  { value: "", label: "All Statuses" },
+  { value: "all", label: "All Statuses" },
   { value: "active", label: "Active" },
   { value: "trial", label: "Trial" },
   { value: "past_due", label: "Past Due" },
@@ -82,28 +82,23 @@ export function CompaniesFilters({
 
       <Select
         placeholder="Status"
-        selectedKeys={status ? new Set([status]) : new Set()}
-        onSelectionChange={(keys) => {
-          const selected = Array.from(keys)[0] as string;
-          onStatusChange(selected ?? "");
+        value={status || "all"}
+        onValueChange={(value) => {
+          onStatusChange(value === "all" ? "" : value);
         }}
         className="w-40"
-        options={statusOptions.map((opt) => ({
-          value: opt.value,
-          label: opt.label,
-        }))}
+        options={statusOptions}
       />
 
       <Select
         placeholder="Plan"
-        selectedKeys={planId ? new Set([planId]) : new Set()}
-        onSelectionChange={(keys) => {
-          const selected = Array.from(keys)[0] as string;
-          onPlanChange(selected ?? "");
+        value={planId || "all"}
+        onValueChange={(value) => {
+          onPlanChange(value === "all" ? "" : value);
         }}
         className="w-40"
         options={[
-          { value: "", label: "All Plans" },
+          { value: "all", label: "All Plans" },
           ...plans.map((plan) => ({
             value: plan.id,
             label: plan.name,
@@ -112,7 +107,7 @@ export function CompaniesFilters({
       />
 
       {hasFilters && (
-        <Button variant="flat" size="sm" onPress={clearFilters}>
+        <Button variant="secondary" size="sm" onPress={clearFilters}>
           Clear Filters
         </Button>
       )}

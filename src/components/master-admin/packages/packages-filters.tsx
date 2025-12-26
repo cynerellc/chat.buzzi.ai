@@ -20,14 +20,13 @@ export function PackagesFilters({
   onCategoryChange,
 }: PackagesFiltersProps) {
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
+    <div className="flex flex-wrap gap-4 mb-6">
       {categories.map((category) => (
         <Button
           key={category.key}
           size="sm"
-          variant={selectedCategory === category.key ? "solid" : "flat"}
-          color={selectedCategory === category.key ? "primary" : "default"}
-          onPress={() => onCategoryChange(category.key)}
+          variant={selectedCategory === category.key ? "default" : "outline"}
+          onClick={() => onCategoryChange(category.key)}
         >
           {category.label}
         </Button>

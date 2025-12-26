@@ -1,22 +1,6 @@
 "use client";
 
 import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Divider,
-  Progress,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from "@heroui/react";
-import {
   ArrowUpRight,
   Bot,
   Calendar,
@@ -30,12 +14,28 @@ import {
   Users,
 } from "lucide-react";
 
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Badge,
+  Separator,
+  Skeleton,
+  Progress,
+  TableRoot,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
 import { PageHeader } from "@/components/layouts/page-header";
 import { useBilling } from "@/hooks/company";
 
-const statusColors: Record<string, "success" | "warning" | "danger" | "default" | "primary"> = {
+const statusColors: Record<string, "success" | "warning" | "danger" | "default" | "info"> = {
   active: "success",
-  trial: "primary",
+  trial: "info",
   past_due: "warning",
   grace_period: "warning",
   cancelled: "default",
@@ -101,8 +101,8 @@ export default function BillingPage() {
         actions={
           <Button
             color="primary"
-            startContent={<CreditCard className="w-4 h-4" />}
-            isDisabled={!subscription}
+            leftIcon={CreditCard}
+            disabled={!subscription}
           >
             Update Payment Method
           </Button>
@@ -117,12 +117,12 @@ export default function BillingPage() {
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <h2 className="text-2xl font-bold">{currentPlan.name}</h2>
-                  <Chip color={statusColors[subscription.status]} variant="flat">
+                  <Badge variant={statusColors[subscription.status]}>
                     {subscription.status === "trial" ? "Trial" : subscription.status}
-                  </Chip>
+                  </Badge>
                 </div>
-                <p className="text-default-500">{currentPlan.description}</p>
-                <div className="flex items-center gap-4 mt-3 text-sm text-default-500">
+                <p className="text-muted-foreground">{currentPlan.description}</p>
+                <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
                     {subscription.status === "trial"
@@ -136,14 +136,14 @@ export default function BillingPage() {
               <div className="text-right">
                 <p className="text-3xl font-bold">
                   {formatCurrency(subscription.currentPrice, subscription.currency)}
-                  <span className="text-lg font-normal text-default-500">
+                  <span className="text-lg font-normal text-muted-foreground">
                     /{subscription.billingCycle === "monthly" ? "mo" : "yr"}
                   </span>
                 </p>
                 {subscription.cancelAtPeriodEnd && (
-                  <Chip color="warning" variant="flat" size="sm" className="mt-2">
+                  <Badge variant="warning" className="mt-2">
                     Cancels at period end
-                  </Chip>
+                  </Badge>
                 )}
               </div>
             </div>
@@ -152,7 +152,7 @@ export default function BillingPage() {
       ) : (
         <Card>
           <CardBody className="p-6 text-center">
-            <p className="text-default-500 mb-4">No active subscription</p>
+            <p className="text-muted-foreground mb-4">No active subscription</p>
             <Button color="primary">Choose a Plan</Button>
           </CardBody>
         </Card>
@@ -170,12 +170,12 @@ export default function BillingPage() {
                   </div>
                   <div>
                     <p className="font-medium">Conversations</p>
-                    <p className="text-sm text-default-500">This billing period</p>
+                    <p className="text-sm text-muted-foreground">This billing period</p>
                   </div>
                 </div>
                 <p className="text-xl font-bold">
                   {subscription.conversationsUsed.toLocaleString()}
-                  <span className="text-sm font-normal text-default-500">
+                  <span className="text-sm font-normal text-muted-foreground">
                     / {subscription.conversationsLimit.toLocaleString()}
                   </span>
                 </p>
@@ -197,12 +197,12 @@ export default function BillingPage() {
                   </div>
                   <div>
                     <p className="font-medium">Storage</p>
-                    <p className="text-sm text-default-500">Knowledge base storage</p>
+                    <p className="text-sm text-muted-foreground">Knowledge base storage</p>
                   </div>
                 </div>
                 <p className="text-xl font-bold">
                   {(subscription.storageUsedMb / 1024).toFixed(1)} GB
-                  <span className="text-sm font-normal text-default-500">
+                  <span className="text-sm font-normal text-muted-foreground">
                     / {(subscription.storageLimitMb / 1024).toFixed(0)} GB
                   </span>
                 </p>
@@ -226,53 +226,53 @@ export default function BillingPage() {
           <CardBody>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-default-100 rounded-lg">
-                  <Bot className="w-5 h-5 text-default-600" />
+                <div className="p-2 bg-muted rounded-lg">
+                  <Bot className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{currentPlan.maxAgents}</p>
-                  <p className="text-sm text-default-500">AI Agents</p>
+                  <p className="text-sm text-muted-foreground">AI Agents</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-default-100 rounded-lg">
-                  <Database className="w-5 h-5 text-default-600" />
+                <div className="p-2 bg-muted rounded-lg">
+                  <Database className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{currentPlan.maxKnowledgeSources}</p>
-                  <p className="text-sm text-default-500">Knowledge Sources</p>
+                  <p className="text-sm text-muted-foreground">Knowledge Sources</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-default-100 rounded-lg">
-                  <Users className="w-5 h-5 text-default-600" />
+                <div className="p-2 bg-muted rounded-lg">
+                  <Users className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{currentPlan.maxTeamMembers}</p>
-                  <p className="text-sm text-default-500">Team Members</p>
+                  <p className="text-sm text-muted-foreground">Team Members</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-default-100 rounded-lg">
-                  <HardDrive className="w-5 h-5 text-default-600" />
+                <div className="p-2 bg-muted rounded-lg">
+                  <HardDrive className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{currentPlan.maxStorageGb} GB</p>
-                  <p className="text-sm text-default-500">Storage</p>
+                  <p className="text-sm text-muted-foreground">Storage</p>
                 </div>
               </div>
             </div>
 
-            <Divider className="my-6" />
+            <Separator className="my-6" />
 
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="flex items-center gap-2">
                 {currentPlan.customBranding ? (
                   <Check className="w-4 h-4 text-success" />
                 ) : (
-                  <span className="w-4 h-4 text-default-300">-</span>
+                  <span className="w-4 h-4 text-muted-foreground">-</span>
                 )}
-                <span className={currentPlan.customBranding ? "" : "text-default-400"}>
+                <span className={currentPlan.customBranding ? "" : "text-muted-foreground"}>
                   Custom Branding
                 </span>
               </div>
@@ -280,9 +280,9 @@ export default function BillingPage() {
                 {currentPlan.prioritySupport ? (
                   <Check className="w-4 h-4 text-success" />
                 ) : (
-                  <span className="w-4 h-4 text-default-300">-</span>
+                  <span className="w-4 h-4 text-muted-foreground">-</span>
                 )}
-                <span className={currentPlan.prioritySupport ? "" : "text-default-400"}>
+                <span className={currentPlan.prioritySupport ? "" : "text-muted-foreground"}>
                   Priority Support
                 </span>
               </div>
@@ -290,9 +290,9 @@ export default function BillingPage() {
                 {currentPlan.apiAccess ? (
                   <Check className="w-4 h-4 text-success" />
                 ) : (
-                  <span className="w-4 h-4 text-default-300">-</span>
+                  <span className="w-4 h-4 text-muted-foreground">-</span>
                 )}
-                <span className={currentPlan.apiAccess ? "" : "text-default-400"}>
+                <span className={currentPlan.apiAccess ? "" : "text-muted-foreground"}>
                   API Access
                 </span>
               </div>
@@ -300,9 +300,9 @@ export default function BillingPage() {
                 {currentPlan.advancedAnalytics ? (
                   <Check className="w-4 h-4 text-success" />
                 ) : (
-                  <span className="w-4 h-4 text-default-300">-</span>
+                  <span className="w-4 h-4 text-muted-foreground">-</span>
                 )}
-                <span className={currentPlan.advancedAnalytics ? "" : "text-default-400"}>
+                <span className={currentPlan.advancedAnalytics ? "" : "text-muted-foreground"}>
                   Advanced Analytics
                 </span>
               </div>
@@ -310,9 +310,9 @@ export default function BillingPage() {
                 {currentPlan.customIntegrations ? (
                   <Check className="w-4 h-4 text-success" />
                 ) : (
-                  <span className="w-4 h-4 text-default-300">-</span>
+                  <span className="w-4 h-4 text-muted-foreground">-</span>
                 )}
-                <span className={currentPlan.customIntegrations ? "" : "text-default-400"}>
+                <span className={currentPlan.customIntegrations ? "" : "text-muted-foreground"}>
                   Custom Integrations
                 </span>
               </div>
@@ -335,45 +335,42 @@ export default function BillingPage() {
                   className={`border-2 ${
                     plan.id === currentPlan?.id
                       ? "border-primary"
-                      : "border-transparent hover:border-default-200"
+                      : "border-transparent hover:border-muted"
                   }`}
                 >
                   <CardBody className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-lg font-semibold">{plan.name}</h4>
                       {plan.id === currentPlan?.id && (
-                        <Chip size="sm" color="primary" variant="flat">
+                        <Badge variant="info">
                           Current
-                        </Chip>
+                        </Badge>
                       )}
                     </div>
                     <p className="text-3xl font-bold mb-2">
                       {formatCurrency(plan.basePrice, plan.currency)}
-                      <span className="text-sm font-normal text-default-500">/mo</span>
+                      <span className="text-sm font-normal text-muted-foreground">/mo</span>
                     </p>
-                    <p className="text-sm text-default-500 mb-4">{plan.description}</p>
+                    <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
                     <ul className="space-y-2 text-sm mb-6">
                       <li className="flex items-center gap-2">
-                        <Bot className="w-4 h-4 text-default-400" />
+                        <Bot className="w-4 h-4 text-muted-foreground" />
                         {plan.maxAgents} AI Agents
                       </li>
                       <li className="flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-default-400" />
+                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
                         {plan.maxConversationsPerMonth.toLocaleString()} conversations/mo
                       </li>
                       <li className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-default-400" />
+                        <Users className="w-4 h-4 text-muted-foreground" />
                         {plan.maxTeamMembers} team members
                       </li>
                     </ul>
                     <Button
-                      fullWidth
-                      color={plan.id === currentPlan?.id ? "default" : "primary"}
-                      variant={plan.id === currentPlan?.id ? "flat" : "solid"}
-                      isDisabled={plan.id === currentPlan?.id}
-                      endContent={
-                        plan.id !== currentPlan?.id && <ArrowUpRight className="w-4 h-4" />
-                      }
+                      className="w-full"
+                      variant={plan.id === currentPlan?.id ? "ghost" : "default"}
+                      disabled={plan.id === currentPlan?.id}
+                      rightIcon={plan.id !== currentPlan?.id ? ArrowUpRight : undefined}
                     >
                       {plan.id === currentPlan?.id ? "Current Plan" : "Upgrade"}
                     </Button>
@@ -392,7 +389,7 @@ export default function BillingPage() {
         </CardHeader>
         <CardBody>
           {paymentHistory.length > 0 ? (
-            <Table aria-label="Payment history" removeWrapper>
+            <TableRoot aria-label="Payment history">
               <TableHeader>
                 <TableColumn>DATE</TableColumn>
                 <TableColumn>AMOUNT</TableColumn>
@@ -408,35 +405,40 @@ export default function BillingPage() {
                       {formatCurrency(payment.amount, payment.currency)}
                     </TableCell>
                     <TableCell>
-                      <Chip size="sm" color={statusColors[payment.status]} variant="flat">
+                      <Badge variant={statusColors[payment.status]}>
                         {payment.status}
-                      </Chip>
+                      </Badge>
                     </TableCell>
-                    <TableCell className="text-default-500">
+                    <TableCell className="text-muted-foreground">
                       {formatDate(payment.periodStart)} - {formatDate(payment.periodEnd)}
                     </TableCell>
                     <TableCell>
                       {payment.invoiceUrl ? (
                         <Button
                           size="sm"
-                          variant="light"
-                          startContent={<Download className="w-4 h-4" />}
-                          as="a"
-                          href={payment.invoiceUrl}
-                          target="_blank"
+                          variant="ghost"
+                          asChild
                         >
-                          Download
+                          <a
+                            href={payment.invoiceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2"
+                          >
+                            <Download size={16} />
+                            Download
+                          </a>
                         </Button>
                       ) : (
-                        <span className="text-default-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </TableRoot>
           ) : (
-            <div className="text-center py-8 text-default-500">
+            <div className="text-center py-8 text-muted-foreground">
               <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>No payment history yet</p>
             </div>
@@ -451,16 +453,16 @@ export default function BillingPage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h4 className="font-medium">Need to make changes?</h4>
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-muted-foreground">
                   Contact support for plan changes, billing questions, or cancellations.
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="flat" startContent={<ExternalLink className="w-4 h-4" />}>
+                <Button variant="ghost" leftIcon={ExternalLink}>
                   Contact Support
                 </Button>
                 {!subscription.cancelAtPeriodEnd && (
-                  <Button color="danger" variant="flat">
+                  <Button color="danger" variant="ghost">
                     Cancel Subscription
                   </Button>
                 )}

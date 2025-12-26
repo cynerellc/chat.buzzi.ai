@@ -29,7 +29,7 @@ import {
   Modal,
   Textarea,
 } from "@/components/ui";
-import type { TabItem, DropdownMenuItem } from "@/components/ui";
+import type { TabItem, DropdownMenuItemData } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -259,14 +259,13 @@ export default function CannedResponsesPage() {
             placeholder="Search responses..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            startContent={<Search size={16} className="text-default-400" />}
+            startContent={<Search size={16} className="text-muted-foreground" />}
             className="w-full sm:w-64"
-            size="sm"
           />
           {categories.length > 0 && (
             <Dropdown
               trigger={
-                <Button variant="bordered" size="sm">
+                <Button variant="outline" size="sm">
                   <Filter size={16} />
                   {selectedCategory ?? "Category"}
                 </Button>
@@ -334,7 +333,7 @@ export default function CannedResponsesPage() {
                 </div>
                 <Dropdown
                   trigger={
-                    <Button variant="ghost" size="sm" isIconOnly>
+                    <Button variant="ghost" size="icon">
                       <MoreHorizontal size={16} />
                     </Button>
                   }
@@ -342,7 +341,7 @@ export default function CannedResponsesPage() {
                     { key: "copy", label: "Copy Content" },
                     { key: "edit", label: "Edit" },
                     { key: "delete", label: "Delete", isDanger: true },
-                  ] satisfies DropdownMenuItem[]}
+                  ] satisfies DropdownMenuItemData[]}
                   onAction={(key) => {
                     if (key === "copy") handleCopy(response.content);
                     if (key === "edit") openModal(response);
@@ -352,19 +351,19 @@ export default function CannedResponsesPage() {
               </div>
 
               {response.shortcut && (
-                <div className="flex items-center gap-1 text-sm text-default-500 mb-2">
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                   <Hash size={12} />
-                  <code className="bg-default-100 px-1 rounded text-xs">
+                  <code className="bg-muted px-1 rounded text-xs">
                     /{response.shortcut}
                   </code>
                 </div>
               )}
 
-              <p className="text-sm text-default-600 line-clamp-3 mb-3">
+              <p className="text-sm text-foreground line-clamp-3 mb-3">
                 {response.content}
               </p>
 
-              <div className="flex items-center justify-between text-xs text-default-400">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>Used {response.usageCount} times</span>
                 {response.lastUsedAt && (
                   <span>
@@ -406,7 +405,7 @@ export default function CannedResponsesPage() {
             placeholder="e.g., greet (use /greet to insert)"
             value={formData.shortcut}
             onChange={(e) => setFormData({ ...formData, shortcut: e.target.value })}
-            startContent={<span className="text-default-400">/</span>}
+            startContent={<span className="text-muted-foreground">/</span>}
           />
 
           <Textarea
@@ -460,7 +459,7 @@ export default function CannedResponsesPage() {
               color="primary"
               onClick={handleSave}
               isLoading={saving}
-              isDisabled={!formData.title || !formData.content}
+              disabled={!formData.title || !formData.content}
             >
               {editingResponse ? "Save Changes" : "Create Response"}
             </Button>

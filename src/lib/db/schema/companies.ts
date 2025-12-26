@@ -3,7 +3,6 @@ import {
   boolean,
   index,
   jsonb,
-  pgTable,
   text,
   timestamp,
   uuid,
@@ -11,13 +10,12 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { agents } from "./agents";
-import { subscriptionStatusEnum } from "./enums";
+import { chatappSchema, subscriptionStatusEnum } from "./enums";
 import { companySubscriptions } from "./subscriptions";
-import { users } from "./users";
 
 // Companies (Tenants) Table
-export const companies = pgTable(
-  "chatapp_companies",
+export const companies = chatappSchema.table(
+  "companies",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -47,6 +45,9 @@ export const companies = pgTable(
     apiKeyHash: varchar("api_key_hash", { length: 255 }),
     apiKeyPrefix: varchar("api_key_prefix", { length: 10 }),
 
+    // Creator - the user who created this company
+    createdBy: uuid("created_by"),
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -58,11 +59,11 @@ export const companies = pgTable(
   ]
 );
 
-// Relations
+// Relations - users relation removed, now handled via companyPermissions junction table
 export const companiesRelations = relations(companies, ({ many }) => ({
-  users: many(users),
   agents: many(agents),
   subscriptions: many(companySubscriptions),
+  // companyPermissions relation is defined in company-permissions.ts to avoid circular imports
 }));
 
 // Types

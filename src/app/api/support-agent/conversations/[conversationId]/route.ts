@@ -10,8 +10,7 @@ import { db } from "@/lib/db";
 import { conversations, endUsers, messages, escalations } from "@/lib/db/schema/conversations";
 import { agents } from "@/lib/db/schema/agents";
 import { users } from "@/lib/db/schema/users";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, desc } from "drizzle-orm";
 
 interface RouteParams {
@@ -24,18 +23,7 @@ export async function GET(
 ) {
   try {
     const { conversationId } = await params;
-
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Get conversation with related data
     const conversationResult = await db
@@ -213,18 +201,7 @@ export async function PATCH(
 ) {
   try {
     const { conversationId } = await params;
-
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     const body = await request.json();
     const { action, data } = body as {
@@ -266,7 +243,7 @@ export async function PATCH(
             role: "human_agent",
             type: "text",
             content: closingMessage,
-            userId: session.user.id,
+            userId: user.id,
           });
         }
 
@@ -277,7 +254,7 @@ export async function PATCH(
             status: "resolved",
             resolutionType: (resolutionType as "ai" | "human" | "abandoned" | "escalated") ?? "human",
             resolvedAt: new Date(),
-            resolvedBy: session.user.id,
+            resolvedBy: user.id,
             updatedAt: new Date(),
           })
           .where(eq(conversations.id, conversationId));
@@ -288,7 +265,7 @@ export async function PATCH(
           .set({
             status: "resolved",
             resolvedAt: new Date(),
-            resolvedBy: session.user.id,
+            resolvedBy: user.id,
             resolution: "Resolved by agent",
             updatedAt: new Date(),
           })
@@ -357,7 +334,7 @@ export async function PATCH(
         await db
           .update(conversations)
           .set({
-            assignedUserId: targetUserId ?? session.user.id,
+            assignedUserId: targetUserId ?? user.id,
             updatedAt: new Date(),
           })
           .where(eq(conversations.id, conversationId));
@@ -367,7 +344,7 @@ export async function PATCH(
           .update(escalations)
           .set({
             status: "assigned",
-            assignedUserId: targetUserId ?? session.user.id,
+            assignedUserId: targetUserId ?? user.id,
             assignedAt: new Date(),
             updatedAt: new Date(),
           })
@@ -410,7 +387,7 @@ export async function PATCH(
             returnedAt: new Date(),
             status: "resolved",
             resolvedAt: new Date(),
-            resolvedBy: session.user.id,
+            resolvedBy: user.id,
             resolution: "Returned to AI",
             updatedAt: new Date(),
           })

@@ -9,19 +9,21 @@
  */
 
 import { db } from "@/lib/db";
-import { agents } from "@/lib/db/schema/agents";
+import { agents, agentPackages, type PackageVariableDefinition } from "@/lib/db/schema/agents";
 import { conversations, messages as messagesTable } from "@/lib/db/schema/conversations";
 import { companies } from "@/lib/db/schema/companies";
 import { eq, and } from "drizzle-orm";
 
 import { BaseAgent, createAgent } from "./base-agent";
-import { agentToConfig } from "../types";
+import { agentToConfig, createVariableContext } from "../types";
 
 import type {
   AgentContext,
   AgentResponse,
   AgentStreamEvent,
   ChannelType,
+  VariableValue,
+  VariableContext,
 } from "../types";
 
 // ============================================================================
@@ -274,6 +276,9 @@ export class AgentRunnerService {
       })
       .where(eq(conversations.id, options.conversationId));
 
+    // Load variable context for the agent
+    const variableContext = await this.loadVariableContext(conversation.agentId);
+
     // Build context
     const context: AgentContext = {
       conversationId: options.conversationId,
@@ -288,6 +293,8 @@ export class AgentRunnerService {
       endUserId: conversation.endUserId,
       channel: conversation.channel as ChannelType,
       timestamp: new Date(),
+      variables: variableContext.variables,
+      securedVariables: variableContext.securedVariables,
     };
 
     // Process message
@@ -391,6 +398,9 @@ export class AgentRunnerService {
       content: options.message,
     });
 
+    // Load variable context for the agent
+    const variableContext = await this.loadVariableContext(conversation.agentId);
+
     // Build context
     const context: AgentContext = {
       conversationId: options.conversationId,
@@ -401,6 +411,8 @@ export class AgentRunnerService {
       endUserId: conversation.endUserId,
       channel: conversation.channel as ChannelType,
       timestamp: new Date(),
+      variables: variableContext.variables,
+      securedVariables: variableContext.securedVariables,
     };
 
     // Stream response
@@ -504,6 +516,45 @@ export class AgentRunnerService {
         updatedAt: new Date(),
       })
       .where(eq(conversations.id, conversationId));
+  }
+
+  /**
+   * Load variable values for an agent
+   * Variables are now stored as JSONB:
+   * - Package variable definitions in agentPackages.variables
+   * - Agent variable values in agents.variableValues
+   */
+  private async loadVariableContext(agentId: string): Promise<VariableContext> {
+    // Get agent with its package to read variable definitions and values
+    const agentData = await db
+      .select({
+        variableValues: agents.variableValues,
+        packageId: agents.packageId,
+        packageVariables: agentPackages.variables,
+      })
+      .from(agents)
+      .leftJoin(agentPackages, eq(agents.packageId, agentPackages.id))
+      .where(eq(agents.id, agentId))
+      .limit(1);
+
+    const agent = agentData[0];
+    if (!agent) {
+      return createVariableContext([]);
+    }
+
+    // Get package variable definitions and agent's values
+    const packageVariablesDefs = (agent.packageVariables as PackageVariableDefinition[]) || [];
+    const agentVariableValues = (agent.variableValues as Record<string, string>) || {};
+
+    // Combine definitions with values
+    const variableValues: VariableValue[] = packageVariablesDefs.map((pv) => ({
+      name: pv.name,
+      value: agentVariableValues[pv.name] || null,
+      variableType: pv.variableType,
+      dataType: pv.dataType,
+    }));
+
+    return createVariableContext(variableValues);
   }
 
   /**

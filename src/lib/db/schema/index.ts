@@ -10,6 +10,9 @@ export * from "./companies";
 // Users & Auth
 export * from "./users";
 
+// Company Permissions (Junction table for user-company-role relationships)
+export * from "./company-permissions";
+
 // Subscription Plans
 export * from "./subscriptions";
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -14,15 +15,18 @@ import {
   Trash2,
   Eye,
   RefreshCw,
+  Database,
+  Layers,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import {
   Button,
   Card,
   CardBody,
   Badge,
   Dropdown,
-  type DropdownMenuItem,
+  type DropdownMenuItemData,
   Skeleton,
 } from "@/components/ui";
 
@@ -105,17 +109,21 @@ export function SourcesGrid({
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <Card key={i}>
-            <CardBody className="p-4">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-lg" />
+            <CardBody className="p-5">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 rounded-xl" />
                 <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
                 </div>
               </div>
               <div className="mt-4 space-y-2">
                 <Skeleton className="h-3 w-full" />
                 <Skeleton className="h-3 w-3/4" />
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Skeleton className="h-6 w-16 rounded-lg" />
+                <Skeleton className="h-6 w-20 rounded-lg" />
               </div>
             </CardBody>
           </Card>
@@ -127,29 +135,45 @@ export function SourcesGrid({
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {/* Create New Source Card */}
-      <Card
-        className="flex min-h-[180px] cursor-pointer items-center justify-center border-dashed border-2 transition-colors hover:border-primary hover:bg-default-100"
-        isPressable
-        onPress={() => router.push("/knowledge/new")}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
       >
-        <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Plus className="h-6 w-6 text-primary" />
-          </div>
-          <span className="font-medium">Add Source</span>
-          <span className="text-sm text-default-500">
-            Upload files, URLs, or text
-          </span>
-        </CardBody>
-      </Card>
+        <Card
+          className="group flex min-h-[220px] cursor-pointer items-center justify-center border-dashed border-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300"
+          onClick={() => router.push("/knowledge/new")}
+        >
+          <CardBody className="flex flex-col items-center gap-3 p-6 text-center">
+            <div className={cn(
+              "flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-300",
+              "bg-gradient-to-br from-primary/15 to-primary/5",
+              "group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/20"
+            )}>
+              <Plus className="h-7 w-7 text-primary" />
+            </div>
+            <span className="font-semibold group-hover:text-primary transition-colors">Add Knowledge Source</span>
+            <span className="text-sm text-muted-foreground">
+              Upload files, URLs, or text
+            </span>
+          </CardBody>
+        </Card>
+      </motion.div>
 
       {/* Source Cards */}
-      {sources.map((source) => {
+      {sources.map((source, index) => {
         const status = getStatusConfig(source.status);
         const StatusIcon = status.icon;
         const TypeIcon = typeIcons[source.type] || FileText;
 
-        const dropdownItems: DropdownMenuItem[] = [
+        const statusColors: Record<string, { bg: string; text: string }> = {
+          pending: { bg: "bg-muted", text: "text-muted-foreground" },
+          processing: { bg: "bg-blue-500/10", text: "text-blue-500" },
+          indexed: { bg: "bg-success/10", text: "text-success" },
+          failed: { bg: "bg-destructive/10", text: "text-destructive" },
+        };
+        const statusStyle = statusColors[source.status] ?? statusColors.pending;
+
+        const dropdownItems: DropdownMenuItemData[] = [
           { key: "view", label: "View Details", icon: Eye },
           ...(source.status === "failed"
             ? [{ key: "reprocess", label: "Reprocess", icon: RefreshCw }]
@@ -158,89 +182,128 @@ export function SourcesGrid({
         ];
 
         return (
-          <Card key={source.id} className="min-h-[180px]">
-            <CardBody className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-default-100">
-                    <TypeIcon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <button
-                      onClick={() => handleSourceClick(source.id)}
-                      className="font-medium truncate hover:text-primary transition-colors text-left"
-                    >
-                      {source.name}
-                    </button>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={status.variant}>
-                        <StatusIcon className={`h-3 w-3 mr-1 ${source.status === "processing" ? "animate-spin" : ""}`} />
-                        {status.label}
-                      </Badge>
+          <motion.div
+            key={source.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: (index + 1) * 0.05 }}
+          >
+            <Card className={cn(
+              "group min-h-[220px] hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 transition-all duration-300",
+              source.status === "failed" && "border-destructive/30"
+            )}>
+              <CardBody className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all duration-300",
+                      "bg-gradient-to-br from-primary/15 to-primary/5 text-primary",
+                      "group-hover:shadow-lg group-hover:shadow-primary/20 group-hover:scale-105"
+                    )}>
+                      <TypeIcon className="h-6 w-6" />
                     </div>
+                    <div className="min-w-0">
+                      <button
+                        onClick={() => handleSourceClick(source.id)}
+                        className="font-semibold truncate hover:text-primary transition-colors text-left block"
+                      >
+                        {source.name}
+                      </button>
+                      <div className={cn(
+                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium mt-1.5",
+                        statusStyle.bg, statusStyle.text
+                      )}>
+                        <StatusIcon className={cn("h-3 w-3", source.status === "processing" && "animate-spin")} />
+                        {status.label}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Dropdown
+                    trigger={
+                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    }
+                    items={dropdownItems}
+                    onAction={(key) => {
+                      if (key === "view") {
+                        handleSourceClick(source.id);
+                      } else if (key === "reprocess") {
+                        onReprocess(source.id);
+                      } else if (key === "delete") {
+                        onDelete(source.id);
+                      }
+                    }}
+                  />
+                </div>
+
+                {source.description && (
+                  <p className="text-sm text-muted-foreground mt-4 line-clamp-2">
+                    {source.description}
+                  </p>
+                )}
+
+                {source.processingError && (
+                  <div className="mt-3 p-2 rounded-lg bg-destructive/10 text-destructive text-sm flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span className="line-clamp-2">{source.processingError}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted/50 text-xs">
+                    <Layers className="h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium">{source.chunkCount}</span>
+                    <span className="text-muted-foreground">chunks</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted/50 text-xs">
+                    <Database className="h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium">{formatTokenCount(source.tokenCount)}</span>
+                    <span className="text-muted-foreground">tokens</span>
                   </div>
                 </div>
 
-                <Dropdown
-                  trigger={
-                    <Button variant="light" isIconOnly size="sm">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  }
-                  items={dropdownItems}
-                  onAction={(key) => {
-                    if (key === "view") {
-                      handleSourceClick(source.id);
-                    } else if (key === "reprocess") {
-                      onReprocess(source.id);
-                    } else if (key === "delete") {
-                      onDelete(source.id);
-                    }
-                  }}
-                />
-              </div>
-
-              {source.description && (
-                <p className="text-sm text-default-500 mt-3 line-clamp-2">
-                  {source.description}
+                <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Added {formatDate(source.createdAt)}
                 </p>
-              )}
-
-              {source.processingError && (
-                <p className="text-sm text-danger mt-2 line-clamp-2">
-                  Error: {source.processingError}
-                </p>
-              )}
-
-              <div className="flex items-center gap-4 mt-4 text-xs text-default-400">
-                <span className="capitalize">{source.type}</span>
-                <span>{source.chunkCount} chunks</span>
-                <span>{formatTokenCount(source.tokenCount)} tokens</span>
-              </div>
-
-              <p className="text-xs text-default-400 mt-2">
-                Added {formatDate(source.createdAt)}
-              </p>
-            </CardBody>
-          </Card>
+              </CardBody>
+            </Card>
+          </motion.div>
         );
       })}
 
       {/* Empty State */}
       {sources.length === 0 && (
-        <Card className="col-span-full flex min-h-[180px] items-center justify-center">
-          <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
-            <FileText className="h-12 w-12 text-default-400" />
-            <p className="text-default-500">No knowledge sources found</p>
-            <Button
-              variant="bordered"
-              size="sm"
-              onPress={() => router.push("/knowledge/new")}
-            >
-              Add your first source
-            </Button>
-          </CardBody>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="col-span-full"
+        >
+          <Card className="flex min-h-[200px] items-center justify-center">
+            <CardBody className="flex flex-col items-center gap-4 p-8 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center">
+                <FileText className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground mb-1">No knowledge sources yet</p>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  Add knowledge sources to help your AI agents provide accurate, contextual responses
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/knowledge/new")}
+                className="mt-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add your first source
+              </Button>
+            </CardBody>
+          </Card>
+        </motion.div>
       )}
     </div>
   );

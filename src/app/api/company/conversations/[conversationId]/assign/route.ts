@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
-import { conversations, users } from "@/lib/db/schema";
+import { companyPermissions, conversations, users } from "@/lib/db/schema";
 
 interface AssignRequest {
   userId: string | null; // null to unassign
@@ -15,13 +14,8 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
-    const currentUser = await requireCompanyAdmin();
-    const company = await getCurrentCompany();
+    const { user: currentUser, company } = await requireCompanyAdmin();
     const { conversationId } = await params;
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
 
     const body: AssignRequest = await request.json();
 
@@ -59,7 +53,8 @@ export async function POST(
           avatarUrl: users.avatarUrl,
         })
         .from(users)
-        .where(and(eq(users.id, body.userId), eq(users.companyId, company.id)))
+        .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
+        .where(and(eq(users.id, body.userId), eq(companyPermissions.companyId, company.id)))
         .limit(1);
 
       if (!user) {

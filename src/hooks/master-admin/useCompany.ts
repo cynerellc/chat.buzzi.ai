@@ -148,7 +148,7 @@ export async function addCompanyUser(
   data: {
     email: string;
     name: string;
-    role: "company_admin" | "support_agent";
+    role: "chatapp.company_admin" | "chatapp.support_agent";
     sendInvite?: boolean;
   }
 ) {

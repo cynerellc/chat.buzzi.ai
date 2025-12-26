@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { knowledgeSources } from "@/lib/db/schema";
 
@@ -22,12 +21,7 @@ export interface KnowledgeSourceListItem {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
@@ -142,12 +136,7 @@ interface CreateKnowledgeSourceRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const body: CreateKnowledgeSourceRequest = await request.json();
 

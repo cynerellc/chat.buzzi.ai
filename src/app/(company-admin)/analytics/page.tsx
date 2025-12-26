@@ -1,23 +1,6 @@
 "use client";
 
 import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Progress,
-  Select,
-  SelectItem,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from "@heroui/react";
-import {
   ArrowDown,
   ArrowUp,
   BarChart3,
@@ -36,12 +19,28 @@ import { useState } from "react";
 
 import { PageHeader } from "@/components/layouts/page-header";
 import { useAnalytics } from "@/hooks/company";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  Progress,
+  Select,
+  Skeleton,
+  TableRoot,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
 
 const dateRangeOptions = [
-  { key: "7", label: "Last 7 days" },
-  { key: "14", label: "Last 14 days" },
-  { key: "30", label: "Last 30 days" },
-  { key: "90", label: "Last 90 days" },
+  { value: "7", label: "Last 7 days" },
+  { value: "14", label: "Last 14 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
 ];
 
 function StatCard({
@@ -83,7 +82,7 @@ function StatCard({
                   ? "text-success"
                   : trend === "down"
                   ? "text-danger"
-                  : "text-default-500"
+                  : "text-muted-foreground"
               }`}
             >
               {trend === "up" ? (
@@ -99,8 +98,8 @@ function StatCard({
         </div>
         <div className="mt-4">
           <p className="text-2xl font-bold">{value}</p>
-          <p className="text-sm text-default-500 mt-1">{title}</p>
-          {description && <p className="text-xs text-default-400 mt-1">{description}</p>}
+          <p className="text-sm text-muted-foreground mt-1">{title}</p>
+          {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
         </div>
       </CardBody>
     </Card>
@@ -142,19 +141,14 @@ export default function AnalyticsPage() {
         actions={
           <div className="flex gap-2">
             <Select
-              size="sm"
-              selectedKeys={[days.toString()]}
-              onSelectionChange={(keys) => {
-                const selected = Array.from(keys)[0] as string;
-                if (selected) setDays(parseInt(selected));
+              options={dateRangeOptions}
+              value={days.toString()}
+              onValueChange={(value) => {
+                if (value) setDays(parseInt(value));
               }}
               className="w-40"
-            >
-              {dateRangeOptions.map((option) => (
-                <SelectItem key={option.key}>{option.label}</SelectItem>
-              ))}
-            </Select>
-            <Button variant="flat" startContent={<Download className="w-4 h-4" />}>
+            />
+            <Button variant="outline" leftIcon={Download}>
               Export
             </Button>
           </div>
@@ -225,7 +219,7 @@ export default function AnalyticsPage() {
                 <TrendingUp className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-default-500">Date Range</p>
+                <p className="text-sm text-muted-foreground">Date Range</p>
                 <p className="font-medium">
                   {dateRange ? `${dateRange.start} to ${dateRange.end}` : "N/A"}
                 </p>
@@ -258,7 +252,7 @@ export default function AnalyticsPage() {
                         style={{ height: `${height}%` }}
                         title={`${metric.date}: ${metric.conversations} conversations`}
                       />
-                      <span className="text-xs text-default-400 rotate-45 origin-left">
+                      <span className="text-xs text-muted-foreground rotate-45 origin-left">
                         {new Date(metric.date).toLocaleDateString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -277,9 +271,9 @@ export default function AnalyticsPage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <BarChart3 className="w-12 h-12 mx-auto mb-3 text-default-300" />
-              <p className="text-default-500">No data available for this period</p>
-              <p className="text-sm text-default-400 mt-1">
+              <BarChart3 className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+              <p className="text-muted-foreground">No data available for this period</p>
+              <p className="text-sm text-muted-foreground mt-1">
                 Analytics will appear as conversations are recorded
               </p>
             </div>
@@ -304,7 +298,7 @@ export default function AnalyticsPage() {
                     <div key={channel} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="capitalize font-medium">{channel}</span>
-                        <span className="text-default-500">
+                        <span className="text-muted-foreground">
                           {count.toLocaleString()} ({percent}%)
                         </span>
                       </div>
@@ -314,7 +308,7 @@ export default function AnalyticsPage() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 text-default-500">
+              <div className="text-center py-8 text-muted-foreground">
                 <p>No channel data available</p>
               </div>
             )}
@@ -328,11 +322,13 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardBody>
             {topTopics.length > 0 ? (
-              <Table aria-label="Top topics" removeWrapper>
+              <TableRoot>
                 <TableHeader>
-                  <TableColumn>TOPIC</TableColumn>
-                  <TableColumn>COUNT</TableColumn>
-                  <TableColumn>RESOLUTION</TableColumn>
+                  <TableRow>
+                    <TableColumn>TOPIC</TableColumn>
+                    <TableColumn>COUNT</TableColumn>
+                    <TableColumn>RESOLUTION</TableColumn>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {topTopics.map((topic, index) => (
@@ -346,20 +342,19 @@ export default function AnalyticsPage() {
                           <Chip
                             size="sm"
                             color={topic.resolutionRate >= 80 ? "success" : "warning"}
-                            variant="flat"
                           >
                             {topic.resolutionRate}%
                           </Chip>
                         ) : (
-                          <span className="text-default-400">N/A</span>
+                          <span className="text-muted-foreground">N/A</span>
                         )}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </TableRoot>
             ) : (
-              <div className="text-center py-8 text-default-500">
+              <div className="text-center py-8 text-muted-foreground">
                 <ThumbsUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>Topic analysis will appear as more conversations are recorded</p>
               </div>
@@ -377,7 +372,7 @@ export default function AnalyticsPage() {
             </div>
             <div>
               <h4 className="font-medium mb-1">Performance Insights</h4>
-              <p className="text-sm text-default-500">
+              <p className="text-sm text-muted-foreground">
                 {summary?.aiResolutionRate && summary.aiResolutionRate >= 70
                   ? "Your AI is handling most queries effectively. Consider expanding the knowledge base to improve further."
                   : summary?.aiResolutionRate && summary.aiResolutionRate >= 50

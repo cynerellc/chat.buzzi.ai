@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 
 import { db } from "@/lib/db";
-import { companies, companySubscriptions, subscriptionPlans, users } from "@/lib/db/schema";
+import { companies, companyPermissions, companySubscriptions, subscriptionPlans, users } from "@/lib/db/schema";
 
 const registerSchema = z.object({
   companyName: z.string().min(2),
@@ -63,15 +63,14 @@ export async function POST(request: Request) {
       throw new Error("Failed to create company");
     }
 
-    // Create user
+    // Create user with base role
     const userResult = await db
       .insert(users)
       .values({
         email,
         name: fullName,
         hashedPassword,
-        companyId: company.id,
-        role: "company_admin",
+        role: "chatapp.user",
         status: "active",
         isActive: true,
       })
@@ -83,6 +82,13 @@ export async function POST(request: Request) {
       await db.delete(companies).where(eq(companies.id, company.id));
       throw new Error("Failed to create user");
     }
+
+    // Create company permission for the user as company admin
+    await db.insert(companyPermissions).values({
+      companyId: company.id,
+      userId: user.id,
+      role: "chatapp.company_admin",
+    });
 
     // Create trial subscription
     const freePlan = await db.query.subscriptionPlans.findFirst({

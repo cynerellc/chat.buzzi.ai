@@ -76,7 +76,7 @@ export function ImpersonateModal({ isOpen, onClose }: ImpersonateModalProps) {
 
       // Redirect to the user's dashboard based on role
       const redirectUrl =
-        selectedUser.role === "company_admin"
+        selectedUser.role === "chatapp.company_admin"
           ? "/company/dashboard"
           : "/chat";
 
@@ -97,9 +97,9 @@ export function ImpersonateModal({ isOpen, onClose }: ImpersonateModalProps) {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case "company_admin":
+      case "chatapp.company_admin":
         return <Badge variant="info">Admin</Badge>;
-      case "support_agent":
+      case "chatapp.support_agent":
         return <Badge variant="default">Agent</Badge>;
       default:
         return <Badge>{role}</Badge>;
@@ -152,15 +152,14 @@ export function ImpersonateModal({ isOpen, onClose }: ImpersonateModalProps) {
           {!isSearching && searchResults?.users && searchResults.users.length > 0 && (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {searchResults.users.map((user) => (
-                <Card
+                <button
                   key={user.id}
-                  className={`p-3 cursor-pointer transition-colors hover:bg-default-100 ${
+                  className={`w-full text-left p-3 rounded-lg border cursor-pointer transition-colors hover:bg-default-100 ${
                     selectedUser?.id === user.id
                       ? "ring-2 ring-primary bg-primary-50"
-                      : ""
+                      : "bg-card"
                   }`}
-                  isPressable
-                  onPress={() => handleSelectUser(user)}
+                  onClick={() => handleSelectUser(user)}
                 >
                   <div className="flex items-center gap-3">
                     <Avatar
@@ -180,7 +179,7 @@ export function ImpersonateModal({ isOpen, onClose }: ImpersonateModalProps) {
                       </p>
                     </div>
                   </div>
-                </Card>
+                </button>
               ))}
             </div>
           )}
@@ -206,7 +205,7 @@ export function ImpersonateModal({ isOpen, onClose }: ImpersonateModalProps) {
                 placeholder="E.g., Investigating support ticket #123..."
                 value={reason}
                 onValueChange={setReason}
-                minRows={2}
+                rows={2}
               />
             </div>
           )}
@@ -219,17 +218,16 @@ export function ImpersonateModal({ isOpen, onClose }: ImpersonateModalProps) {
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="flat" onPress={handleClose}>
+          <Button variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
           <Button
-            color="warning"
-            onPress={handleStartImpersonation}
-            isLoading={isStarting}
-            isDisabled={!selectedUser}
+            variant="warning"
+            onClick={handleStartImpersonation}
+            disabled={isStarting || !selectedUser}
             startContent={<UserCheck size={16} />}
           >
-            Start Impersonation
+            {isStarting ? "Starting..." : "Start Impersonation"}
           </Button>
         </ModalFooter>
       </ModalContent>

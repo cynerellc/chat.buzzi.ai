@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { and, count, eq, gte } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import {
   companySubscriptions,
@@ -25,12 +24,7 @@ export interface UsageOverview {
 
 export async function GET() {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     // Get current month start
     const now = new Date();

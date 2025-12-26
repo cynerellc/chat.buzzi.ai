@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { and, count, eq, gte, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getCurrentCompany } from "@/lib/auth/tenant";
 import { db } from "@/lib/db";
 import { conversations } from "@/lib/db/schema";
 
@@ -19,12 +18,7 @@ export interface DashboardStats {
 
 export async function GET() {
   try {
-    await requireCompanyAdmin();
-    const company = await getCurrentCompany();
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { company } = await requireCompanyAdmin();
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

@@ -8,32 +8,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { supportAgentStatus, conversations } from "@/lib/db/schema/conversations";
+import { companyPermissions } from "@/lib/db/schema/company-permissions";
 import { users } from "@/lib/db/schema/users";
-import { auth } from "@/lib/auth";
-import { getCurrentCompany } from "@/lib/auth/tenant";
+import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, or, sql } from "drizzle-orm";
 
 type AgentStatus = "online" | "busy" | "away" | "invisible" | "offline";
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get company
-    const company = await getCurrentCompany();
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
+    const { user, company } = await requireSupportAgent();
 
     // Get or create agent status
     let [status] = await db
       .select()
       .from(supportAgentStatus)
-      .where(eq(supportAgentStatus.userId, session.user.id))
+      .where(eq(supportAgentStatus.userId, user.id))
       .limit(1);
 
     if (!status) {
@@ -41,7 +31,7 @@ export async function GET(request: NextRequest) {
       [status] = await db
         .insert(supportAgentStatus)
         .values({
-          userId: session.user.id,
+          userId: user.id,
           status: "offline",
           maxConcurrentChats: 5,
           currentChatCount: 0,
@@ -56,7 +46,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(conversations.companyId, company.id),
-          eq(conversations.assignedUserId, session.user.id),
+          eq(conversations.assignedUserId, user.id),
           or(
             eq(conversations.status, "active"),
             eq(conversations.status, "with_human")
@@ -64,7 +54,7 @@ export async function GET(request: NextRequest) {
         )
       );
 
-    // Get online teammates (for capacity display)
+    // Get online teammates (for capacity display) via company_permissions
     const onlineTeammates = await db
       .select({
         id: users.id,
@@ -76,9 +66,11 @@ export async function GET(request: NextRequest) {
       })
       .from(supportAgentStatus)
       .innerJoin(users, eq(supportAgentStatus.userId, users.id))
+      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
       .where(
         and(
-          eq(users.companyId, company.id),
+          eq(companyPermissions.companyId, company.id),
+          sql`${users.deletedAt} IS NULL`,
           or(
             eq(supportAgentStatus.status, "online"),
             eq(supportAgentStatus.status, "busy")
@@ -92,7 +84,7 @@ export async function GET(request: NextRequest) {
       currentChatCount: activeCount?.count ?? 0,
       lastStatusChange: status?.lastStatusChange,
       lastActivityAt: status?.lastActivityAt,
-      teammates: onlineTeammates.filter((t) => t.id !== session.user.id),
+      teammates: onlineTeammates.filter((t) => t.id !== user.id),
     });
   } catch (error) {
     console.error("Get agent status error:", error);
@@ -105,11 +97,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Authenticate user
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user } = await requireSupportAgent();
 
     const body = await request.json();
     const { status, maxConcurrentChats } = body as {
@@ -149,7 +137,7 @@ export async function PUT(request: NextRequest) {
     const [existing] = await db
       .select()
       .from(supportAgentStatus)
-      .where(eq(supportAgentStatus.userId, session.user.id))
+      .where(eq(supportAgentStatus.userId, user.id))
       .limit(1);
 
     let updatedStatus;
@@ -158,13 +146,13 @@ export async function PUT(request: NextRequest) {
       [updatedStatus] = await db
         .update(supportAgentStatus)
         .set(updateData)
-        .where(eq(supportAgentStatus.userId, session.user.id))
+        .where(eq(supportAgentStatus.userId, user.id))
         .returning();
     } else {
       [updatedStatus] = await db
         .insert(supportAgentStatus)
         .values({
-          userId: session.user.id,
+          userId: user.id,
           status: status ?? "offline",
           maxConcurrentChats: maxConcurrentChats ?? 5,
           currentChatCount: 0,

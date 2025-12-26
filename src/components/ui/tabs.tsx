@@ -1,12 +1,65 @@
 "use client";
 
-import { Tabs as HeroTabs, Tab as HeroTab, type TabsProps as HeroTabsProps } from "@heroui/react";
+import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { type LucideIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type Key, useCallback } from "react";
+import {
+  forwardRef,
+  type ComponentPropsWithoutRef,
+  type ElementRef,
+  useCallback,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
+const TabsRoot = TabsPrimitive.Root;
+
+const TabsList = forwardRef<
+  ElementRef<typeof TabsPrimitive.List>,
+  ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      "inline-flex h-10 items-center justify-center rounded-[3px] bg-muted p-1 text-muted-foreground",
+      className
+    )}
+    {...props}
+  />
+));
+TabsList.displayName = TabsPrimitive.List.displayName;
+
+const TabsTrigger = forwardRef<
+  ElementRef<typeof TabsPrimitive.Trigger>,
+  ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-[3px] px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:rounded-[1px]",
+      className
+    )}
+    {...props}
+  />
+));
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+
+const TabsContent = forwardRef<
+  ElementRef<typeof TabsPrimitive.Content>,
+  ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      className
+    )}
+    {...props}
+  />
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
+
+// Legacy wrapper types and component
 export interface TabItem {
   key: string;
   label: string;
@@ -16,11 +69,24 @@ export interface TabItem {
   content?: React.ReactNode;
 }
 
-export interface TabsProps extends Omit<HeroTabsProps, "children"> {
+export interface TabsProps {
   items: TabItem[];
   syncWithUrl?: boolean;
   urlParam?: string;
+  selectedKey?: string;
+  onSelectionChange?: (key: string) => void;
+  className?: string;
+  variant?: "solid" | "underlined" | "bordered" | "light";
+  color?: "default" | "primary" | "secondary" | "success" | "warning" | "danger";
+  size?: "sm" | "md" | "lg";
 }
+
+const variantClasses = {
+  solid: "bg-muted",
+  underlined: "bg-transparent border-b rounded-none",
+  bordered: "bg-transparent border rounded-[3px]",
+  light: "bg-transparent",
+};
 
 export function Tabs({
   items,
@@ -29,40 +95,40 @@ export function Tabs({
   className,
   selectedKey,
   onSelectionChange,
-  ...props
+  variant = "solid",
 }: TabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const urlSelectedKey = syncWithUrl ? searchParams.get(urlParam) ?? items[0]?.key : undefined;
-  const effectiveSelectedKey = syncWithUrl ? urlSelectedKey : selectedKey;
+  const effectiveSelectedKey = syncWithUrl ? urlSelectedKey : selectedKey ?? items[0]?.key;
 
-  const handleSelectionChange = useCallback(
-    (key: Key) => {
+  const handleValueChange = useCallback(
+    (value: string) => {
       if (syncWithUrl) {
         const params = new URLSearchParams(searchParams.toString());
-        params.set(urlParam, String(key));
+        params.set(urlParam, value);
         router.push(`${pathname}?${params.toString()}`);
       }
-      // Cast to string | number to match HeroUI's expected Key type
-      onSelectionChange?.(key as string | number);
+      onSelectionChange?.(value);
     },
     [syncWithUrl, urlParam, router, pathname, searchParams, onSelectionChange]
   );
 
   return (
-    <HeroTabs
-      className={cn(className)}
-      selectedKey={effectiveSelectedKey}
-      onSelectionChange={handleSelectionChange}
-      {...props}
+    <TabsRoot
+      value={effectiveSelectedKey}
+      onValueChange={handleValueChange}
+      className={className}
     >
-      {items.map((item) => (
-        <HeroTab
-          key={item.key}
-          isDisabled={item.disabled}
-          title={
+      <TabsList className={cn(variantClasses[variant])}>
+        {items.map((item) => (
+          <TabsTrigger
+            key={item.key}
+            value={item.key}
+            disabled={item.disabled}
+          >
             <div className="flex items-center gap-2">
               {item.icon && <item.icon size={16} />}
               <span>{item.label}</span>
@@ -72,13 +138,22 @@ export function Tabs({
                 </span>
               )}
             </div>
-          }
-        >
-          {item.content}
-        </HeroTab>
-      ))}
-    </HeroTabs>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {items.map((item) =>
+        item.content ? (
+          <TabsContent key={item.key} value={item.key}>
+            {item.content}
+          </TabsContent>
+        ) : null
+      )}
+    </TabsRoot>
   );
 }
 
-export { HeroTab as Tab };
+// Export primitives
+export { TabsRoot, TabsList, TabsTrigger, TabsContent };
+
+// Legacy export
+export const Tab = TabsTrigger;

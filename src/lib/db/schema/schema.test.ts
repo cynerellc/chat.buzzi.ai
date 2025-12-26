@@ -7,9 +7,14 @@ describe("Database Schema", () => {
   describe("Enums", () => {
     it("should export user role enum", () => {
       expect(schema.userRoleEnum).toBeDefined();
-      expect(schema.userRoleEnum.enumValues).toContain("master_admin");
-      expect(schema.userRoleEnum.enumValues).toContain("company_admin");
-      expect(schema.userRoleEnum.enumValues).toContain("support_agent");
+      expect(schema.userRoleEnum.enumValues).toContain("chatapp.master_admin");
+      expect(schema.userRoleEnum.enumValues).toContain("chatapp.user");
+    });
+
+    it("should export company permission role enum", () => {
+      expect(schema.companyPermissionRoleEnum).toBeDefined();
+      expect(schema.companyPermissionRoleEnum.enumValues).toContain("chatapp.company_admin");
+      expect(schema.companyPermissionRoleEnum.enumValues).toContain("chatapp.support_agent");
     });
 
     it("should export user status enum", () => {
@@ -58,114 +63,115 @@ describe("Database Schema", () => {
   });
 
   describe("Tables", () => {
+    // Tables are in the 'chatapp' schema without prefix
     it("should export companies table", () => {
       expect(schema.companies).toBeDefined();
-      expect(getTableName(schema.companies)).toBe("chatapp_companies");
+      expect(getTableName(schema.companies)).toBe("companies");
     });
 
     it("should export users table", () => {
       expect(schema.users).toBeDefined();
-      expect(getTableName(schema.users)).toBe("chatapp_users");
+      expect(getTableName(schema.users)).toBe("users");
     });
 
     it("should export accounts table (Auth.js)", () => {
       expect(schema.accounts).toBeDefined();
-      expect(getTableName(schema.accounts)).toBe("chatapp_accounts");
+      expect(getTableName(schema.accounts)).toBe("accounts");
     });
 
     it("should export sessions table (Auth.js)", () => {
       expect(schema.sessions).toBeDefined();
-      expect(getTableName(schema.sessions)).toBe("chatapp_sessions");
+      expect(getTableName(schema.sessions)).toBe("sessions");
     });
 
     it("should export verificationTokens table (Auth.js)", () => {
       expect(schema.verificationTokens).toBeDefined();
-      expect(getTableName(schema.verificationTokens)).toBe("chatapp_verification_tokens");
+      expect(getTableName(schema.verificationTokens)).toBe("verification_tokens");
     });
 
     it("should export subscription plans table", () => {
       expect(schema.subscriptionPlans).toBeDefined();
-      expect(getTableName(schema.subscriptionPlans)).toBe("chatapp_subscription_plans");
+      expect(getTableName(schema.subscriptionPlans)).toBe("subscription_plans");
     });
 
     it("should export company subscriptions table", () => {
       expect(schema.companySubscriptions).toBeDefined();
-      expect(getTableName(schema.companySubscriptions)).toBe("chatapp_company_subscriptions");
+      expect(getTableName(schema.companySubscriptions)).toBe("company_subscriptions");
     });
 
     it("should export agent packages table", () => {
       expect(schema.agentPackages).toBeDefined();
-      expect(getTableName(schema.agentPackages)).toBe("chatapp_agent_packages");
+      expect(getTableName(schema.agentPackages)).toBe("agent_packages");
     });
 
     it("should export agents table", () => {
       expect(schema.agents).toBeDefined();
-      expect(getTableName(schema.agents)).toBe("chatapp_agents");
+      expect(getTableName(schema.agents)).toBe("agents");
     });
 
     it("should export knowledge sources table", () => {
       expect(schema.knowledgeSources).toBeDefined();
-      expect(getTableName(schema.knowledgeSources)).toBe("chatapp_knowledge_sources");
+      expect(getTableName(schema.knowledgeSources)).toBe("knowledge_sources");
     });
 
     it("should export knowledge chunks table", () => {
       expect(schema.knowledgeChunks).toBeDefined();
-      expect(getTableName(schema.knowledgeChunks)).toBe("chatapp_knowledge_chunks");
+      expect(getTableName(schema.knowledgeChunks)).toBe("knowledge_chunks");
     });
 
     it("should export FAQ items table", () => {
       expect(schema.faqItems).toBeDefined();
-      expect(getTableName(schema.faqItems)).toBe("chatapp_faq_items");
+      expect(getTableName(schema.faqItems)).toBe("faq_items");
     });
 
     it("should export conversations table", () => {
       expect(schema.conversations).toBeDefined();
-      expect(getTableName(schema.conversations)).toBe("chatapp_conversations");
+      expect(getTableName(schema.conversations)).toBe("conversations");
     });
 
     it("should export messages table", () => {
       expect(schema.messages).toBeDefined();
-      expect(getTableName(schema.messages)).toBe("chatapp_messages");
+      expect(getTableName(schema.messages)).toBe("messages");
     });
 
     it("should export escalations table", () => {
       expect(schema.escalations).toBeDefined();
-      expect(getTableName(schema.escalations)).toBe("chatapp_escalations");
+      expect(getTableName(schema.escalations)).toBe("escalations");
     });
 
     it("should export integrations table", () => {
       expect(schema.integrations).toBeDefined();
-      expect(getTableName(schema.integrations)).toBe("chatapp_integrations");
+      expect(getTableName(schema.integrations)).toBe("integrations");
     });
 
     it("should export webhooks table", () => {
       expect(schema.webhooks).toBeDefined();
-      expect(getTableName(schema.webhooks)).toBe("chatapp_webhooks");
+      expect(getTableName(schema.webhooks)).toBe("webhooks");
     });
 
     it("should export invitations table", () => {
       expect(schema.invitations).toBeDefined();
-      expect(getTableName(schema.invitations)).toBe("chatapp_invitations");
+      expect(getTableName(schema.invitations)).toBe("invitations");
     });
 
     it("should export audit logs table", () => {
       expect(schema.auditLogs).toBeDefined();
-      expect(getTableName(schema.auditLogs)).toBe("chatapp_audit_logs");
+      expect(getTableName(schema.auditLogs)).toBe("audit_logs");
     });
 
     it("should export daily analytics table", () => {
       expect(schema.dailyAnalytics).toBeDefined();
-      expect(getTableName(schema.dailyAnalytics)).toBe("chatapp_daily_analytics");
+      expect(getTableName(schema.dailyAnalytics)).toBe("daily_analytics");
     });
 
     it("should export hourly analytics table", () => {
       expect(schema.hourlyAnalytics).toBeDefined();
-      expect(getTableName(schema.hourlyAnalytics)).toBe("chatapp_hourly_analytics");
+      expect(getTableName(schema.hourlyAnalytics)).toBe("hourly_analytics");
     });
 
     it("should export platform analytics table", () => {
       expect(schema.platformAnalytics).toBeDefined();
-      expect(getTableName(schema.platformAnalytics)).toBe("chatapp_platform_analytics");
+      expect(getTableName(schema.platformAnalytics)).toBe("platform_analytics");
     });
   });
 
@@ -210,6 +216,7 @@ describe("Database Schema", () => {
         status: "trial",
         apiKeyHash: null,
         apiKeyPrefix: null,
+        createdBy: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         deletedAt: null,
@@ -225,13 +232,13 @@ describe("Database Schema", () => {
         name: "Test User",
         image: null,
         hashedPassword: null,
-        companyId: null,
-        role: "support_agent",
+        role: "chatapp.user",
         status: "active",
         phone: null,
         avatarUrl: null,
         permissions: {},
         settings: {},
+        activeCompanyId: null,
         isActive: true,
         lastLoginAt: null,
         ipAllowlist: [],
@@ -257,6 +264,7 @@ describe("Database Schema", () => {
         modelId: "gpt-4o-mini",
         temperature: 70,
         behavior: {},
+        businessHours: null,
         escalationEnabled: true,
         escalationTriggers: [],
         knowledgeSourceIds: [],
