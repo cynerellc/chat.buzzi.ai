@@ -10,6 +10,7 @@ import {
   UsageByCompany,
   ChannelBreakdown,
 } from "@/components/master-admin/analytics";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   useAnalyticsOverview,
   useConversationsAnalytics,
@@ -17,6 +18,7 @@ import {
 } from "@/hooks/master-admin";
 
 export default function AnalyticsPage() {
+  useSetPageTitle("Analytics");
   const [days, setDays] = useState(30);
 
   const { overview, isLoading: isOverviewLoading } = useAnalyticsOverview();

@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { agents } from "@/lib/db/schema/agents";
+import { agents } from "@/lib/db/schema/chatbots";
 import { companies } from "@/lib/db/schema/companies";
 import { conversations, endUsers } from "@/lib/db/schema/conversations";
 import { eq, and } from "drizzle-orm";
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       .insert(conversations)
       .values({
         companyId,
-        agentId,
+        chatbotId: agentId,
         endUserId: endUser.id,
         channel: "web",
         status: "active",

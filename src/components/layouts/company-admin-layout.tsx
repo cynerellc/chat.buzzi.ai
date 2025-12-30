@@ -5,11 +5,10 @@ import {
   Bot,
   Database,
   MessageSquare,
-  Palette,
-  Plug,
   Settings,
   CreditCard,
   Users,
+  Hexagon,
 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode } from "react";
@@ -21,59 +20,66 @@ import { type SidebarSection } from "./sidebar";
 const companyAdminSections: SidebarSection[] = [
   {
     key: "main",
-    title: "Main",
+    title: "Operations",
     items: [
       { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { key: "agents", label: "Agents", href: "/agents", icon: Bot },
+      { key: "chatbots", label: "Chatbots", href: "/chatbots", icon: Bot },
       { key: "knowledge", label: "Knowledge Base", href: "/knowledge", icon: Database },
       { key: "conversations", label: "Conversations", href: "/conversations", icon: MessageSquare },
     ],
   },
   {
     key: "configure",
-    title: "Configure",
+    title: "Configuration",
     items: [
-      { key: "widget", label: "Widget", href: "/widget", icon: Palette },
-      { key: "integrations", label: "Integrations", href: "/integrations", icon: Plug },
       { key: "settings", label: "Settings", href: "/settings", icon: Settings },
       { key: "billing", label: "Billing", href: "/billing", icon: CreditCard },
     ],
   },
   {
     key: "team",
-    title: "Team",
+    title: "Organization",
     items: [
-      { key: "team", label: "Team Management", href: "/team", icon: Users },
+      { key: "team", label: "Team", href: "/team", icon: Users },
     ],
   },
 ];
 
-// Logo component
+// Logo component - Enterprise style
 function CompanyLogo({ companyName }: { companyName?: string }) {
   return (
-    <Link href="/dashboard" className="flex items-center gap-2">
-      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-        <span className="text-white font-bold text-sm">
-          {companyName?.charAt(0).toUpperCase() ?? "C"}
-        </span>
+    <Link href="/dashboard" className="flex items-center gap-3 group">
+      {/* Logo mark */}
+      <div className="relative">
+        <div className="w-9 h-9 rounded bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+          <Hexagon size={16} className="text-primary-foreground/90" strokeWidth={1.5} />
+        </div>
+        {/* Subtle glow effect */}
+        <div className="absolute inset-0 rounded bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
-      <div className="flex flex-col">
-        <span className="font-bold text-sm leading-tight">
+
+      {/* Text */}
+      <div className="flex flex-col min-w-0">
+        <span className="font-semibold text-sm text-foreground truncate leading-tight">
           {companyName ?? "Company"}
         </span>
-        <span className="text-xs text-default-500 leading-tight">Dashboard</span>
+        <span className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.15em] font-medium">
+          Control Panel
+        </span>
       </div>
     </Link>
   );
 }
 
-function CompanyLogoCollapsed({ companyName }: { companyName?: string }) {
+function CompanyLogoCollapsed() {
   return (
-    <Link href="/dashboard">
-      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-        <span className="text-white font-bold text-sm">
-          {companyName?.charAt(0).toUpperCase() ?? "C"}
-        </span>
+    <Link href="/dashboard" className="group">
+      <div className="relative">
+        <div className="w-9 h-9 rounded bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+          <Hexagon size={16} className="text-primary-foreground/90" strokeWidth={1.5} />
+        </div>
+        {/* Subtle glow effect */}
+        <div className="absolute inset-0 rounded bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </Link>
   );
@@ -89,12 +95,8 @@ export function CompanyAdminLayout({ children, companyName }: CompanyAdminLayout
     <MainLayout
       sidebarProps={{
         logo: <CompanyLogo companyName={companyName} />,
-        logoCollapsed: <CompanyLogoCollapsed companyName={companyName} />,
+        logoCollapsed: <CompanyLogoCollapsed />,
         sections: companyAdminSections,
-      }}
-      headerProps={{
-        title: companyName,
-        subtitle: "Company Admin",
       }}
     >
       {children}

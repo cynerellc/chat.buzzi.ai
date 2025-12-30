@@ -34,6 +34,7 @@ import {
   type BadgeVariant,
   type TabItem,
 } from "@/components/ui";
+import { MODEL_OPTIONS } from "@/lib/constants";
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -82,13 +83,6 @@ const statusBadgeVariants: Record<string, BadgeVariant> = {
   inactive: "default",
 };
 
-const modelOptions = [
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-  { value: "claude-3-opus", label: "Claude 3 Opus" },
-];
 
 export default function AgentConfigurationPage({
   params,
@@ -108,7 +102,7 @@ export default function AgentConfigurationPage({
     description: "",
     packageId: "",
     systemPrompt: "",
-    modelId: "gpt-4o-mini",
+    modelId: "gpt-5-mini",
     temperature: 70,
     isActive: true,
     maxTokens: 2048,
@@ -429,9 +423,9 @@ export default function AgentConfigurationPage({
                 selectedKeys={new Set([formData.modelId])}
                 onSelectionChange={(keys) => {
                   const selected = Array.from(keys)[0] as string;
-                  updateField("modelId", selected ?? "gpt-4o-mini");
+                  updateField("modelId", selected ?? "gpt-5-mini");
                 }}
-                options={modelOptions}
+                options={[...MODEL_OPTIONS]}
                 disabled={!isEditing}
               />
               <div>

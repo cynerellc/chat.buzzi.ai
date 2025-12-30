@@ -9,7 +9,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { agents } from "./agents";
+import { chatbots } from "./chatbots";
 import { chatappSchema, subscriptionStatusEnum } from "./enums";
 import { companySubscriptions } from "./subscriptions";
 
@@ -61,7 +61,7 @@ export const companies = chatappSchema.table(
 
 // Relations - users relation removed, now handled via companyPermissions junction table
 export const companiesRelations = relations(companies, ({ many }) => ({
-  agents: many(agents),
+  chatbots: many(chatbots),
   subscriptions: many(companySubscriptions),
   // companyPermissions relation is defined in company-permissions.ts to avoid circular imports
 }));

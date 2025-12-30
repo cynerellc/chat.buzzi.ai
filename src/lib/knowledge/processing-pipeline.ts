@@ -5,11 +5,11 @@
  * 1. Extract text from documents
  * 2. Split into chunks
  * 3. Generate embeddings
- * 4. Store vectors in Qdrant and metadata in PostgreSQL
+ * 4. Store vectors in Qdrant
  */
 
 import { db } from "@/lib/db";
-import { knowledgeSources, knowledgeChunks, faqItems } from "@/lib/db/schema/knowledge";
+import { knowledgeSources, faqItems } from "@/lib/db/schema/knowledge";
 import { eq, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
@@ -17,12 +17,10 @@ import { processDocument } from "./document-processor";
 import { chunkText, CHUNKING_PRESETS, type TextChunk } from "./chunking-service";
 import { getEmbeddingService } from "./embedding-service";
 import {
-  getQdrantService,
   storeChunks,
   storeFaq,
   deleteChunksBySource,
   deleteFaq,
-  COLLECTIONS,
   type VectorPayload,
   type FaqPayload,
 } from "./qdrant-client";
@@ -32,8 +30,6 @@ export interface ProcessingOptions {
   chunkingPreset?: keyof typeof CHUNKING_PRESETS;
   embedBatchSize?: number;
   onProgress?: (progress: ProcessingProgress) => void;
-  useQdrant?: boolean; // Toggle between Qdrant and pgvector
-  storeInPostgres?: boolean; // Also store in PostgreSQL for backup
 }
 
 export interface ProcessingProgress {
@@ -59,7 +55,6 @@ export interface ProcessingResult {
   totalTokens: number;
   processingTimeMs: number;
   error?: string;
-  vectorStore?: "qdrant" | "pgvector";
 }
 
 // Default configuration
@@ -143,14 +138,35 @@ export class ProcessingPipeline {
       const document = await processDocument(content, contentType);
       onProgress?.({ stage: "extracting", progress: 100, message: "Content extraction complete" });
 
-      // Update source config with crawl info
+      // Extract page title and domain for auto-naming
+      let pageTitle: string | null = null;
+      let domain: string;
+      try {
+        const parsedUrl = new URL(url);
+        domain = parsedUrl.hostname.replace(/^www\./, "");
+
+        // Extract title from HTML
+        const titleMatch = content.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (titleMatch?.[1]) {
+          pageTitle = titleMatch[1].trim();
+        }
+      } catch {
+        domain = url;
+      }
+
+      // Generate source name: "domain.com - Page Title" or just "domain.com"
+      const autoName = pageTitle ? `${domain} - ${pageTitle}` : domain;
+
+      // Update source config with crawl info and auto-generated name
       await db
         .update(knowledgeSources)
         .set({
+          name: autoName,
           sourceConfig: {
             url,
             lastCrawled: new Date().toISOString(),
             contentType,
+            pageTitle,
           },
           updatedAt: new Date(),
         })
@@ -214,13 +230,14 @@ export class ProcessingPipeline {
       onProgress,
       chunkingPreset = "qa",
       embedBatchSize = DEFAULT_EMBED_BATCH_SIZE,
-      useQdrant = true, // Default to Qdrant
-      storeInPostgres = false,
     } = options;
 
-    // Get source info for companyId
+    // Get source info for companyId and category
     const [source] = await db
-      .select({ companyId: knowledgeSources.companyId })
+      .select({
+        companyId: knowledgeSources.companyId,
+        category: knowledgeSources.category,
+      })
       .from(knowledgeSources)
       .where(eq(knowledgeSources.id, sourceId))
       .limit(1);
@@ -266,35 +283,16 @@ export class ProcessingPipeline {
       });
     }
 
-    // 4. Store chunks in vector store
-    onProgress?.({ stage: "storing", progress: 0, message: "Storing chunks in vector store" });
-
-    let vectorStore: "qdrant" | "pgvector" = "qdrant";
-
-    if (useQdrant) {
-      // Store in Qdrant
-      await this.storeChunksInQdrant(
-        sourceId,
-        source.companyId,
-        chunks,
-        embeddings,
-        onProgress
-      );
-    } else {
-      // Store in PostgreSQL (pgvector)
-      vectorStore = "pgvector";
-      await this.storeChunksInPostgres(
-        sourceId,
-        chunks,
-        embeddings,
-        onProgress
-      );
-    }
-
-    // Optionally also store in PostgreSQL for backup
-    if (useQdrant && storeInPostgres) {
-      await this.storeChunksInPostgres(sourceId, chunks, embeddings);
-    }
+    // 4. Store chunks in Qdrant
+    onProgress?.({ stage: "storing", progress: 0, message: "Storing chunks in Qdrant" });
+    await this.storeChunksInQdrant(
+      sourceId,
+      source.companyId,
+      source.category,
+      chunks,
+      embeddings,
+      onProgress
+    );
 
     // 5. Update source status
     await db
@@ -317,7 +315,6 @@ export class ProcessingPipeline {
       chunksCreated: chunks.length,
       totalTokens,
       processingTimeMs: performance.now() - startTime,
-      vectorStore,
     };
   }
 
@@ -327,6 +324,7 @@ export class ProcessingPipeline {
   private async storeChunksInQdrant(
     sourceId: string,
     companyId: string,
+    category: string | null,
     chunks: TextChunk[],
     embeddings: number[][],
     onProgress?: (progress: ProcessingProgress) => void
@@ -354,6 +352,7 @@ export class ProcessingPipeline {
         payload: {
           sourceId,
           companyId,
+          category,
           content: chunk.content,
           chunkIndex: chunk.index,
           tokenCount: chunk.tokenEstimate,
@@ -383,48 +382,6 @@ export class ProcessingPipeline {
       chunksProcessed: chunks.length,
       totalChunks: chunks.length,
     });
-  }
-
-  /**
-   * Store chunks in PostgreSQL with pgvector
-   */
-  private async storeChunksInPostgres(
-    sourceId: string,
-    chunks: TextChunk[],
-    embeddings: number[][],
-    onProgress?: (progress: ProcessingProgress) => void
-  ): Promise<void> {
-    // Delete existing chunks for this source
-    await db
-      .delete(knowledgeChunks)
-      .where(eq(knowledgeChunks.sourceId, sourceId));
-
-    // Insert new chunks with embeddings
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const embedding = embeddings[i];
-      if (!chunk || !embedding) continue;
-
-      const embeddingStr = `[${embedding.join(",")}]`;
-      const metadataJson = JSON.stringify(chunk.metadata || {});
-
-      await db.execute(sql`
-        INSERT INTO chatapp_knowledge_chunks
-        (id, source_id, chunk_index, content, token_count, embedding, metadata, created_at)
-        VALUES (gen_random_uuid(), ${sourceId}, ${chunk.index}, ${chunk.content}, ${chunk.tokenEstimate}, ${embeddingStr}::vector, ${metadataJson}::jsonb, NOW())
-      `);
-
-      if (i % 10 === 0 || i === chunks.length - 1) {
-        const progress = Math.round(((i + 1) / chunks.length) * 100);
-        onProgress?.({
-          stage: "storing",
-          progress,
-          message: `Stored ${i + 1}/${chunks.length} chunks`,
-          chunksProcessed: i + 1,
-          totalChunks: chunks.length,
-        });
-      }
-    }
   }
 
   /**
@@ -532,97 +489,10 @@ export class ProcessingPipeline {
   }
 
   /**
-   * Delete all chunks for a source from both stores
+   * Delete all chunks for a source from Qdrant
    */
   async deleteSourceChunks(sourceId: string): Promise<void> {
-    // Delete from Qdrant
-    try {
-      await deleteChunksBySource(sourceId);
-    } catch {
-      // Qdrant deletion failed, continue with PostgreSQL
-    }
-
-    // Delete from PostgreSQL
-    await db
-      .delete(knowledgeChunks)
-      .where(eq(knowledgeChunks.sourceId, sourceId));
-  }
-
-  /**
-   * Migrate chunks from PostgreSQL to Qdrant
-   */
-  async migrateToQdrant(
-    sourceId: string,
-    companyId: string,
-    onProgress?: (progress: number, message: string) => void
-  ): Promise<{ migrated: number; errors: number }> {
-    let migrated = 0;
-    let errors = 0;
-
-    // Get all chunks from PostgreSQL
-    const pgChunks = await db.execute<{
-      id: string;
-      content: string;
-      chunk_index: number;
-      token_count: number;
-      metadata: Record<string, unknown>;
-      embedding: number[];
-    }>(sql`
-      SELECT id, content, chunk_index, token_count, metadata, embedding::text
-      FROM chatapp_knowledge_chunks
-      WHERE source_id = ${sourceId}
-      ORDER BY chunk_index
-    `);
-
-    const qdrantChunks: Array<{
-      id: string;
-      vector: number[];
-      payload: VectorPayload;
-    }> = [];
-
-    for (let i = 0; i < pgChunks.length; i++) {
-      const chunk = pgChunks[i];
-      if (!chunk) continue;
-
-      try {
-        // Parse embedding from PostgreSQL format
-        const embeddingStr = String(chunk.embedding);
-        const embedding = JSON.parse(
-          embeddingStr.replace(/^\[/, "[").replace(/\]$/, "]")
-        ) as number[];
-
-        qdrantChunks.push({
-          id: chunk.id,
-          vector: embedding,
-          payload: {
-            sourceId,
-            companyId,
-            content: chunk.content,
-            chunkIndex: chunk.chunk_index,
-            tokenCount: chunk.token_count,
-            metadata: chunk.metadata,
-          },
-        });
-
-        migrated++;
-      } catch {
-        errors++;
-      }
-
-      if (i % 20 === 0 || i === pgChunks.length - 1) {
-        onProgress?.(
-          Math.round(((i + 1) / pgChunks.length) * 100),
-          `Migrating ${i + 1}/${pgChunks.length} chunks`
-        );
-      }
-    }
-
-    // Store in Qdrant
-    if (qdrantChunks.length > 0) {
-      await storeChunks(qdrantChunks);
-    }
-
-    return { migrated, errors };
+    await deleteChunksBySource(sourceId);
   }
 
   /**
@@ -697,11 +567,50 @@ export async function processKnowledgeText(
   return pipeline.processText(sourceId, content, options);
 }
 
-export async function migrateSourceToQdrant(
+/**
+ * Trigger background indexing for a knowledge source
+ * This starts processing immediately in the background without blocking
+ */
+export function triggerBackgroundIndexing(
   sourceId: string,
-  companyId: string,
-  onProgress?: (progress: number, message: string) => void
-): Promise<{ migrated: number; errors: number }> {
-  const pipeline = getProcessingPipeline();
-  return pipeline.migrateToQdrant(sourceId, companyId, onProgress);
+  sourceType: "file" | "url" | "text",
+  sourceConfig: {
+    fileBuffer?: Buffer;
+    fileType?: string;
+    fileName?: string;
+    url?: string;
+    content?: string;
+  }
+): void {
+  // Use setImmediate to start processing in the next event loop tick
+  setImmediate(async () => {
+    const pipeline = getProcessingPipeline();
+    try {
+      switch (sourceType) {
+        case "file":
+          if (sourceConfig.fileBuffer && sourceConfig.fileType && sourceConfig.fileName) {
+            await pipeline.processFile(
+              sourceId,
+              sourceConfig.fileBuffer,
+              sourceConfig.fileType,
+              sourceConfig.fileName
+            );
+          }
+          break;
+        case "url":
+          if (sourceConfig.url) {
+            await pipeline.processUrl(sourceId, sourceConfig.url);
+          }
+          break;
+        case "text":
+          if (sourceConfig.content) {
+            await pipeline.processText(sourceId, sourceConfig.content);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error(`Background indexing failed for source ${sourceId}:`, error);
+      // Status is already set to 'failed' by the pipeline's error handler
+    }
+  });
 }

@@ -164,7 +164,6 @@ export function TransferModal({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               startContent={<Search size={16} className="text-muted-foreground" />}
-              size="sm"
             />
           </div>
 
@@ -265,7 +264,6 @@ export function TransferModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               minRows={2}
-              maxRows={4}
               className="resize-none"
             />
           </div>

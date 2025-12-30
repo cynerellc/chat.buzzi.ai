@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Lock, Variable, Save, AlertCircle } from "lucide-react";
 
 import { Button, Card, CardHeader, CardBody, Input, addToast } from "@/components/ui";
@@ -13,20 +13,15 @@ interface VariablesTabProps {
 }
 
 export function VariablesTab({ agent, onSave, isSaving }: VariablesTabProps) {
-  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
+  // Initialize values from agent's raw variable values
+  const [variableValues, setVariableValues] = useState<Record<string, string>>(
+    () => agent.rawVariableValues ?? {}
+  );
   const [hasChanges, setHasChanges] = useState(false);
 
   // Get variable definitions from the agent's package or from variableValues
   const variables: AgentVariableValue[] = agent.variableValues || [];
   const hasVariables = variables.length > 0;
-
-  // Initialize values from agent's raw variable values
-  useEffect(() => {
-    if (agent.rawVariableValues) {
-      setVariableValues(agent.rawVariableValues);
-      setHasChanges(false);
-    }
-  }, [agent.rawVariableValues]);
 
   const updateValue = (name: string, value: string) => {
     setVariableValues((prev) => ({ ...prev, [name]: value }));

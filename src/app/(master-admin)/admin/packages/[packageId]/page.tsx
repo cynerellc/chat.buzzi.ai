@@ -1,10 +1,11 @@
 "use client";
 
-import { Plus, Save, Trash2, Users, User, Bot, Variable, Lock, Unlock } from "lucide-react";
+import { Plus, Save, Trash2, Users, User, Bot, Variable, ChevronDown, ChevronUp, Lock, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState, useCallback } from "react";
 
 import { PageHeader } from "@/components/layouts";
+import { AgentAvatarPicker } from "@/components/shared";
 import {
   Button,
   Card,
@@ -17,13 +18,15 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   createPackage,
   deletePackage,
   updatePackage,
   usePackage,
-  type PackageAgentData,
+  type AgentListItemData,
 } from "@/hooks/master-admin";
+import { MODEL_OPTIONS } from "@/lib/constants";
 
 interface PackageEditorPageProps {
   params: Promise<{ packageId: string }>;
@@ -49,21 +52,23 @@ interface FormData {
   packageType: "single_agent" | "multi_agent";
   isActive: boolean;
   isPublic: boolean;
-  agents: PackageAgentData[];
+  agents: AgentListItemData[];
   variables: PackageVariableData[];
 }
 
-const defaultAgentData: PackageAgentData = {
-  agentIdentifier: "",
+const defaultAgentData: AgentListItemData = {
+  agent_identifier: "",
   name: "New Agent",
   designation: "",
-  agentType: "worker",
-  systemPrompt: "",
-  modelId: "gpt-4o-mini",
-  temperature: 70,
+  routing_prompt: "",
+  agent_type: "worker",
+  avatar_url: "",
+  default_system_prompt: "",
+  default_model_id: "gpt-5-mini",
+  default_temperature: 70,
   tools: [],
-  managedAgentIds: [],
-  sortOrder: 0,
+  managed_agent_ids: [],
+  sort_order: 0,
 };
 
 const defaultVariableData: PackageVariableData = {
@@ -84,7 +89,7 @@ const defaultFormData: FormData = {
   packageType: "single_agent",
   isActive: true,
   isPublic: true,
-  agents: [{ ...defaultAgentData, agentIdentifier: crypto.randomUUID().slice(0, 8) }],
+  agents: [{ ...defaultAgentData, agent_identifier: crypto.randomUUID().slice(0, 8) }],
   variables: [],
 };
 
@@ -95,21 +100,9 @@ const categoryOptions = [
   { value: "custom", label: "Custom" },
 ];
 
-const modelOptions = [
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-  { value: "claude-3-5-haiku", label: "Claude 3.5 Haiku" },
-  { value: "claude-opus-4", label: "Claude Opus 4" },
-];
-
-const agentTypeOptions = [
-  { value: "worker", label: "Worker" },
-  { value: "supervisor", label: "Supervisor" },
-];
 
 export default function PackageEditorPage({ params }: PackageEditorPageProps) {
+  useSetPageTitle("Package Editor");
   const { packageId } = use(params);
   const router = useRouter();
   const isNewPackage = packageId === "new";
@@ -122,25 +115,27 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeAgentTab, setActiveAgentTab] = useState("0");
+  const [expandedVariables, setExpandedVariables] = useState<Set<number>>(new Set());
 
   // Load package data when available
   useEffect(() => {
     if (pkg) {
-      const packageAgents: PackageAgentData[] = pkg.packageAgents?.length
-        ? pkg.packageAgents.map((pa) => ({
-            id: pa.id,
-            agentIdentifier: pa.agentIdentifier,
-            name: pa.name,
-            designation: pa.designation ?? "",
-            agentType: pa.agentType as "worker" | "supervisor",
-            systemPrompt: pa.systemPrompt,
-            modelId: pa.modelId,
-            temperature: pa.temperature,
-            tools: (pa.tools as string[]) ?? [],
-            managedAgentIds: (pa.managedAgentIds as string[]) ?? [],
-            sortOrder: pa.sortOrder,
-          }))
-        : [{ ...defaultAgentData, agentIdentifier: crypto.randomUUID().slice(0, 8) }];
+      const agentsList: AgentListItemData[] = pkg.agentsList?.length
+        ? pkg.agentsList.map((agent) => ({
+          agent_identifier: agent.agent_identifier,
+          name: agent.name,
+          designation: agent.designation ?? "",
+          routing_prompt: agent.routing_prompt ?? "",
+          agent_type: agent.agent_type as "worker" | "supervisor",
+          avatar_url: agent.avatar_url ?? "",
+          default_system_prompt: agent.default_system_prompt,
+          default_model_id: agent.default_model_id,
+          default_temperature: agent.default_temperature,
+          tools: (agent.tools as unknown[]) ?? [],
+          managed_agent_ids: (agent.managed_agent_ids as string[]) ?? [],
+          sort_order: agent.sort_order ?? 0,
+        }))
+        : [{ ...defaultAgentData, agent_identifier: crypto.randomUUID().slice(0, 8) }];
 
       // Load variables from package
       const packageVariables: PackageVariableData[] = (pkg.variables || []).map((v) => ({
@@ -162,7 +157,7 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
         packageType: (pkg.packageType as "single_agent" | "multi_agent") ?? "single_agent",
         isActive: pkg.isActive,
         isPublic: pkg.isPublic,
-        agents: packageAgents,
+        agents: agentsList,
         variables: packageVariables,
       });
     }
@@ -182,8 +177,8 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
       if (!agent.name.trim()) {
         newErrors[`agent_${index}_name`] = "Agent name is required";
       }
-      if (!agent.systemPrompt.trim()) {
-        newErrors[`agent_${index}_systemPrompt`] = "System prompt is required";
+      if (!agent.default_system_prompt.trim()) {
+        newErrors[`agent_${index}_default_system_prompt`] = "System prompt is required";
       }
     });
 
@@ -217,9 +212,9 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
         packageType: formData.packageType,
         isActive: formData.isActive,
         isPublic: formData.isPublic,
-        packageAgents: formData.agents.map((agent, index) => ({
+        agentsList: formData.agents.map((agent, index) => ({
           ...agent,
-          sortOrder: index,
+          sort_order: index,
         })),
         // Variables stored as JSONB array
         variables: formData.variables.map((v) => ({
@@ -273,10 +268,10 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updateAgentField = <K extends keyof PackageAgentData>(
+  const updateAgentField = <K extends keyof AgentListItemData>(
     agentIndex: number,
     field: K,
-    value: PackageAgentData[K]
+    value: AgentListItemData[K]
   ) => {
     setFormData((prev) => {
       const newAgents = [...prev.agents];
@@ -289,11 +284,11 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
   };
 
   const addAgent = () => {
-    const newAgent: PackageAgentData = {
+    const newAgent: AgentListItemData = {
       ...defaultAgentData,
-      agentIdentifier: crypto.randomUUID().slice(0, 8),
+      agent_identifier: crypto.randomUUID().slice(0, 8),
       name: `Agent ${formData.agents.length + 1}`,
-      sortOrder: formData.agents.length,
+      sort_order: formData.agents.length,
     };
     setFormData((prev) => ({
       ...prev,
@@ -330,10 +325,13 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
 
   // Variable management functions
   const addVariable = () => {
+    const newIndex = formData.variables.length;
     setFormData((prev) => ({
       ...prev,
       variables: [...prev.variables, { ...defaultVariableData }],
     }));
+    // Auto-expand newly added variable
+    setExpandedVariables((prev) => new Set(prev).add(newIndex));
   };
 
   const removeVariable = (index: number) => {
@@ -341,6 +339,15 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
       ...prev,
       variables: prev.variables.filter((_, i) => i !== index),
     }));
+    // Update expanded indices after removal
+    setExpandedVariables((prev) => {
+      const newSet = new Set<number>();
+      prev.forEach((i) => {
+        if (i < index) newSet.add(i);
+        else if (i > index) newSet.add(i - 1);
+      });
+      return newSet;
+    });
   };
 
   const updateVariableField = <K extends keyof PackageVariableData>(
@@ -355,6 +362,18 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
         newVariables[varIndex] = { ...existingVar, [field]: value };
       }
       return { ...prev, variables: newVariables };
+    });
+  };
+
+  const toggleVariableExpanded = (index: number) => {
+    setExpandedVariables((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
     });
   };
 
@@ -488,16 +507,14 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
             <button
               type="button"
               onClick={() => handlePackageTypeChange("single_agent")}
-              className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                formData.packageType === "single_agent"
+              className={`flex-1 p-4 rounded-xl border-2 transition-all ${formData.packageType === "single_agent"
                   ? "border-primary bg-primary-50"
                   : "border-default-200 hover:border-default-300"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${
-                  formData.packageType === "single_agent" ? "bg-primary-100" : "bg-default-100"
-                }`}>
+                <div className={`p-2 rounded-lg ${formData.packageType === "single_agent" ? "bg-primary-100" : "bg-default-100"
+                  }`}>
                   <User size={24} className={formData.packageType === "single_agent" ? "text-primary" : "text-default-500"} />
                 </div>
                 <div className="text-left">
@@ -510,16 +527,14 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
             <button
               type="button"
               onClick={() => handlePackageTypeChange("multi_agent")}
-              className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                formData.packageType === "multi_agent"
+              className={`flex-1 p-4 rounded-xl border-2 transition-all ${formData.packageType === "multi_agent"
                   ? "border-primary bg-primary-50"
                   : "border-default-200 hover:border-default-300"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${
-                  formData.packageType === "multi_agent" ? "bg-primary-100" : "bg-default-100"
-                }`}>
+                <div className={`p-2 rounded-lg ${formData.packageType === "multi_agent" ? "bg-primary-100" : "bg-default-100"
+                  }`}>
                   <Users size={24} className={formData.packageType === "multi_agent" ? "text-primary" : "text-default-500"} />
                 </div>
                 <div className="text-left">
@@ -595,106 +610,184 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {formData.variables.map((variable, index) => (
-                <div key={index} className="p-4 border border-default-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <Input
-                          label="Variable Name"
-                          placeholder="e.g., API_KEY"
-                          value={variable.name}
-                          onValueChange={(v) => updateVariableField(index, "name", v.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
-                          isInvalid={!!errors[`variable_${index}_name`]}
-                          errorMessage={errors[`variable_${index}_name`]}
-                          description="UPPERCASE with underscores only"
-                          isRequired
-                        />
-                        <Input
-                          label="Display Name"
-                          placeholder="e.g., API Key"
-                          value={variable.displayName}
-                          onValueChange={(v) => updateVariableField(index, "displayName", v)}
-                          isInvalid={!!errors[`variable_${index}_displayName`]}
-                          errorMessage={errors[`variable_${index}_displayName`]}
-                          isRequired
-                        />
-                      </div>
+            <div className="space-y-2">
+              {formData.variables.map((variable, index) => {
+                const isExpanded = expandedVariables.has(index);
+                const hasError = errors[`variable_${index}_name`] || errors[`variable_${index}_displayName`];
 
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <Select
-                          label="Variable Type"
-                          selectedKeys={new Set([variable.variableType])}
-                          onSelectionChange={(keys) => {
-                            const selected = Array.from(keys)[0] as "variable" | "secured_variable";
-                            updateVariableField(index, "variableType", selected);
-                          }}
-                          options={[
-                            { value: "variable", label: "Variable" },
-                            { value: "secured_variable", label: "Secured (Secret)" },
-                          ]}
-                        />
-                        <Select
-                          label="Data Type"
-                          selectedKeys={new Set([variable.dataType])}
-                          onSelectionChange={(keys) => {
-                            const selected = Array.from(keys)[0] as "string" | "number" | "boolean" | "json";
-                            updateVariableField(index, "dataType", selected);
-                          }}
-                          options={[
-                            { value: "string", label: "String" },
-                            { value: "number", label: "Number" },
-                            { value: "boolean", label: "Boolean" },
-                            { value: "json", label: "JSON" },
-                          ]}
-                        />
-                        <div className="flex items-end">
-                          <Switch
-                            isSelected={variable.required}
-                            onValueChange={(v) => updateVariableField(index, "required", v)}
-                          >
-                            Required
-                          </Switch>
+                return (
+                  <div
+                    key={index}
+                    className={`border rounded-lg overflow-hidden transition-all ${hasError ? "border-danger" : "border-default-200"
+                      }`}
+                  >
+                    {/* Collapsed Header - Always Visible */}
+                    <div
+                      className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-default-50 transition-colors ${isExpanded ? "bg-default-50 border-b border-default-200" : ""
+                        }`}
+                      onClick={() => toggleVariableExpanded(index)}
+                    >
+                      {/* Expand/Collapse Icon */}
+                      <button
+                        type="button"
+                        className="p-1 rounded hover:bg-default-100 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleVariableExpanded(index);
+                        }}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp size={16} className="text-muted-foreground" />
+                        ) : (
+                          <ChevronDown size={16} className="text-muted-foreground" />
+                        )}
+                      </button>
+
+                      {/* Variable Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-sm font-medium truncate">
+                            {variable.name || <span className="text-muted-foreground italic">VARIABLE_NAME</span>}
+                          </span>
+                          {variable.displayName && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <span className="text-sm text-muted-foreground truncate">
+                                {variable.displayName}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
 
-                      <Input
-                        label="Description"
-                        placeholder="Brief description of this variable"
-                        value={variable.description ?? ""}
-                        onValueChange={(v) => updateVariableField(index, "description", v)}
-                      />
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {variable.variableType !== "secured_variable" && (
-                          <Input
-                            label="Default Value"
-                            placeholder="Optional default value"
-                            value={variable.defaultValue ?? ""}
-                            onValueChange={(v) => updateVariableField(index, "defaultValue", v)}
-                          />
+                      {/* Badges */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {variable.variableType === "secured_variable" && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-warning-100 text-warning-700 rounded-full">
+                            <Shield size={12} />
+                            Secret
+                          </span>
                         )}
-                        <Input
-                          label="Placeholder"
-                          placeholder="Input placeholder text"
-                          value={variable.placeholder ?? ""}
-                          onValueChange={(v) => updateVariableField(index, "placeholder", v)}
-                        />
+                        <span className="px-2 py-0.5 text-xs font-medium bg-default-100 text-default-600 rounded-full">
+                          {variable.dataType}
+                        </span>
+                        {variable.required && (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-primary-100 text-primary-700 rounded-full">
+                            Required
+                          </span>
+                        )}
+                        {hasError && (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-danger-100 text-danger-700 rounded-full">
+                            Error
+                          </span>
+                        )}
                       </div>
+
+                      {/* Delete Button */}
+                      <Button
+                        variant="ghost"
+                        color="danger"
+                        size="sm"
+                        className="flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeVariable(index);
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
                     </div>
 
-                    <Button
-                      variant="ghost"
-                      color="danger"
-                      size="sm"
-                      onClick={() => removeVariable(index)}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
+                    {/* Expanded Content */}
+                    {isExpanded && (
+                      <div className="p-4 space-y-4 bg-default-50">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <Input
+                            label="Variable Name"
+                            placeholder="e.g., API_KEY"
+                            value={variable.name}
+                            onValueChange={(v) => updateVariableField(index, "name", v.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
+                            isInvalid={!!errors[`variable_${index}_name`]}
+                            errorMessage={errors[`variable_${index}_name`]}
+                            description="UPPERCASE with underscores only"
+                            isRequired
+                          />
+                          <Input
+                            label="Display Name"
+                            placeholder="e.g., API Key"
+                            value={variable.displayName}
+                            onValueChange={(v) => updateVariableField(index, "displayName", v)}
+                            isInvalid={!!errors[`variable_${index}_displayName`]}
+                            errorMessage={errors[`variable_${index}_displayName`]}
+                            isRequired
+                          />
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <Select
+                            label="Variable Type"
+                            selectedKeys={new Set([variable.variableType])}
+                            onSelectionChange={(keys) => {
+                              const selected = Array.from(keys)[0] as "variable" | "secured_variable";
+                              updateVariableField(index, "variableType", selected);
+                            }}
+                            options={[
+                              { value: "variable", label: "Variable" },
+                              { value: "secured_variable", label: "Secured (Secret)" },
+                            ]}
+                          />
+                          <Select
+                            label="Data Type"
+                            selectedKeys={new Set([variable.dataType])}
+                            onSelectionChange={(keys) => {
+                              const selected = Array.from(keys)[0] as "string" | "number" | "boolean" | "json";
+                              updateVariableField(index, "dataType", selected);
+                            }}
+                            options={[
+                              { value: "string", label: "String" },
+                              { value: "number", label: "Number" },
+                              { value: "boolean", label: "Boolean" },
+                              { value: "json", label: "JSON" },
+                            ]}
+                          />
+                          <div className="flex items-end">
+                            <Switch
+                              isSelected={variable.required}
+                              onValueChange={(v) => updateVariableField(index, "required", v)}
+                            >
+                              Required
+                            </Switch>
+                          </div>
+                        </div>
+
+                        <Input
+                          label="Description"
+                          placeholder="Brief description of this variable"
+                          value={variable.description ?? ""}
+                          onValueChange={(v) => updateVariableField(index, "description", v)}
+                        />
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {variable.variableType !== "secured_variable" && (
+                            <Input
+                              label="Default Value"
+                              placeholder="Optional default value"
+                              value={variable.defaultValue ?? ""}
+                              onValueChange={(v) => updateVariableField(index, "defaultValue", v)}
+                            />
+                          )}
+                          <Input
+                            label="Placeholder"
+                            placeholder="Input placeholder text"
+                            value={variable.placeholder ?? ""}
+                            onValueChange={(v) => updateVariableField(index, "placeholder", v)}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
@@ -737,13 +830,24 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
     const agent = formData.agents[agentIndex];
     if (!agent) return null;
 
-    const showSupervisorOptions = formData.packageType === "multi_agent";
-    const workerAgents = formData.agents
-      .filter((a, i) => i !== agentIndex && a.agentType === "worker")
-      .map((a) => ({ value: a.agentIdentifier, label: a.name }));
-
     return (
       <div className="space-y-4">
+        {/* Avatar Picker */}
+        <div className="flex items-center gap-4">
+          <AgentAvatarPicker
+            value={agent.avatar_url || undefined}
+            onChange={(url) => updateAgentField(agentIndex, "avatar_url", url ?? "")}
+            agentName={agent.name}
+            size="lg"
+          />
+          <div className="flex-1">
+            <p className="text-sm font-medium">Agent Avatar</p>
+            <p className="text-xs text-muted-foreground">
+              Click to select a preset avatar or upload a custom one
+            </p>
+          </div>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2">
           <Input
             label="Agent Name"
@@ -763,51 +867,34 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
           />
         </div>
 
-        {showSupervisorOptions && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select
-              label="Agent Type"
-              selectedKeys={new Set([agent.agentType])}
-              onSelectionChange={(keys) => {
-                const selected = Array.from(keys)[0] as "worker" | "supervisor";
-                updateAgentField(agentIndex, "agentType", selected);
-              }}
-              options={agentTypeOptions}
-              description="Supervisors can delegate tasks to worker agents"
-            />
-            {agent.agentType === "supervisor" && workerAgents.length > 0 && (
-              <Select
-                label="Managed Workers"
-                selectedKeys={new Set(agent.managedAgentIds ?? [])}
-                onSelectionChange={(keys) => {
-                  updateAgentField(agentIndex, "managedAgentIds", Array.from(keys) as string[]);
-                }}
-                options={workerAgents}
-                description="Select worker agents this supervisor manages"
-              />
-            )}
-          </div>
-        )}
+        <Textarea
+          label="Duties (Routing Prompt)"
+          placeholder="Brief description of this agent's responsibilities for routing decisions..."
+          value={agent.routing_prompt ?? ""}
+          onValueChange={(v) => updateAgentField(agentIndex, "routing_prompt", v)}
+          minRows={2}
+          description="Used by the supervisor to route conversations to the right agent"
+        />
 
         <div className="grid gap-4 md:grid-cols-2">
           <Select
             label="Model"
-            selectedKeys={new Set([agent.modelId])}
+            selectedKeys={new Set([agent.default_model_id])}
             onSelectionChange={(keys) => {
               const selected = Array.from(keys)[0] as string;
-              updateAgentField(agentIndex, "modelId", selected ?? "gpt-4o-mini");
+              updateAgentField(agentIndex, "default_model_id", selected ?? "gpt-5-mini");
             }}
-            options={modelOptions}
+            options={[...MODEL_OPTIONS]}
           />
           <div>
             <Slider
-              label={`Temperature: ${agent.temperature}%`}
+              label={`Temperature: ${agent.default_temperature}%`}
               min={0}
               max={100}
               step={1}
-              value={[agent.temperature]}
+              value={[agent.default_temperature]}
               onValueChange={(values) =>
-                updateAgentField(agentIndex, "temperature", values[0] ?? 0)
+                updateAgentField(agentIndex, "default_temperature", values[0] ?? 0)
               }
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -823,11 +910,11 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
           </label>
           <Textarea
             placeholder="Enter the system prompt for this agent..."
-            value={agent.systemPrompt}
-            onValueChange={(v) => updateAgentField(agentIndex, "systemPrompt", v)}
+            value={agent.default_system_prompt}
+            onValueChange={(v) => updateAgentField(agentIndex, "default_system_prompt", v)}
             minRows={6}
-            isInvalid={!!errors[`agent_${agentIndex}_systemPrompt`]}
-            errorMessage={errors[`agent_${agentIndex}_systemPrompt`]}
+            isInvalid={!!errors[`agent_${agentIndex}_default_system_prompt`]}
+            errorMessage={errors[`agent_${agentIndex}_default_system_prompt`]}
           />
         </div>
 
@@ -837,10 +924,10 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
             Agent Identifier
           </label>
           <code className="text-sm bg-default-100 px-3 py-2 rounded-lg block">
-            {agent.agentIdentifier}
+            {agent.agent_identifier}
           </code>
           <p className="text-xs text-muted-foreground mt-1">
-            Use this ID in your code: <code>createBuzziAgent({"{"} agentId: &quot;{agent.agentIdentifier}&quot; {"}"})</code>
+            Use this ID in your code: <code>createBuzziAgent({"{"} agentId: &quot;{agent.agent_identifier}&quot; {"}"})</code>
           </p>
         </div>
 

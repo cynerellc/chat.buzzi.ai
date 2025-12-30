@@ -1,21 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
-  Link as LinkIcon,
-  FileType,
-  Plus,
   Search,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  MoreVertical,
-  Trash2,
-  Eye,
-  MessageSquareText,
+  RefreshCw,
+  FolderPlus,
 } from "lucide-react";
 
 import {
@@ -23,16 +14,28 @@ import {
   Card,
   CardBody,
   Select,
-  Badge,
-  Dropdown,
-  type DropdownMenuItemData,
-  Tabs,
-  type TabItem,
   Input,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
   addToast,
 } from "@/components/ui";
-import { useKnowledgeSources, useFaqs } from "@/hooks/company";
+import { useSetPageTitle } from "@/contexts/page-context";
+import {
+  useKnowledgeSources,
+  useFaqs,
+  useKnowledgeCategories,
+  useCreateKnowledgeCategory,
+  useDeleteKnowledgeCategory,
+  useReindexAll,
+} from "@/hooks/company";
 import type { KnowledgeFilters } from "@/hooks/company/useKnowledge";
+
+import { CategorySection } from "@/components/company-admin/knowledge/category-section";
+import { CategoryModal } from "@/components/company-admin/knowledge/category-modal";
+import { ReindexModal } from "@/components/company-admin/knowledge/reindex-modal";
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All Types" },
@@ -49,60 +52,115 @@ const STATUS_OPTIONS = [
   { value: "failed", label: "Failed" },
 ];
 
-type StatusConfig = {
-  label: string;
-  variant: "default" | "success" | "warning" | "danger" | "info";
-  icon: React.ComponentType<{ className?: string }>;
-};
-
-const defaultStatusConfig: StatusConfig = { label: "Pending", variant: "default", icon: Clock };
-
-const statusConfig: Record<string, StatusConfig> = {
-  pending: defaultStatusConfig,
-  processing: { label: "Processing", variant: "info", icon: Loader2 },
-  indexed: { label: "Indexed", variant: "success", icon: CheckCircle },
-  failed: { label: "Failed", variant: "danger", icon: AlertCircle },
-};
-
-const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  file: FileText,
-  url: LinkIcon,
-  text: FileType,
-};
-
-function getStatusConfig(status: string): StatusConfig {
-  return statusConfig[status] ?? defaultStatusConfig;
-}
-
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toString();
-}
-
 export default function KnowledgePage() {
+  useSetPageTitle("Knowledge Base");
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<string>("sources");
   const [filters, setFilters] = useState<KnowledgeFilters>({
     page: 1,
-    limit: 20,
+    limit: 100, // Load more to group by category
   });
   const [searchValue, setSearchValue] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(["uncategorized"])
+  );
+  const [isReindexModalOpen, setIsReindexModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [deleteSourceModal, setDeleteSourceModal] = useState<{
+    isOpen: boolean;
+    sourceId: string;
+    sourceName: string;
+    chunkCount: number;
+  }>({ isOpen: false, sourceId: "", sourceName: "", chunkCount: 0 });
+  const [deleteCategoryModal, setDeleteCategoryModal] = useState<{
+    isOpen: boolean;
+    categoryName: string;
+    sourceCount: number;
+    faqCount: number;
+    chunkCount: number;
+  }>({ isOpen: false, categoryName: "", sourceCount: 0, faqCount: 0, chunkCount: 0 });
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const { sources, pagination, isLoading, mutate } = useKnowledgeSources(filters);
+  // Data fetching
+  const { sources, isLoading, mutate } = useKnowledgeSources(filters);
   const { faqs, isLoading: isLoadingFaqs, mutate: mutateFaqs } = useFaqs();
+  const { categories, mutate: mutateCategories } = useKnowledgeCategories();
+  const { createCategory, isCreating } = useCreateKnowledgeCategory();
+  const { deleteCategory } = useDeleteKnowledgeCategory();
+  const { reindex, isReindexing, result: reindexResult } = useReindexAll();
+
+  // Group sources by category
+  const sourcesByCategory = useMemo(() => {
+    const grouped: Record<string, typeof sources> = {};
+
+    // Initialize with all categories
+    categories.forEach((cat) => {
+      grouped[cat.name] = [];
+    });
+    grouped["uncategorized"] = [];
+
+    // Group sources by category name
+    sources.forEach((source) => {
+      const key = source.category || "uncategorized";
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(source);
+    });
+
+    // Filter by search
+    if (searchValue) {
+      const search = searchValue.toLowerCase();
+      Object.keys(grouped).forEach((key) => {
+        const items = grouped[key];
+        if (items) {
+          grouped[key] = items.filter(
+            (s) =>
+              s.name.toLowerCase().includes(search) ||
+              s.description?.toLowerCase().includes(search)
+          );
+        }
+      });
+    }
+
+    return grouped;
+  }, [sources, categories, searchValue]);
+
+  // Group FAQs by category
+  const faqsByCategory = useMemo(() => {
+    const grouped: Record<string, typeof faqs> = {};
+
+    // Initialize with all categories
+    categories.forEach((cat) => {
+      grouped[cat.name] = [];
+    });
+    grouped["uncategorized"] = [];
+
+    // Group FAQs
+    faqs.forEach((faq) => {
+      const key = faq.category || "uncategorized";
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(faq);
+    });
+
+    // Filter by search
+    if (searchValue) {
+      const search = searchValue.toLowerCase();
+      Object.keys(grouped).forEach((key) => {
+        const items = grouped[key];
+        if (items) {
+          grouped[key] = items.filter(
+            (f) =>
+              f.question.toLowerCase().includes(search) ||
+              f.answer.toLowerCase().includes(search)
+          );
+        }
+      });
+    }
+
+    return grouped;
+  }, [faqs, categories, searchValue]);
 
   const handleFilterChange = (key: keyof KnowledgeFilters, value: string) => {
     setFilters((prev) => ({
@@ -116,19 +174,37 @@ export default function KnowledgePage() {
     router.push(`/knowledge/${sourceId}`);
   };
 
-  const handleDeleteSource = async (sourceId: string) => {
+  const handleDeleteSourceClick = (sourceId: string) => {
+    const source = sources.find((s) => s.id === sourceId);
+    if (source) {
+      setDeleteSourceModal({
+        isOpen: true,
+        sourceId: source.id,
+        sourceName: source.name,
+        chunkCount: source.chunkCount,
+      });
+    }
+  };
+
+  const handleConfirmDeleteSource = async () => {
+    if (!deleteSourceModal.sourceId) return;
+
+    setIsDeleting(true);
     try {
-      const response = await fetch(`/api/company/knowledge/${sourceId}`, {
+      const response = await fetch(`/api/company/knowledge/${deleteSourceModal.sourceId}`, {
         method: "DELETE",
       });
       if (response.ok) {
         addToast({ title: "Knowledge source deleted", color: "success" });
         mutate();
+        setDeleteSourceModal({ isOpen: false, sourceId: "", sourceName: "", chunkCount: 0 });
       } else {
         throw new Error("Failed to delete");
       }
     } catch {
       addToast({ title: "Failed to delete knowledge source", color: "danger" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -148,10 +224,98 @@ export default function KnowledgePage() {
     }
   };
 
-  const tabItems: TabItem[] = [
-    { key: "sources", label: "Knowledge Sources" },
-    { key: "faqs", label: "FAQs" },
-  ];
+  const handleAddCategory = async (name: string) => {
+    const result = await createCategory({ name });
+    if (result?.category) {
+      addToast({ title: "Category created", color: "success" });
+      mutateCategories();
+      // Expand the new category
+      setExpandedCategories((prev) => new Set([...prev, result.category.name]));
+    }
+  };
+
+  const handleDeleteCategoryClick = (categoryName: string) => {
+    const category = categories.find((c) => c.name === categoryName);
+    const categorySources = sourcesByCategory[categoryName] || [];
+    const categoryFaqs = faqsByCategory[categoryName] || [];
+
+    // Calculate total chunks from all sources in this category
+    const totalChunks = categorySources.reduce((sum, s) => sum + s.chunkCount, 0);
+
+    setDeleteCategoryModal({
+      isOpen: true,
+      categoryName,
+      sourceCount: category?.sourceCount ?? categorySources.length,
+      faqCount: category?.faqCount ?? categoryFaqs.length,
+      chunkCount: totalChunks,
+    });
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!deleteCategoryModal.categoryName) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteCategory({ name: deleteCategoryModal.categoryName });
+      addToast({ title: "Category deleted", color: "success" });
+      mutateCategories();
+      mutate(); // Refresh sources as they become uncategorized
+      mutateFaqs(); // Refresh FAQs as they become uncategorized
+      setDeleteCategoryModal({ isOpen: false, categoryName: "", sourceCount: 0, faqCount: 0, chunkCount: 0 });
+    } catch {
+      addToast({ title: "Failed to delete category", color: "danger" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleCategory = (categoryName: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryName)) {
+        next.delete(categoryName);
+      } else {
+        next.add(categoryName);
+      }
+      return next;
+    });
+  };
+
+  const handleAddSource = (categoryName?: string) => {
+    const url = categoryName
+      ? `/knowledge/new?category=${encodeURIComponent(categoryName)}`
+      : "/knowledge/new";
+    router.push(url);
+  };
+
+  const handleAddFaq = (categoryName?: string) => {
+    const url = categoryName
+      ? `/knowledge/new?type=faq&category=${encodeURIComponent(categoryName)}`
+      : "/knowledge/new?type=faq";
+    router.push(url);
+  };
+
+  const handleEditFaq = (faqId: string) => {
+    router.push(`/knowledge/new?type=faq&edit=${faqId}`);
+  };
+
+  const handleReindex = async () => {
+    try {
+      await reindex();
+      mutate();
+      mutateFaqs();
+    } catch {
+      addToast({ title: "Failed to reindex", color: "danger" });
+    }
+  };
+
+  // Count totals for reindex modal
+  const indexedSourceCount = sources.filter(
+    (s) => s.status === "indexed" || s.status === "failed"
+  ).length;
+
+  // Check if there's any content
+  const hasContent = sources.length > 0 || faqs.length > 0 || categories.length > 0;
 
   return (
     <div className="space-y-6">
@@ -163,286 +327,243 @@ export default function KnowledgePage() {
             Manage documents, URLs, and FAQs that power your AI agents
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Button
             variant="outline"
-            leftIcon={MessageSquareText}
-            onPress={() => router.push("/knowledge/new?type=faq")}
+            leftIcon={RefreshCw}
+            onPress={() => setIsReindexModalOpen(true)}
           >
-            Add FAQ
+            Reindex All
           </Button>
           <Button
             color="primary"
-            leftIcon={Plus}
-            onPress={() => router.push("/knowledge/new")}
+            leftIcon={FolderPlus}
+            onPress={() => setIsCategoryModalOpen(true)}
           >
-            Add Source
+            Add Category
           </Button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs
-        items={tabItems}
-        selectedKey={activeTab}
-        onSelectionChange={(key) => setActiveTab(key as string)}
-      />
-
-      {activeTab === "sources" ? (
-        <>
-          {/* Filters */}
-          <Card>
-            <CardBody>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex-1 min-w-[200px]">
-                  <Input
-                    placeholder="Search sources..."
-                    value={searchValue}
-                    onValueChange={setSearchValue}
-                    startContent={<Search className="h-4 w-4 text-muted-foreground" />}
-                    isClearable
-                    onClear={() => setSearchValue("")}
-                  />
-                </div>
-
-                <Select
-                  options={TYPE_OPTIONS}
-                  selectedKeys={new Set([filters.type || "all"])}
-                  onSelectionChange={(keys) => {
-                    const selected = Array.from(keys)[0];
-                    handleFilterChange("type", selected as string);
-                  }}
-                  className="w-[150px]"
-                />
-
-                <Select
-                  options={STATUS_OPTIONS}
-                  selectedKeys={new Set([filters.status || "all"])}
-                  onSelectionChange={(keys) => {
-                    const selected = Array.from(keys)[0];
-                    handleFilterChange("status", selected as string);
-                  }}
-                  className="w-[150px]"
+      {/* Filters */}
+      {hasContent && (
+        <Card>
+          <CardBody>
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1 min-w-[200px]">
+                <Input
+                  placeholder="Search sources and FAQs..."
+                  value={searchValue}
+                  onValueChange={setSearchValue}
+                  startContent={
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                  }
+                  isClearable
+                  onClear={() => setSearchValue("")}
                 />
               </div>
-            </CardBody>
-          </Card>
 
-          {/* Sources List */}
-          <Card>
-            <CardBody className="p-0">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-muted-foreground">Loading sources...</div>
-                </div>
-              ) : sources.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground font-medium">No knowledge sources</p>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    Add documents, URLs, or text to train your AI agents
-                  </p>
-                  <Button
-                    color="primary"
-                    leftIcon={Plus}
-                    onPress={() => router.push("/knowledge/new")}
-                  >
-                    Add Your First Source
-                  </Button>
-                </div>
-              ) : (
-                <div className="divide-y divide-divider">
-                  {sources.map((source) => {
-                    const status = getStatusConfig(source.status);
-                    const StatusIcon = status.icon;
-                    const TypeIcon = typeIcons[source.type] || FileText;
+              <Select
+                options={TYPE_OPTIONS}
+                selectedKeys={new Set([filters.type || "all"])}
+                onSelectionChange={(keys) => {
+                  const selected = Array.from(keys)[0];
+                  handleFilterChange("type", selected as string);
+                }}
+                className="w-[150px]"
+              />
 
-                    const dropdownItems: DropdownMenuItemData[] = [
-                      { key: "view", label: "View Details", icon: Eye },
-                      { key: "delete", label: "Delete", icon: Trash2, isDanger: true },
-                    ];
-
-                    return (
-                      <div
-                        key={source.id}
-                        className="p-4 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          {/* Icon */}
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                            <TypeIcon className="h-5 w-5" />
-                          </div>
-
-                          {/* Content */}
-                          <button
-                            onClick={() => handleSourceClick(source.id)}
-                            className="flex-1 text-left"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{source.name}</span>
-                              <Badge variant={status.variant}>
-                                <StatusIcon className={`h-3 w-3 mr-1 ${source.status === "processing" ? "animate-spin" : ""}`} />
-                                {status.label}
-                              </Badge>
-                            </div>
-                            {source.description && (
-                              <p className="text-sm text-muted-foreground truncate mt-1">
-                                {source.description}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                              <span className="capitalize">{source.type}</span>
-                              <span>{source.chunkCount} chunks</span>
-                              <span>{formatTokenCount(source.tokenCount)} tokens</span>
-                              <span>Added {formatDate(source.createdAt)}</span>
-                            </div>
-                          </button>
-
-                          {/* Actions */}
-                          <Dropdown
-                            trigger={
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            }
-                            items={dropdownItems}
-                            onAction={(key) => {
-                              if (key === "view") {
-                                handleSourceClick(source.id);
-                              } else if (key === "delete") {
-                                handleDeleteSource(source.id);
-                              }
-                            }}
-                          />
-                        </div>
-
-                        {/* Error message */}
-                        {source.processingError && (
-                          <div className="mt-2 p-2 rounded bg-danger-50 text-danger-600 text-sm">
-                            Error: {source.processingError}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </>
-      ) : (
-        <>
-          {/* FAQs List */}
-          <Card>
-            <CardBody className="p-0">
-              {isLoadingFaqs ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-muted-foreground">Loading FAQs...</div>
-                </div>
-              ) : faqs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <MessageSquareText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground font-medium">No FAQs yet</p>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    Add frequently asked questions for quick, accurate responses
-                  </p>
-                  <Button
-                    color="primary"
-                    leftIcon={Plus}
-                    onPress={() => router.push("/knowledge/new?type=faq")}
-                  >
-                    Add Your First FAQ
-                  </Button>
-                </div>
-              ) : (
-                <div className="divide-y divide-divider">
-                  {faqs.map((faq) => {
-                    const dropdownItems: DropdownMenuItemData[] = [
-                      { key: "edit", label: "Edit", icon: Eye },
-                      { key: "delete", label: "Delete", icon: Trash2, isDanger: true },
-                    ];
-
-                    return (
-                      <div
-                        key={faq.id}
-                        className="p-4 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-start gap-4">
-                          {/* Content */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{faq.question}</span>
-                              {faq.category && (
-                                <Badge variant="default">{faq.category}</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {faq.answer}
-                            </p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                              <span>Used {faq.usageCount} times</span>
-                              <span>
-                                {faq.helpfulCount} helpful / {faq.notHelpfulCount} not helpful
-                              </span>
-                              <span>Priority: {faq.priority}</span>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <Dropdown
-                            trigger={
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            }
-                            items={dropdownItems}
-                            onAction={(key) => {
-                              if (key === "edit") {
-                                router.push(`/knowledge/new?type=faq&edit=${faq.id}`);
-                              } else if (key === "delete") {
-                                handleDeleteFaq(faq.id);
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </>
+              <Select
+                options={STATUS_OPTIONS}
+                selectedKeys={new Set([filters.status || "all"])}
+                onSelectionChange={(keys) => {
+                  const selected = Array.from(keys)[0];
+                  handleFilterChange("status", selected as string);
+                }}
+                className="w-[150px]"
+              />
+            </div>
+          </CardBody>
+        </Card>
       )}
 
-      {/* Pagination for sources */}
-      {activeTab === "sources" && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-            {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-            {pagination.total} sources
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onPress={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) - 1 }))}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page >= pagination.totalPages}
-              onPress={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
-            >
-              Next
-            </Button>
-          </div>
+      {/* Category Sections */}
+      {isLoading || isLoadingFaqs ? (
+        <Card>
+          <CardBody>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-muted-foreground">Loading...</div>
+            </div>
+          </CardBody>
+        </Card>
+      ) : !hasContent ? (
+        <Card>
+          <CardBody>
+            <div className="flex flex-col items-center justify-center py-12">
+              <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground font-medium">
+                No knowledge sources
+              </p>
+              <p className="text-muted-foreground text-sm mb-4">
+                Create a category and add documents, URLs, or FAQs to train
+                your AI agents
+              </p>
+              <Button
+                color="primary"
+                leftIcon={FolderPlus}
+                onPress={() => setIsCategoryModalOpen(true)}
+              >
+                Create Your First Category
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {/* Render categories */}
+          {categories.map((category) => (
+            <CategorySection
+              key={category.name}
+              category={category}
+              sources={sourcesByCategory[category.name] || []}
+              faqs={faqsByCategory[category.name] || []}
+              isExpanded={expandedCategories.has(category.name)}
+              onToggle={() => toggleCategory(category.name)}
+              onAddSource={handleAddSource}
+              onAddFaq={handleAddFaq}
+              onViewSource={handleSourceClick}
+              onEditFaq={handleEditFaq}
+              onDeleteSource={handleDeleteSourceClick}
+              onDeleteFaq={handleDeleteFaq}
+              onDeleteCategory={() => handleDeleteCategoryClick(category.name)}
+            />
+          ))}
+
+          {/* Uncategorized section */}
+          {((sourcesByCategory["uncategorized"]?.length ?? 0) > 0 ||
+            (faqsByCategory["uncategorized"]?.length ?? 0) > 0 ||
+            categories.length === 0) && (
+            <CategorySection
+              category={null}
+              sources={sourcesByCategory["uncategorized"] || []}
+              faqs={faqsByCategory["uncategorized"] || []}
+              isExpanded={expandedCategories.has("uncategorized")}
+              onToggle={() => toggleCategory("uncategorized")}
+              onAddSource={() => handleAddSource()}
+              onAddFaq={() => handleAddFaq()}
+              onViewSource={handleSourceClick}
+              onEditFaq={handleEditFaq}
+              onDeleteSource={handleDeleteSourceClick}
+              onDeleteFaq={handleDeleteFaq}
+            />
+          )}
         </div>
       )}
+
+      {/* Category Creation Modal */}
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSubmit={handleAddCategory}
+        isSubmitting={isCreating}
+      />
+
+      {/* Reindex Modal */}
+      <ReindexModal
+        isOpen={isReindexModalOpen}
+        onClose={() => setIsReindexModalOpen(false)}
+        onConfirm={handleReindex}
+        isReindexing={isReindexing}
+        result={reindexResult}
+        sourceCount={indexedSourceCount}
+        faqCount={faqs.length}
+      />
+
+      {/* Delete Source Confirmation Modal */}
+      <Modal
+        isOpen={deleteSourceModal.isOpen}
+        onClose={() => setDeleteSourceModal({ isOpen: false, sourceId: "", sourceName: "", chunkCount: 0 })}
+      >
+        <ModalContent>
+          <ModalHeader>Delete Knowledge Source</ModalHeader>
+          <ModalBody>
+            <p>
+              Are you sure you want to delete &quot;{deleteSourceModal.sourceName}&quot;? This action cannot be undone.
+            </p>
+            {deleteSourceModal.chunkCount > 0 && (
+              <p className="text-muted-foreground text-sm mt-2">
+                All {deleteSourceModal.chunkCount} chunks and vector embeddings will be removed from the database.
+              </p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              onPress={() => setDeleteSourceModal({ isOpen: false, sourceId: "", sourceName: "", chunkCount: 0 })}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="danger"
+              onPress={handleConfirmDeleteSource}
+              isLoading={isDeleting}
+            >
+              Delete Source
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Delete Category Confirmation Modal */}
+      <Modal
+        isOpen={deleteCategoryModal.isOpen}
+        onClose={() => setDeleteCategoryModal({ isOpen: false, categoryName: "", sourceCount: 0, faqCount: 0, chunkCount: 0 })}
+      >
+        <ModalContent>
+          <ModalHeader>Delete Category</ModalHeader>
+          <ModalBody>
+            <p>
+              Are you sure you want to delete the category &quot;{deleteCategoryModal.categoryName}&quot;?
+            </p>
+            {(deleteCategoryModal.sourceCount > 0 || deleteCategoryModal.faqCount > 0 || deleteCategoryModal.chunkCount > 0) && (
+              <div className="mt-4 p-3 rounded-lg bg-danger-50 border border-danger-200">
+                <p className="text-sm font-medium text-danger-700 mb-2">
+                  The following data will be permanently deleted:
+                </p>
+                <ul className="text-sm text-danger-600 space-y-1">
+                  {deleteCategoryModal.sourceCount > 0 && (
+                    <li>• {deleteCategoryModal.sourceCount} knowledge source{deleteCategoryModal.sourceCount !== 1 ? "s" : ""}</li>
+                  )}
+                  {deleteCategoryModal.faqCount > 0 && (
+                    <li>• {deleteCategoryModal.faqCount} FAQ item{deleteCategoryModal.faqCount !== 1 ? "s" : ""}</li>
+                  )}
+                  {deleteCategoryModal.chunkCount > 0 && (
+                    <li>• {deleteCategoryModal.chunkCount} chunk{deleteCategoryModal.chunkCount !== 1 ? "s" : ""} from vector store</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            <p className="text-muted-foreground text-sm mt-3">
+              This action cannot be undone. All sources, FAQs, and their vector embeddings will be permanently removed.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              onPress={() => setDeleteCategoryModal({ isOpen: false, categoryName: "", sourceCount: 0, faqCount: 0, chunkCount: 0 })}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="danger"
+              onPress={handleConfirmDeleteCategory}
+              isLoading={isDeleting}
+            >
+              Delete Category
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

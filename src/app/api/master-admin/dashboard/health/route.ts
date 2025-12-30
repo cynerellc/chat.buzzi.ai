@@ -87,7 +87,7 @@ async function checkQueue(): Promise<ServiceHealth> {
 
 async function checkStorage(): Promise<ServiceHealth> {
   // Check if storage is configured
-  const hasStorage = !!process.env.SUPABASE_URL;
+  const hasStorage = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   if (!hasStorage) {
     return {

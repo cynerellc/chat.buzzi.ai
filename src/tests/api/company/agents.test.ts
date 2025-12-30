@@ -51,13 +51,22 @@ describe("Company Agents API", () => {
   const mockAgent = {
     id: "agent-123",
     companyId: "company-123",
+    packageType: "single_agent",
     name: "Test Agent",
     description: "A test agent",
     type: "support",
     status: "active",
-    systemPrompt: "You are a helpful assistant",
-    modelId: "gpt-4o-mini",
-    temperature: 70,
+    agentsList: [
+      {
+        agent_identifier: "main",
+        name: "Test Agent",
+        agent_type: "worker",
+        default_system_prompt: "You are a helpful assistant",
+        default_model_id: "gpt-4o-mini",
+        default_temperature: 70,
+        sort_order: 0,
+      },
+    ],
     totalConversations: 10,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -222,8 +231,6 @@ describe("Company Agents API", () => {
             ...mockAgent,
             type: "custom",
             status: "draft",
-            modelId: "gpt-4o-mini",
-            temperature: 70,
           },
         ])
       );
@@ -247,7 +254,7 @@ describe("Company Agents API", () => {
 
       expect(response.status).toBe(201);
       expect(data.agent.status).toBe("draft");
-      expect(data.agent.modelId).toBe("gpt-4o-mini");
+      expect(data.agent.agentsList[0].default_model_id).toBe("gpt-4o-mini");
     });
   });
 });

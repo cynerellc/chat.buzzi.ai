@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { conversations, endUsers, messages, escalations } from "@/lib/db/schema/conversations";
-import { agents } from "@/lib/db/schema/agents";
+import { agents } from "@/lib/db/schema/chatbots";
 import { users } from "@/lib/db/schema/users";
 import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, or, desc, sql, isNull, inArray } from "drizzle-orm";
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by agent
     if (params.agentId) {
-      conditions.push(eq(conversations.agentId, params.agentId));
+      conditions.push(eq(conversations.chatbotId, params.agentId));
     }
 
     // Calculate offset
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
         agent: {
           id: agents.id,
           name: agents.name,
-          avatarUrl: agents.avatarUrl,
+          agentsList: agents.agentsList,
         },
         // Assigned user info
         assignedUser: {
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
       })
       .from(conversations)
       .leftJoin(endUsers, eq(conversations.endUserId, endUsers.id))
-      .leftJoin(agents, eq(conversations.agentId, agents.id))
+      .leftJoin(agents, eq(conversations.chatbotId, agents.id))
       .leftJoin(users, eq(conversations.assignedUserId, users.id))
       .where(and(...conditions))
       .orderBy(desc(conversations.lastMessageAt))
@@ -190,6 +190,10 @@ export async function GET(request: NextRequest) {
       const escalation = escalationMap.get(conv.id);
       const metadata = conv.metadata as Record<string, unknown> | null;
 
+      // Extract avatarUrl from agentsList
+      const agentsListData = (conv.agent?.agentsList as { avatar_url?: string }[] | null) || [];
+      const agentAvatarUrl = agentsListData[0]?.avatar_url || null;
+
       return {
         id: conv.id,
         status: conv.status,
@@ -201,7 +205,11 @@ export async function GET(request: NextRequest) {
         createdAt: conv.createdAt,
         lastMessageAt: conv.lastMessageAt,
         endUser: conv.endUser,
-        agent: conv.agent,
+        agent: conv.agent ? {
+          id: conv.agent.id,
+          name: conv.agent.name,
+          avatarUrl: agentAvatarUrl,
+        } : null,
         assignedUser: conv.assignedUser,
         lastMessage: lastMessage
           ? {

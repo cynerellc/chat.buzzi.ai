@@ -5,7 +5,7 @@ import { Search } from "lucide-react";
 import { Input, Select } from "@/components/ui";
 
 const actionOptions = [
-  { value: "", label: "All Actions" },
+  { value: "all", label: "All Actions" },
   { value: "company", label: "Company Actions" },
   { value: "user", label: "User Actions" },
   { value: "agent", label: "Agent Actions" },
@@ -16,7 +16,7 @@ const actionOptions = [
 ];
 
 const resourceOptions = [
-  { value: "", label: "All Resources" },
+  { value: "all", label: "All Resources" },
   { value: "company", label: "Company" },
   { value: "user", label: "User" },
   { value: "agent", label: "Agent" },
@@ -57,10 +57,10 @@ export function AuditLogsFilters({
       <div className="flex gap-2">
         <Select
           aria-label="Filter by action"
-          selectedKeys={new Set([action])}
+          selectedKeys={new Set([action || "all"])}
           onSelectionChange={(keys) => {
             const selected = Array.from(keys)[0] as string;
-            onActionChange(selected ?? "");
+            onActionChange(selected === "all" ? "" : selected);
           }}
           options={actionOptions}
           className="w-40"
@@ -68,10 +68,10 @@ export function AuditLogsFilters({
 
         <Select
           aria-label="Filter by resource"
-          selectedKeys={new Set([resource])}
+          selectedKeys={new Set([resource || "all"])}
           onSelectionChange={(keys) => {
             const selected = Array.from(keys)[0] as string;
-            onResourceChange(selected ?? "");
+            onResourceChange(selected === "all" ? "" : selected);
           }}
           options={resourceOptions}
           className="w-40"

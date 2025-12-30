@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
+import { PageProvider, usePageTitle } from "@/contexts/page-context";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 
@@ -11,55 +12,54 @@ import { MobileSidebar, Sidebar, useSidebar, type SidebarProps } from "./sidebar
 export interface MainLayoutProps {
   children: ReactNode;
   sidebarProps: SidebarProps;
-  headerProps?: Omit<HeaderProps, "onMenuClick">;
   className?: string;
 }
 
 export function MainLayout({
   children,
   sidebarProps,
-  headerProps,
   className,
 }: MainLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Desktop sidebar */}
-      {!isMobile && <Sidebar {...sidebarProps} />}
+    <PageProvider>
+      <div className="min-h-screen bg-background">
+        {/* Desktop sidebar */}
+        {!isMobile && <Sidebar {...sidebarProps} />}
 
-      {/* Mobile sidebar */}
-      {isMobile && (
-        <MobileSidebar
-          {...sidebarProps}
-          isOpen={isMobileMenuOpen}
-          onClose={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+        {/* Mobile sidebar */}
+        {isMobile && (
+          <MobileSidebar
+            {...sidebarProps}
+            isOpen={isMobileMenuOpen}
+            onClose={() => setIsMobileMenuOpen(false)}
+          />
+        )}
 
-      {/* Main content area */}
-      <MainContent
-        headerProps={{
-          ...headerProps,
-          onMenuClick: () => setIsMobileMenuOpen(true),
-        }}
-        className={className}
-      >
-        {children}
-      </MainContent>
-    </div>
+        {/* Main content area */}
+        <MainContent
+          onMenuClick={() => setIsMobileMenuOpen(true)}
+          className={className}
+        >
+          {children}
+        </MainContent>
+      </div>
+    </PageProvider>
   );
 }
 
 // Content wrapper that responds to sidebar state
 interface MainContentProps {
   children: ReactNode;
-  headerProps?: HeaderProps;
+  onMenuClick?: () => void;
   className?: string;
 }
 
-function MainContent({ children, headerProps, className }: MainContentProps) {
+function MainContent({ children, onMenuClick, className }: MainContentProps) {
+  const { pageTitle } = usePageTitle();
+
   // Get sidebar state if available
   let isCollapsed = false;
   try {
@@ -72,14 +72,32 @@ function MainContent({ children, headerProps, className }: MainContentProps) {
   return (
     <div
       className={cn(
-        "transition-all duration-200",
+        "transition-all duration-200 min-h-screen flex flex-col",
         // Adjust margin based on sidebar state (desktop only)
         "lg:ml-64",
         isCollapsed && "lg:ml-[72px]"
       )}
     >
-      {headerProps && <Header {...headerProps} />}
-      <main className={cn("p-4 lg:p-6", className)}>{children}</main>
+      <Header pageTitle={pageTitle} onMenuClick={onMenuClick} />
+
+      {/* Content area with subtle grid pattern */}
+      <div className="relative flex-1">
+        {/* Subtle grid background */}
+        <div className="absolute inset-0 content-grid-pattern opacity-30 pointer-events-none" />
+
+        {/* Corner accents for content area */}
+        <div className="absolute top-4 left-4 w-3 h-3 pointer-events-none hidden lg:block">
+          <div className="absolute top-0 left-0 w-2 h-[1px] bg-border/40" />
+          <div className="absolute top-0 left-0 w-[1px] h-2 bg-border/40" />
+        </div>
+        <div className="absolute top-4 right-4 w-3 h-3 pointer-events-none hidden lg:block">
+          <div className="absolute top-0 right-0 w-2 h-[1px] bg-border/40" />
+          <div className="absolute top-0 right-0 w-[1px] h-2 bg-border/40" />
+        </div>
+
+        {/* Main content */}
+        <main className={cn("relative p-4 lg:p-6", className)}>{children}</main>
+      </div>
     </div>
   );
 }

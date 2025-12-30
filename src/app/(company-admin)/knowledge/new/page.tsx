@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -8,6 +8,11 @@ import {
   Link as LinkIcon,
   FileType,
   Upload,
+  X,
+  Loader2,
+  CheckCircle,
+  FolderOpen,
+  AlertCircle,
 } from "lucide-react";
 
 import {
@@ -18,46 +23,79 @@ import {
   CardBody,
   Chip,
   Textarea,
-  RadioGroup,
-  Radio,
+  Tabs,
   addToast,
+  Badge,
 } from "@/components/ui";
-import { useCreateKnowledgeSource, useCreateFaq, useFaq, useUpdateFaq } from "@/hooks/company";
+import { useSetPageTitle } from "@/contexts/page-context";
+import {
+  useCreateKnowledgeSource,
+  useCreateFaq,
+  useFaq,
+  useUpdateFaq,
+  useFileUpload,
+} from "@/hooks/company";
 
 type SourceType = "file" | "url" | "text";
 
 function KnowledgeNewPageContent() {
+  useSetPageTitle("New Knowledge Source");
   const router = useRouter();
   const searchParams = useSearchParams();
   const isFaqMode = searchParams.get("type") === "faq";
   const editFaqId = searchParams.get("edit");
+  const categoryFromUrl = searchParams.get("category");
   const isEditMode = Boolean(editFaqId);
 
-  const [sourceType, setSourceType] = useState<SourceType>("text");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [sourceType, setSourceType] = useState<SourceType>("file");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
   const [textContent, setTextContent] = useState("");
 
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{
+    storagePath: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+  } | null>(null);
+
   // FAQ state
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
-  const [category, setCategory] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [priority, setPriority] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Hooks
   const { createSource, isCreating } = useCreateKnowledgeSource();
   const { createFaq, isCreating: isCreatingFaq } = useCreateFaq();
   const { faq: existingFaq, isLoading: isLoadingFaq } = useFaq(editFaqId);
   const { updateFaq, isUpdating: isUpdatingFaq } = useUpdateFaq(editFaqId || "");
+  const { uploadFile, isUploading } = useFileUpload();
+
+  // Redirect if no category is provided (except for edit mode)
+  useEffect(() => {
+    if (!categoryFromUrl && !isEditMode) {
+      addToast({
+        title: "Category required",
+        description: "Please select a category first",
+        color: "warning",
+      });
+      router.push("/knowledge");
+    }
+  }, [categoryFromUrl, isEditMode, router]);
 
   // Initialize form with existing FAQ data when editing
   if (isEditMode && existingFaq && !isInitialized) {
     setQuestion(existingFaq.question);
     setAnswer(existingFaq.answer);
-    setCategory(existingFaq.category || "");
     setTags(existingFaq.tags || []);
     setPriority(existingFaq.priority);
     setIsInitialized(true);
@@ -74,8 +112,75 @@ function KnowledgeNewPageContent() {
     setTags(tags.filter((t) => t !== tag));
   };
 
+  // File handling - auto-set name from filename
+  const handleFileSelect = useCallback(async (file: File) => {
+    setSelectedFile(file);
+    // Auto-generate name from filename (without extension)
+    const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+    setName(nameWithoutExt);
+
+    try {
+      const result = await uploadFile(file);
+      setUploadResult(result);
+      addToast({ title: "File uploaded successfully", color: "success" });
+    } catch (err) {
+      addToast({
+        title: err instanceof Error ? err.message : "Failed to upload file",
+        color: "danger",
+      });
+      setSelectedFile(null);
+    }
+  }, [uploadFile]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await handleFileSelect(files[0]!);
+    }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      await handleFileSelect(files[0]!);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setUploadResult(null);
+    setName("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Extract domain from URL for auto-naming
+  const extractDomainFromUrl = (urlString: string): string => {
+    try {
+      const parsedUrl = new URL(urlString);
+      return parsedUrl.hostname.replace(/^www\./, "");
+    } catch {
+      return urlString;
+    }
+  };
+
   const handleSubmitSource = async () => {
-    if (!name.trim()) {
+    // For text type, name is required
+    if (sourceType === "text" && !name.trim()) {
       addToast({ title: "Please enter a name", color: "warning" });
       return;
     }
@@ -90,20 +195,40 @@ function KnowledgeNewPageContent() {
       return;
     }
 
+    if (sourceType === "file" && !uploadResult) {
+      addToast({ title: "Please upload a file", color: "warning" });
+      return;
+    }
+
     try {
       const sourceConfig: Record<string, unknown> = {};
+      let sourceName = name.trim();
 
       if (sourceType === "url") {
         sourceConfig.url = url.trim();
         sourceConfig.crawlDepth = 1;
+        // Auto-generate name from URL domain if not manually set
+        if (!sourceName) {
+          sourceName = extractDomainFromUrl(url.trim());
+        }
       } else if (sourceType === "text") {
         sourceConfig.content = textContent.trim();
+      } else if (sourceType === "file" && uploadResult) {
+        sourceConfig.storagePath = uploadResult.storagePath;
+        sourceConfig.fileName = uploadResult.fileName;
+        sourceConfig.fileSize = uploadResult.fileSize;
+        sourceConfig.fileType = uploadResult.mimeType;
+        // Use filename as name
+        if (!sourceName) {
+          sourceName = uploadResult.fileName.replace(/\.[^/.]+$/, "");
+        }
       }
 
       await createSource({
-        name: name.trim(),
+        name: sourceName,
         description: description.trim() || undefined,
         type: sourceType,
+        category: categoryFromUrl ? decodeURIComponent(categoryFromUrl) : undefined,
         sourceConfig,
       });
 
@@ -129,7 +254,7 @@ function KnowledgeNewPageContent() {
       const faqData = {
         question: question.trim(),
         answer: answer.trim(),
-        category: category.trim() || undefined,
+        category: categoryFromUrl ? decodeURIComponent(categoryFromUrl) : undefined,
         tags,
         priority,
       };
@@ -147,6 +272,23 @@ function KnowledgeNewPageContent() {
     }
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  };
+
+  // Don't render if no category (will redirect)
+  if (!categoryFromUrl && !isEditMode) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // FAQ Mode
   if (isFaqMode) {
     if (isEditMode && isLoadingFaq) {
       return (
@@ -177,6 +319,15 @@ function KnowledgeNewPageContent() {
           </div>
         </div>
 
+        {/* Category Badge */}
+        {categoryFromUrl && (
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Category:</span>
+            <Badge variant="secondary">{decodeURIComponent(categoryFromUrl)}</Badge>
+          </div>
+        )}
+
         <Card>
           <CardHeader>
             <h2 className="text-lg font-semibold">FAQ Details</h2>
@@ -198,13 +349,6 @@ function KnowledgeNewPageContent() {
               onValueChange={setAnswer}
               minRows={4}
               isRequired
-            />
-
-            <Input
-              label="Category"
-              placeholder="e.g., Shipping, Returns, Pricing"
-              value={category}
-              onValueChange={setCategory}
             />
 
             <div className="space-y-2">
@@ -260,6 +404,7 @@ function KnowledgeNewPageContent() {
     );
   }
 
+  // Source Mode
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
@@ -279,73 +424,79 @@ function KnowledgeNewPageContent() {
         </div>
       </div>
 
+      {/* Category Badge */}
+      {categoryFromUrl && (
+        <div className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Category:</span>
+          <Badge variant="secondary">{decodeURIComponent(categoryFromUrl)}</Badge>
+        </div>
+      )}
+
       {/* Source Type Selection */}
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-semibold">Source Type</h2>
-        </CardHeader>
-        <CardBody>
-          <RadioGroup
-            value={sourceType}
-            onValueChange={(v) => setSourceType(v as SourceType)}
-            orientation="horizontal"
-          >
-            <Radio value="text">
-              <div className="flex items-center gap-2">
-                <FileType className="h-4 w-4" />
-                Plain Text
-              </div>
-            </Radio>
-            <Radio value="url">
-              <div className="flex items-center gap-2">
-                <LinkIcon className="h-4 w-4" />
-                URL / Website
-              </div>
-            </Radio>
-            <Radio value="file" disabled>
-              <div className="flex items-center gap-2 opacity-50">
-                <FileText className="h-4 w-4" />
-                File Upload (Coming Soon)
-              </div>
-            </Radio>
-          </RadioGroup>
-        </CardBody>
-      </Card>
+    
+          <Tabs
+            items={[
+               { key: "file", label: "File Upload", icon: FileText },
+             
+              { key: "url", label: "URL / Website", icon: LinkIcon },
+              { key: "text", label: "Plain Text", icon: FileType },
+            ]}
+            selectedKey={sourceType}
+            onSelectionChange={(key) => {
+              setSourceType(key as SourceType);
+              // Clear name when switching types (will be auto-generated)
+              if (key !== "text") {
+                setName("");
+              }
+            }}
+            variant="underlined"
+          />
+        
 
       {/* Source Details */}
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold">Source Details</h2>
+          <h2 className="text-lg font-semibold">
+            {sourceType === "text" && "Enter Text Content"}
+            {sourceType === "url" && "Enter URL"}
+            {sourceType === "file" && "Upload File"}
+          </h2>
         </CardHeader>
         <CardBody className="space-y-6">
-          <Input
-            label="Name"
-            placeholder="e.g., Product Documentation, FAQ, Company Policies"
-            value={name}
-            onValueChange={setName}
-            isRequired
-          />
-
-          <Textarea
-            label="Description"
-            placeholder="Brief description of what this source contains..."
-            value={description}
-            onValueChange={setDescription}
-            minRows={2}
-          />
-
-          {sourceType === "url" && (
+          {/* Name field only for text type */}
+          {sourceType === "text" && (
             <Input
-              label="URL"
-              placeholder="https://example.com/docs"
-              value={url}
-              onValueChange={setUrl}
-              type="url"
+              label="Name"
+              placeholder="e.g., Company Policies, Product Information"
+              value={name}
+              onValueChange={setName}
               isRequired
-              description="We'll crawl this page and extract its content"
             />
           )}
 
+          {/* URL Input */}
+          {sourceType === "url" && (
+            <div className="space-y-4">
+              <Input
+                label="URL"
+                placeholder="https://example.com/docs"
+                value={url}
+                onValueChange={setUrl}
+                type="url"
+                isRequired
+                description="We'll fetch and index the content from this page"
+              />
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50">
+                <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-sm text-muted-foreground">
+                  The source will be automatically named using the domain and page title.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Text Content */}
           {sourceType === "text" && (
             <Textarea
               label="Content"
@@ -358,20 +509,94 @@ function KnowledgeNewPageContent() {
             />
           )}
 
+          {/* File Upload */}
           {sourceType === "file" && (
-            <div className="border-2 border-dashed border-divider rounded-lg p-8 text-center">
-              <Upload className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground mb-2">
-                Drag and drop files here, or click to browse
-              </p>
-              <p className="text-muted-foreground text-sm">
-                Supported formats: PDF, DOCX, TXT, MD (max 10MB)
-              </p>
-              <Button variant="outline" className="mt-4" disabled>
-                Browse Files
-              </Button>
-            </div>
+            <>
+              {selectedFile && uploadResult ? (
+                <div className="border rounded-lg p-4 bg-success-50/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-success" />
+                      <div>
+                        <p className="font-medium">{selectedFile.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatFileSize(selectedFile.size)} - Uploaded successfully
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onPress={handleRemoveFile}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 p-2 rounded bg-muted/50">
+                    <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <p className="text-sm text-muted-foreground">
+                      The source will be named &quot;{selectedFile.name.replace(/\.[^/.]+$/, "")}&quot;
+                    </p>
+                  </div>
+                </div>
+              ) : selectedFile && isUploading ? (
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <div>
+                      <p className="font-medium">{selectedFile.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Uploading...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragging
+                      ? "border-primary bg-primary/5"
+                      : "border-divider hover:border-primary/50"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <Upload className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground mb-2">
+                    Drag and drop files here, or click to browse
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Supported formats: PDF, DOCX, DOC, TXT, MD, CSV, HTML (max 10MB)
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.doc,.txt,.md,.csv,.html,.htm"
+                    onChange={handleFileInputChange}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onPress={() => fileInputRef.current?.click()}
+                    isLoading={isUploading}
+                  >
+                    Browse Files
+                  </Button>
+                </div>
+              )}
+            </>
           )}
+
+          {/* Optional Description */}
+          <Textarea
+            label="Description (optional)"
+            placeholder="Brief description of what this source contains..."
+            value={description}
+            onValueChange={setDescription}
+            minRows={2}
+          />
         </CardBody>
       </Card>
 
@@ -384,7 +609,7 @@ function KnowledgeNewPageContent() {
           color="primary"
           onPress={handleSubmitSource}
           isLoading={isCreating}
-          disabled={sourceType === "file"}
+          isDisabled={sourceType === "file" && !uploadResult}
         >
           Create Source
         </Button>

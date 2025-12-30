@@ -1,4 +1,4 @@
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -157,7 +157,7 @@ export async function GET(request: Request, context: RouteContext) {
       const [messagesCount] = await db
         .select({ count: count() })
         .from(messages)
-        .where(sql`${messages.conversationId} = ANY(${conversationIds})`);
+        .where(inArray(messages.conversationId, conversationIds));
       messagesTotal = messagesCount?.count ?? 0;
     }
 

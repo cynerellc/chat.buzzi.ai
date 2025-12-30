@@ -21,6 +21,7 @@ import {
   Badge,
   Input,
 } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import { useConversations, useAgents } from "@/hooks/company";
 import type { ConversationFilters } from "@/hooks/company/useConversations";
 
@@ -80,6 +81,7 @@ function formatTimeAgo(dateString: string): string {
 }
 
 export default function ConversationsPage() {
+  useSetPageTitle("Conversations");
   const router = useRouter();
   const [filters, setFilters] = useState<ConversationFilters>({
     page: 1,
@@ -91,7 +93,7 @@ export default function ConversationsPage() {
   const { agents } = useAgents();
 
   const agentOptions = [
-    { value: "", label: "All Agents" },
+    { value: "all", label: "All Agents" },
     ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
   ];
 
@@ -177,10 +179,10 @@ export default function ConversationsPage() {
 
             <Select
               options={agentOptions}
-              selectedKeys={new Set([filters.agentId || ""])}
+              selectedKeys={new Set([filters.agentId || "all"])}
               onSelectionChange={(keys) => {
                 const selected = Array.from(keys)[0];
-                handleFilterChange("agentId", selected as string);
+                handleFilterChange("agentId", selected === "all" ? "" : (selected as string));
               }}
               className="w-[180px]"
               placeholder="All Agents"

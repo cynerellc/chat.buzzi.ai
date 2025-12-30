@@ -12,6 +12,7 @@ interface RouteParams {
 interface TestMessageRequest {
   message: string;
   conversationHistory?: { role: "user" | "assistant"; content: string }[];
+  stream?: boolean;
 }
 
 interface TestMessageResponse {
@@ -59,19 +60,72 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       fallbackMessage?: string;
     };
 
+    // Get agent config from agentsList (first agent is primary)
+    const agentsList = (agent.agentsList as { default_system_prompt: string; default_model_id: string; default_temperature: number }[]) || [];
+    const primaryAgent = agentsList[0];
+    const systemPrompt = primaryAgent?.default_system_prompt || "";
+    const modelId = primaryAgent?.default_model_id || "gpt-5-mini";
+    const temperature = primaryAgent?.default_temperature ?? 70;
+
     // Simulate AI response based on the agent configuration
     const simulatedResponse = generateSimulatedResponse(
       body.message,
-      agent.systemPrompt,
+      systemPrompt,
       behavior,
       body.conversationHistory || []
     );
 
+    const reasoning = `Using agent "${agent.name}" with model ${modelId} at temperature ${temperature / 100}`;
+    const tokensUsed = Math.floor(Math.random() * 500) + 100;
+
+    // Handle streaming response
+    if (body.stream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          // Simulate streaming by breaking the response into chunks
+          const words = simulatedResponse.split(" ");
+
+          for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            const content = i === 0 ? word : " " + word;
+
+            const chunk = JSON.stringify({ type: "content", content });
+            controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+
+            // Simulate typing delay (30-80ms per word)
+            await new Promise((resolve) =>
+              setTimeout(resolve, Math.floor(Math.random() * 50) + 30)
+            );
+          }
+
+          // Send final metadata
+          const doneChunk = JSON.stringify({
+            type: "done",
+            reasoning,
+            tokensUsed,
+          });
+          controller.enqueue(encoder.encode(`data: ${doneChunk}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
+    // Non-streaming response (fallback)
     const response: TestMessageResponse = {
       response: simulatedResponse,
       toolCalls: [],
-      reasoning: `Using agent "${agent.name}" with model ${agent.modelId} at temperature ${agent.temperature / 100}`,
-      tokensUsed: Math.floor(Math.random() * 500) + 100,
+      reasoning,
+      tokensUsed,
     };
 
     return NextResponse.json(response);

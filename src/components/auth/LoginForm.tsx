@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertCircle, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Mail, Shield, ArrowRight } from "lucide-react";
 
 import { Button, Checkbox, Input } from "@/components/ui";
 import { useSearchParams } from "next/navigation";
@@ -37,6 +37,19 @@ function GoogleIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+const formItemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.1,
+      duration: 0.3,
+      ease: "easeOut" as const,
+    },
+  }),
+};
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const { login, loginWithGoogle } = useAuth();
@@ -89,119 +102,201 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="w-full max-w-md"
     >
+      {/* Header */}
       <div className="text-center mb-8">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.3 }}
-          className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4"
+          className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text"
         >
-          <Sparkles className="w-6 h-6 text-primary" />
-        </motion.div>
-        <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
-        <p className="text-muted-foreground mt-2">Sign in to your account to continue</p>
+          Welcome back
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.3 }}
+          className="text-muted-foreground mt-2 text-sm"
+        >
+          Sign in to access your AI support dashboard
+        </motion.p>
       </div>
 
+      {/* Success message after registration */}
       {registered && (
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-4 p-3 rounded-lg bg-success/10 border border-success/20 flex items-center gap-2 text-success"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-5 p-4 rounded-xl bg-success/10 border border-success/20 flex items-start gap-3"
         >
-          <Sparkles size={18} />
-          <span className="text-sm">Account created successfully! Please sign in.</span>
+          <div className="shrink-0 w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4 text-success" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-success">Account created successfully!</p>
+            <p className="text-xs text-success/80 mt-0.5">Please sign in with your credentials.</p>
+          </div>
         </motion.div>
       )}
 
+      {/* Error message */}
       {error && (
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-destructive"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-5 p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex items-start gap-3"
         >
-          <AlertCircle size={18} />
-          <span className="text-sm">{error}</span>
+          <div className="shrink-0 w-8 h-8 rounded-full bg-destructive/20 flex items-center justify-center">
+            <AlertCircle className="w-4 h-4 text-destructive" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-destructive">Sign in failed</p>
+            <p className="text-xs text-destructive/80 mt-0.5">{error}</p>
+          </div>
         </motion.div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <Input
-          {...register("email")}
-          type="email"
-          label="Email"
-          placeholder="Enter your email"
-          isRequired
-          isInvalid={!!errors.email}
-          errorMessage={errors.email?.message}
-          autoComplete="email"
-        />
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <motion.div
+          custom={0}
+          variants={formItemVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <Input
+            {...register("email")}
+            type="email"
+            label="Email address"
+            placeholder="name@company.com"
+            isRequired
+            isInvalid={!!errors.email}
+            errorMessage={errors.email?.message}
+            autoComplete="email"
+            startContent={<Mail className="w-4 h-4 text-muted-foreground" />}
+          />
+        </motion.div>
 
-        <PasswordInput
-          {...register("password")}
-          value={password}
-          label="Password"
-          placeholder="Enter your password"
-          isRequired
-          isInvalid={!!errors.password}
-          errorMessage={errors.password?.message}
-        />
+        <motion.div
+          custom={1}
+          variants={formItemVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <PasswordInput
+            {...register("password")}
+            value={password}
+            label="Password"
+            placeholder="Enter your password"
+            isRequired
+            isInvalid={!!errors.password}
+            errorMessage={errors.password?.message}
+          />
+        </motion.div>
 
-        <div className="flex items-center justify-between">
-          <Checkbox {...register("rememberMe")} size="sm">
-            Remember me
+        <motion.div
+          custom={2}
+          variants={formItemVariants}
+          initial="hidden"
+          animate="visible"
+          className="flex items-center justify-between pt-1"
+        >
+          <Checkbox {...register("rememberMe")} size="sm" className="text-muted-foreground">
+            <span className="text-sm">Remember me</span>
           </Checkbox>
           <Link
             href="/forgot-password"
-            className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+            className="text-sm text-primary hover:text-primary/80 transition-colors font-medium hover:underline underline-offset-4"
           >
             Forgot password?
           </Link>
-        </div>
+        </motion.div>
 
-        <Button
-          type="submit"
-          color="primary"
-          className="w-full font-medium"
-          isLoading={isLoading}
-          size="lg"
+        <motion.div
+          custom={3}
+          variants={formItemVariants}
+          initial="hidden"
+          animate="visible"
+          className="pt-2"
         >
-          Sign In
-        </Button>
+          <Button
+            type="submit"
+            color="primary"
+            className="w-full font-medium h-11 text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.01] active:scale-[0.99] transition-all"
+            isLoading={isLoading}
+            size="lg"
+          >
+            {isLoading ? (
+              "Signing in..."
+            ) : (
+              <span className="flex items-center gap-2">
+                Sign in
+                <ArrowRight className="w-4 h-4" />
+              </span>
+            )}
+          </Button>
+        </motion.div>
       </form>
 
+      {/* Divider */}
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
+          <div className="w-full border-t border-border/60" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+        <div className="relative flex justify-center">
+          <span className="bg-card px-3 text-xs text-muted-foreground uppercase tracking-wider">
+            or continue with
+          </span>
         </div>
       </div>
 
-      <Button
-        variant="outline"
-        className="w-full h-11 font-medium gap-3 hover:bg-muted/50 transition-colors"
-        startContent={<GoogleIcon className="w-5 h-5" />}
-        onClick={handleGoogleLogin}
-        isDisabled={isLoading}
+      {/* Google sign-in */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.3 }}
       >
-        Continue with Google
-      </Button>
+        <Button
+          variant="outline"
+          className="w-full h-11 font-medium gap-3 hover:bg-muted/50 hover:border-border transition-all hover:scale-[1.01] active:scale-[0.99]"
+          startContent={<GoogleIcon className="w-5 h-5" />}
+          onClick={handleGoogleLogin}
+          isDisabled={isLoading}
+        >
+          Continue with Google
+        </Button>
+      </motion.div>
 
-      <p className="text-center text-sm text-muted-foreground mt-6">
+      {/* Sign up link */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.3 }}
+        className="text-center text-sm text-muted-foreground mt-6"
+      >
         Don&apos;t have an account?{" "}
         <Link
           href="/register"
-          className="text-primary hover:text-primary/80 transition-colors font-medium"
+          className="text-primary hover:text-primary/80 transition-colors font-semibold hover:underline underline-offset-4"
         >
           Create account
         </Link>
-      </p>
+      </motion.p>
+
+      {/* Trust indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6, duration: 0.3 }}
+        className="flex items-center justify-center gap-2 mt-6 text-xs text-muted-foreground/70"
+      >
+        <Shield className="w-3.5 h-3.5" />
+        <span>Secured with enterprise-grade encryption</span>
+      </motion.div>
     </motion.div>
   );
 }

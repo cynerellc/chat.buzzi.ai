@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { agents } from "./agents";
+import { chatbots } from "./chatbots";
 import { companies } from "./companies";
 import { chatappSchema } from "./enums";
 
@@ -24,7 +24,7 @@ export const dailyAnalytics = chatappSchema.table(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    agentId: uuid("agent_id").references(() => agents.id, { onDelete: "cascade" }),
+    chatbotId: uuid("chatbot_id").references(() => chatbots.id, { onDelete: "cascade" }),
 
     // Date
     date: date("date").notNull(),
@@ -78,7 +78,7 @@ export const dailyAnalytics = chatappSchema.table(
   },
   (table) => [
     index("daily_analytics_company_idx").on(table.companyId),
-    index("daily_analytics_agent_idx").on(table.agentId),
+    index("daily_analytics_chatbot_idx").on(table.chatbotId),
     index("daily_analytics_date_idx").on(table.date),
     index("daily_analytics_company_date_idx").on(table.companyId, table.date),
   ]
@@ -94,7 +94,7 @@ export const hourlyAnalytics = chatappSchema.table(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    agentId: uuid("agent_id").references(() => agents.id, { onDelete: "cascade" }),
+    chatbotId: uuid("chatbot_id").references(() => chatbots.id, { onDelete: "cascade" }),
 
     // Hour (stored as timestamp of the hour start)
     hour: timestamp("hour").notNull(),
@@ -204,9 +204,9 @@ export const dailyAnalyticsRelations = relations(dailyAnalytics, ({ one }) => ({
     fields: [dailyAnalytics.companyId],
     references: [companies.id],
   }),
-  agent: one(agents, {
-    fields: [dailyAnalytics.agentId],
-    references: [agents.id],
+  chatbot: one(chatbots, {
+    fields: [dailyAnalytics.chatbotId],
+    references: [chatbots.id],
   }),
 }));
 
@@ -215,9 +215,9 @@ export const hourlyAnalyticsRelations = relations(hourlyAnalytics, ({ one }) => 
     fields: [hourlyAnalytics.companyId],
     references: [companies.id],
   }),
-  agent: one(agents, {
-    fields: [hourlyAnalytics.agentId],
-    references: [agents.id],
+  chatbot: one(chatbots, {
+    fields: [hourlyAnalytics.chatbotId],
+    references: [chatbots.id],
   }),
 }));
 

@@ -14,6 +14,13 @@ import { eq, asc } from "drizzle-orm";
 
 import type { LLMMessage, HistoryConfig } from "../types";
 
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUUID(str: string): boolean {
+  return UUID_REGEX.test(str);
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -214,13 +221,23 @@ export class HistoryService {
   private async loadFromDatabase(
     conversationId: string
   ): Promise<ConversationHistory | null> {
+    // Skip database query if conversationId is not a valid UUID
+    // This handles test sessions and other non-persistent conversations
+    if (!isValidUUID(conversationId)) {
+      console.log(`[HistoryService] Skipping DB load - conversationId "${conversationId}" is not a valid UUID`);
+      return null;
+    }
+
     try {
+      console.log(`[HistoryService] Loading history from DB for conversation: ${conversationId}`);
       const dbMessages = await db
         .select()
         .from(messagesTable)
         .where(eq(messagesTable.conversationId, conversationId))
         .orderBy(asc(messagesTable.createdAt))
         .limit(this.config.maxMessages);
+
+      console.log(`[HistoryService] Found ${dbMessages.length} messages in DB`);
 
       if (dbMessages.length === 0) {
         return null;
@@ -246,7 +263,7 @@ export class HistoryService {
         updatedAt: lastMessage?.createdAt ?? new Date(),
       };
     } catch (error) {
-      console.error("Error loading history from database:", error);
+      console.error("[HistoryService] Error loading history from database:", error);
       return null;
     }
   }

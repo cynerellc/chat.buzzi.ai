@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { escalations, conversations, endUsers, messages } from "@/lib/db/schema/conversations";
-import { agents } from "@/lib/db/schema/agents";
+import { agents } from "@/lib/db/schema/chatbots";
 import { users } from "@/lib/db/schema/users";
 import { eq, and, desc, asc, sql, or, isNull } from "drizzle-orm";
 import { requireSupportAgent } from "@/lib/auth/guards";
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       .from(escalations)
       .innerJoin(conversations, eq(escalations.conversationId, conversations.id))
       .innerJoin(endUsers, eq(conversations.endUserId, endUsers.id))
-      .innerJoin(agents, eq(conversations.agentId, agents.id))
+      .innerJoin(agents, eq(conversations.chatbotId, agents.id))
       .where(and(...conditions))
       .orderBy(
         desc(

@@ -47,6 +47,37 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   "claude-3-haiku-20240307": 200000,
 };
 
+// Models that use max_completion_tokens instead of max_tokens
+const MODELS_USING_COMPLETION_TOKENS = new Set([
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4o-2024-05-13",
+  "gpt-4o-2024-08-06",
+  "gpt-4o-2024-11-20",
+  "gpt-4o-mini-2024-07-18",
+  "gpt-5",
+  "gpt-5-mini",
+  "gpt-5-turbo",
+  "o1",
+  "o1-mini",
+  "o1-preview",
+  "o3-mini",
+]);
+
+// Check if a model uses max_completion_tokens (covers future models too)
+function usesCompletionTokens(model: string): boolean {
+  if (MODELS_USING_COMPLETION_TOKENS.has(model)) return true;
+  // Newer OpenAI models (gpt-4o+, gpt-5+, o1+, o3+) use max_completion_tokens
+  return /^(gpt-4o|gpt-5|o1|o3)/.test(model);
+}
+
+// Models that don't support custom temperature (reasoning models)
+function supportsTemperature(model: string): boolean {
+  // o1, o3, and gpt-5 reasoning models don't support custom temperature
+  if (/^(o1|o3|gpt-5)/.test(model)) return false;
+  return true;
+}
+
 // ============================================================================
 // LLM Client Class
 // ============================================================================
@@ -153,12 +184,25 @@ export class LLMClient {
     const openaiMessages = this.convertToOpenAIMessages(messages);
     const openaiTools = tools ? this.convertToOpenAITools(tools) : undefined;
 
+    // Use max_completion_tokens for newer models, max_tokens for older ones
+    const useMaxCompletionTokens = usesCompletionTokens(this.config.model);
+    const tokenParams = useMaxCompletionTokens
+      ? { max_completion_tokens: this.config.maxTokens }
+      : { max_tokens: this.config.maxTokens };
+
+    // Only include temperature for models that support it
+    const tempParams = supportsTemperature(this.config.model)
+      ? { temperature: this.config.temperature }
+      : {};
+
+    console.log(`[LLMClient] chatOpenAI - model: ${this.config.model}, useCompletionTokens: ${useMaxCompletionTokens}, supportsTemp: ${supportsTemperature(this.config.model)}, maxTokens: ${this.config.maxTokens}`);
+
     const response = await this.openaiClient.chat.completions.create({
       model: this.config.model,
       messages: openaiMessages,
       tools: openaiTools,
-      temperature: this.config.temperature,
-      max_tokens: this.config.maxTokens,
+      ...tempParams,
+      ...tokenParams,
     });
 
     const choice = response.choices[0];
@@ -202,12 +246,25 @@ export class LLMClient {
     const openaiMessages = this.convertToOpenAIMessages(messages);
     const openaiTools = tools ? this.convertToOpenAITools(tools) : undefined;
 
+    // Use max_completion_tokens for newer models, max_tokens for older ones
+    const useMaxCompletionTokens = usesCompletionTokens(this.config.model);
+    const tokenParams = useMaxCompletionTokens
+      ? { max_completion_tokens: this.config.maxTokens }
+      : { max_tokens: this.config.maxTokens };
+
+    // Only include temperature for models that support it
+    const tempParams = supportsTemperature(this.config.model)
+      ? { temperature: this.config.temperature }
+      : {};
+
+    console.log(`[LLMClient] streamOpenAI - model: ${this.config.model}, useCompletionTokens: ${useMaxCompletionTokens}, supportsTemp: ${supportsTemperature(this.config.model)}, maxTokens: ${this.config.maxTokens}`);
+
     const stream = await this.openaiClient.chat.completions.create({
       model: this.config.model,
       messages: openaiMessages,
       tools: openaiTools,
-      temperature: this.config.temperature,
-      max_tokens: this.config.maxTokens,
+      ...tempParams,
+      ...tokenParams,
       stream: true,
     });
 
@@ -277,14 +334,22 @@ export class LLMClient {
       if (msg.role === "tool") {
         return {
           role: "tool" as const,
-          content: msg.content,
+          content: msg.content ?? "",
           tool_call_id: msg.toolCallId || "",
+        };
+      }
+
+      if (msg.role === "assistant" && msg.tool_calls && msg.tool_calls.length > 0) {
+        return {
+          role: "assistant" as const,
+          content: msg.content ?? "",
+          tool_calls: msg.tool_calls,
         };
       }
 
       return {
         role: msg.role as "system" | "user" | "assistant",
-        content: msg.content,
+        content: msg.content ?? "",
       };
     });
   }
@@ -449,16 +514,16 @@ export class LLMClient {
 
     for (const msg of messages) {
       if (msg.role === "system") {
-        systemPrompt += (systemPrompt ? "\n\n" : "") + msg.content;
+        systemPrompt += (systemPrompt ? "\n\n" : "") + (msg.content ?? "");
       } else if (msg.role === "user") {
         anthropicMessages.push({
           role: "user",
-          content: msg.content,
+          content: msg.content ?? "",
         });
       } else if (msg.role === "assistant") {
         anthropicMessages.push({
           role: "assistant",
-          content: msg.content,
+          content: msg.content ?? "",
         });
       } else if (msg.role === "tool") {
         // Tool results in Anthropic are sent as user messages with tool_result blocks
@@ -468,7 +533,7 @@ export class LLMClient {
             {
               type: "tool_result",
               tool_use_id: msg.toolCallId || "",
-              content: msg.content,
+              content: msg.content ?? "",
             },
           ],
         });

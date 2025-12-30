@@ -4,6 +4,7 @@ import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { faqItems } from "@/lib/db/schema";
+import { getProcessingPipeline } from "@/lib/knowledge/processing-pipeline";
 
 export interface FaqListItem {
   id: string;
@@ -142,7 +143,22 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // TODO: Create vector embedding for semantic search
+    if (!newFaq) {
+      return NextResponse.json(
+        { error: "Failed to create FAQ" },
+        { status: 500 }
+      );
+    }
+
+    // Index FAQ in Qdrant for semantic search (async, don't wait)
+    setImmediate(async () => {
+      try {
+        const pipeline = getProcessingPipeline();
+        await pipeline.processFaq(newFaq.id, { useQdrant: true });
+      } catch (error) {
+        console.error(`Failed to index FAQ ${newFaq.id} in Qdrant:`, error);
+      }
+    });
 
     return NextResponse.json({ faq: newFaq }, { status: 201 });
   } catch (error) {

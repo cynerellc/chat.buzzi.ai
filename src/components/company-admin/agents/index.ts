@@ -8,3 +8,4 @@ export { EscalationTab } from "./escalation-tab";
 export { WidgetTab } from "./widget-tab";
 export { AnalyticsTab } from "./analytics-tab";
 export { TestChatModal } from "./test-chat-modal";
+export { TestConfigSidebar } from "./test-config-sidebar";

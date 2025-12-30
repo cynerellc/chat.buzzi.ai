@@ -10,20 +10,21 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+import { chatbots } from "./chatbots";
 import { companies } from "./companies";
 import { chatappSchema, integrationStatusEnum, integrationTypeEnum, invitationStatusEnum } from "./enums";
 import { users } from "./users";
 
-// Integrations Table
+// Integrations Table (per chatbot)
 export const integrations = chatappSchema.table(
   "integrations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
-    // Company Reference
-    companyId: uuid("company_id")
+    // Chatbot Reference (changed from companyId)
+    chatbotId: uuid("chatbot_id")
       .notNull()
-      .references(() => companies.id, { onDelete: "cascade" }),
+      .references(() => chatbots.id, { onDelete: "cascade" }),
 
     // Integration Info
     type: integrationTypeEnum("type").notNull(),
@@ -53,22 +54,22 @@ export const integrations = chatappSchema.table(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("integrations_company_idx").on(table.companyId),
+    index("integrations_chatbot_idx").on(table.chatbotId),
     index("integrations_type_idx").on(table.type),
     index("integrations_status_idx").on(table.status),
   ]
 );
 
-// Webhooks Table (outgoing webhooks)
+// Webhooks Table (outgoing webhooks - per chatbot)
 export const webhooks = chatappSchema.table(
   "webhooks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
-    // Company Reference
-    companyId: uuid("company_id")
+    // Chatbot Reference (changed from companyId)
+    chatbotId: uuid("chatbot_id")
       .notNull()
-      .references(() => companies.id, { onDelete: "cascade" }),
+      .references(() => chatbots.id, { onDelete: "cascade" }),
 
     // Webhook Info
     name: varchar("name", { length: 255 }).notNull(),
@@ -101,7 +102,7 @@ export const webhooks = chatappSchema.table(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("webhooks_company_idx").on(table.companyId),
+    index("webhooks_chatbot_idx").on(table.chatbotId),
     index("webhooks_active_idx").on(table.isActive),
   ]
 );
@@ -145,7 +146,7 @@ export const webhookDeliveries = chatappSchema.table(
   ]
 );
 
-// Team Invitations Table
+// Team Invitations Table (remains company-scoped)
 export const invitations = chatappSchema.table(
   "invitations",
   {
@@ -185,7 +186,7 @@ export const invitations = chatappSchema.table(
   ]
 );
 
-// Audit Log Table
+// Audit Log Table (remains company-scoped)
 export const auditLogs = chatappSchema.table(
   "audit_logs",
   {
@@ -230,16 +231,16 @@ export const auditLogs = chatappSchema.table(
 
 // Relations
 export const integrationsRelations = relations(integrations, ({ one }) => ({
-  company: one(companies, {
-    fields: [integrations.companyId],
-    references: [companies.id],
+  chatbot: one(chatbots, {
+    fields: [integrations.chatbotId],
+    references: [chatbots.id],
   }),
 }));
 
 export const webhooksRelations = relations(webhooks, ({ one, many }) => ({
-  company: one(companies, {
-    fields: [webhooks.companyId],
-    references: [companies.id],
+  chatbot: one(chatbots, {
+    fields: [webhooks.chatbotId],
+    references: [chatbots.id],
   }),
   deliveries: many(webhookDeliveries),
 }));

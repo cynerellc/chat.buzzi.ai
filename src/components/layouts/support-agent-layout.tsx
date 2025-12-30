@@ -96,9 +96,6 @@ export function SupportAgentLayout({ children, companyName }: SupportAgentLayout
         sections: supportAgentSections,
         footer: <AgentStatusFooter />,
       }}
-      headerProps={{
-        title: "Support Inbox",
-      }}
     >
       {children}
     </MainLayout>

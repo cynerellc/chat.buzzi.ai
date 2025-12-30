@@ -9,6 +9,7 @@ import {
   UsageOverview,
   ActivityFeed,
 } from "@/components/company-admin/dashboard";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   useDashboardStats,
   useAgentsOverview,
@@ -18,6 +19,7 @@ import {
 } from "@/hooks/company";
 
 export default function CompanyAdminDashboard() {
+  useSetPageTitle("Dashboard");
   const { stats, isLoading: statsLoading } = useDashboardStats();
   const { agents, isLoading: agentsLoading } = useAgentsOverview();
   const { conversations, isLoading: conversationsLoading } =

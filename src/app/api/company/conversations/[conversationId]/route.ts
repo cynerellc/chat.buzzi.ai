@@ -97,15 +97,23 @@ export async function GET(
       .limit(1);
 
     // Get agent
-    const [agent] = await db
+    const [agentRow] = await db
       .select({
         id: agents.id,
         name: agents.name,
-        avatarUrl: agents.avatarUrl,
+        agentsList: agents.agentsList,
       })
       .from(agents)
-      .where(eq(agents.id, conversation.agentId))
+      .where(eq(agents.id, conversation.chatbotId))
       .limit(1);
+
+    // Extract avatarUrl from agentsList[0]
+    const agentsListData = (agentRow?.agentsList as { avatar_url?: string }[] | null) || [];
+    const agent = agentRow ? {
+      id: agentRow.id,
+      name: agentRow.name,
+      avatarUrl: agentsListData[0]?.avatar_url || null,
+    } : null;
 
     // Get assigned user if any
     let assignedUser = null;

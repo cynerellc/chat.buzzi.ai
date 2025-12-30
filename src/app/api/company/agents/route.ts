@@ -3,7 +3,7 @@ import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agents, agentPackages, conversations, type PackageVariableDefinition } from "@/lib/db/schema";
+import { agents, agentPackages, conversations, type PackageVariableDefinition, type AgentListItem as AgentListItemSchema } from "@/lib/db/schema";
 
 export interface AgentListItem {
   id: string;
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         id: agents.id,
         name: agents.name,
         description: agents.description,
-        avatarUrl: agents.avatarUrl,
+        agentsList: agents.agentsList,
         type: agents.type,
         status: agents.status,
         totalConversations: agents.totalConversations,
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
           .from(conversations)
           .where(
             and(
-              eq(conversations.agentId, agent.id),
+              eq(conversations.chatbotId, agent.id),
               gte(conversations.createdAt, weekAgo)
             )
           );
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
           .from(conversations)
           .where(
             and(
-              eq(conversations.agentId, agent.id),
+              eq(conversations.chatbotId, agent.id),
               eq(conversations.resolutionType, "ai"),
               gte(conversations.resolvedAt, weekAgo)
             )
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
           .from(conversations)
           .where(
             and(
-              eq(conversations.agentId, agent.id),
+              eq(conversations.chatbotId, agent.id),
               sql`${conversations.resolutionType} IS NOT NULL`,
               gte(conversations.resolvedAt, weekAgo)
             )
@@ -99,11 +99,15 @@ export async function GET(request: NextRequest) {
         const aiResolutionRate =
           totalResolved > 0 ? Math.round((aiResolved / totalResolved) * 100) : 0;
 
+        // Get avatar from first agent in agents_list
+        const agentsList = (agent.agentsList as AgentListItemSchema[]) || [];
+        const primaryAgent = agentsList[0];
+
         return {
           id: agent.id,
           name: agent.name,
           description: agent.description,
-          avatarUrl: agent.avatarUrl,
+          avatarUrl: primaryAgent?.avatar_url ?? null,
           type: agent.type,
           status: agent.status,
           totalConversations: agent.totalConversations,
@@ -130,9 +134,11 @@ interface CreateAgentRequest {
   description?: string;
   type?: "support" | "sales" | "general" | "custom";
   packageId?: string;
+  // Agent configuration (will be stored in agents_list)
   systemPrompt?: string;
   modelId?: string;
   temperature?: number;
+  knowledgeCategories?: string[];
   behavior?: Record<string, unknown>;
   // Variable values are now stored as a simple key-value object
   variableValues?: Record<string, string>;
@@ -151,13 +157,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let systemPrompt = body.systemPrompt;
-    let modelId = body.modelId || "gpt-4o-mini";
-    let temperature = body.temperature ?? 70;
+    let agentsList: AgentListItemSchema[] = [];
     let behavior = body.behavior;
     let type = body.type || "custom";
+    let variableValues: Record<string, string> = {};
 
-    // If packageId is provided, get defaults from the package
+    // If packageId is provided, copy agents_list and defaults from the package
     if (body.packageId) {
       const [agentPackage] = await db
         .select()
@@ -166,9 +171,11 @@ export async function POST(request: NextRequest) {
         .limit(1);
 
       if (agentPackage) {
-        systemPrompt = systemPrompt || agentPackage.defaultSystemPrompt;
-        modelId = body.modelId || agentPackage.defaultModelId;
-        temperature = body.temperature ?? agentPackage.defaultTemperature;
+        // Copy agents_list from package
+        agentsList = (agentPackage.agentsList as AgentListItemSchema[]) || [];
+
+        // Legacy package handling removed - packages must now have agentsList defined
+
         behavior = body.behavior || (agentPackage.defaultBehavior as Record<string, unknown>);
 
         // Infer type from package category if not specified
@@ -180,30 +187,9 @@ export async function POST(request: NextRequest) {
           };
           type = categoryToType[agentPackage.category.toLowerCase()] || "custom";
         }
-      }
-    }
 
-    // Ensure we have a system prompt
-    if (!systemPrompt) {
-      systemPrompt = `You are a helpful AI assistant named ${body.name} for ${company.name}.
-Your role is to assist customers with their questions and concerns.
-Be professional, friendly, and concise in your responses.
-If you cannot help with something, offer to connect the customer with a human agent.`;
-    }
-
-    // If packageId is provided, initialize variable values from package defaults
-    let variableValues: Record<string, string> = {};
-    if (body.packageId) {
-      // Get package to read its variable definitions
-      const [agentPackage] = await db
-        .select({ variables: agentPackages.variables })
-        .from(agentPackages)
-        .where(eq(agentPackages.id, body.packageId))
-        .limit(1);
-
-      if (agentPackage) {
+        // Initialize variable values from package defaults
         const pkgVariables = (agentPackage.variables as PackageVariableDefinition[]) || [];
-        // Initialize with defaults, then override with provided values
         pkgVariables.forEach((pv) => {
           if (pv.defaultValue && pv.variableType !== "secured_variable") {
             variableValues[pv.name] = pv.defaultValue;
@@ -215,9 +201,28 @@ If you cannot help with something, offer to connect the customer with a human ag
       if (body.variableValues) {
         variableValues = { ...variableValues, ...body.variableValues };
       }
+    } else {
+      // No package - create a single agent from request params
+      const systemPrompt = body.systemPrompt ||
+        `You are a helpful AI assistant named ${body.name} for ${company.name}.
+Your role is to assist customers with their questions and concerns.
+Be professional, friendly, and concise in your responses.
+If you cannot help with something, offer to connect the customer with a human agent.`;
+
+      agentsList = [{
+        agent_identifier: "main",
+        name: body.name,
+        agent_type: "worker",
+        default_system_prompt: systemPrompt,
+        default_model_id: body.modelId || "gpt-5-mini",
+        default_temperature: body.temperature ?? 70,
+        knowledge_categories: body.knowledgeCategories || [],
+        tools: [],
+        sort_order: 0,
+      }];
     }
 
-    // Create the agent with variable values stored as JSONB
+    // Create the agent with agents_list and variable values stored as JSONB
     const [newAgent] = await db
       .insert(agents)
       .values({
@@ -227,9 +232,7 @@ If you cannot help with something, offer to connect the customer with a human ag
         description: body.description || null,
         type,
         status: "draft",
-        systemPrompt,
-        modelId,
-        temperature,
+        agentsList,
         behavior: behavior || {
           greeting: "Hello! How can I help you today?",
           fallbackMessage: "I'm sorry, I don't understand. Let me connect you with a human agent.",

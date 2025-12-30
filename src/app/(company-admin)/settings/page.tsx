@@ -21,6 +21,7 @@ import {
   type TabItem,
   Textarea,
 } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   AlertTriangle,
@@ -76,6 +77,7 @@ const locales = [
 ];
 
 export default function SettingsPage() {
+  useSetPageTitle("Settings");
   const { settings, isLoading, mutate } = useSettings();
   const { updateSettings, isUpdating } = useUpdateSettings();
   const { generateKey, isGenerating } = useGenerateApiKey();
@@ -172,7 +174,7 @@ export default function SettingsPage() {
   // Sync form with settings
   useEffect(() => {
     if (settings) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Sync state with prop changes
+       
       setFormData({
         name: settings.name,
         description: settings.description || "",

@@ -6,16 +6,23 @@
  * - Caching agent instances
  * - Routing messages to appropriate agents
  * - Managing agent execution
+ *
+ * Uses AdkExecutor for chatbot execution via Google ADK
  */
 
 import { db } from "@/lib/db";
-import { agents, agentPackages, type PackageVariableDefinition } from "@/lib/db/schema/agents";
+import {
+  chatbots,
+  chatbotPackages,
+  type PackageVariableDefinition,
+  type AgentListItem,
+} from "@/lib/db/schema/chatbots";
 import { conversations, messages as messagesTable } from "@/lib/db/schema/conversations";
 import { companies } from "@/lib/db/schema/companies";
 import { eq, and } from "drizzle-orm";
 
-import { BaseAgent, createAgent } from "./base-agent";
-import { agentToConfig, createVariableContext } from "../types";
+import { AdkExecutor, createAdkExecutor } from "./adk-executor";
+import { createVariableContext } from "../types";
 
 import type {
   AgentContext,
@@ -66,27 +73,27 @@ export interface SendMessageOptions {
 // Agent Cache
 // ============================================================================
 
-class AgentCache {
-  private cache: Map<string, { agent: BaseAgent; timestamp: number }> = new Map();
+class ExecutorCache {
+  private cache: Map<string, { executor: AdkExecutor; timestamp: number }> = new Map();
   private readonly ttlMs = 300000; // 5 minutes
 
-  get(agentId: string): BaseAgent | undefined {
-    const entry = this.cache.get(agentId);
+  get(chatbotId: string): AdkExecutor | undefined {
+    const entry = this.cache.get(chatbotId);
     if (entry) {
       if (Date.now() - entry.timestamp < this.ttlMs) {
-        return entry.agent;
+        return entry.executor;
       }
-      this.cache.delete(agentId);
+      this.cache.delete(chatbotId);
     }
     return undefined;
   }
 
-  set(agentId: string, agent: BaseAgent): void {
-    this.cache.set(agentId, { agent, timestamp: Date.now() });
+  set(chatbotId: string, executor: AdkExecutor): void {
+    this.cache.set(chatbotId, { executor, timestamp: Date.now() });
   }
 
-  delete(agentId: string): void {
-    this.cache.delete(agentId);
+  delete(chatbotId: string): void {
+    this.cache.delete(chatbotId);
   }
 
   clear(): void {
@@ -99,66 +106,135 @@ class AgentCache {
 // ============================================================================
 
 export class AgentRunnerService {
-  private agentCache: AgentCache;
+  private executorCache: ExecutorCache;
 
   constructor() {
-    this.agentCache = new AgentCache();
+    this.executorCache = new ExecutorCache();
   }
 
   /**
-   * Load an agent by ID
+   * Load a chatbot executor by ID
    */
-  async loadAgent(agentId: string): Promise<BaseAgent | null> {
+  async loadExecutor(chatbotId: string): Promise<AdkExecutor | null> {
     // Check cache first
-    const cached = this.agentCache.get(agentId);
+    const cached = this.executorCache.get(chatbotId);
     if (cached) {
       return cached;
     }
 
-    // Load from database
-    const agentData = await db
-      .select()
-      .from(agents)
-      .where(and(eq(agents.id, agentId), eq(agents.status, "active")))
+    // Load chatbot with package info
+    const chatbotData = await db
+      .select({
+        id: chatbots.id,
+        companyId: chatbots.companyId,
+        packageId: chatbots.packageId,
+        packageType: chatbots.packageType,
+        agentsList: chatbots.agentsList,
+        variableValues: chatbots.variableValues,
+        status: chatbots.status,
+        // Package fields
+        packageSlug: chatbotPackages.slug,
+        packageVariables: chatbotPackages.variables,
+      })
+      .from(chatbots)
+      .leftJoin(chatbotPackages, eq(chatbots.packageId, chatbotPackages.id))
+      .where(and(eq(chatbots.id, chatbotId), eq(chatbots.status, "active")))
       .limit(1);
 
-    if (agentData.length === 0) {
+    if (chatbotData.length === 0) {
+      console.error(`[AgentRunner] Chatbot ${chatbotId} not found or not active`);
       return null;
     }
 
-    // Convert to config and create agent
-    const agentRecord = agentData[0];
-    if (!agentRecord) {
+    const chatbot = chatbotData[0];
+    if (!chatbot) {
       return null;
     }
-    const config = agentToConfig(agentRecord);
-    const agent = createAgent(config);
 
-    // Cache the agent
-    this.agentCache.set(agentId, agent);
+    // Get agents list
+    const agentsList = chatbot.agentsList as AgentListItem[] || [];
+    if (agentsList.length === 0) {
+      console.error(`[AgentRunner] Chatbot ${chatbotId} has no agents configured`);
+      return null;
+    }
 
-    return agent;
+    // Find the primary agent (first supervisor or first agent)
+    const primaryAgent = agentsList.find((a) => a.agent_type === "supervisor") || agentsList[0];
+    if (!primaryAgent) {
+      console.error(`[AgentRunner] Chatbot ${chatbotId} has no primary agent`);
+      return null;
+    }
+
+    // Determine knowledge categories (combine all agents' categories)
+    const allCategories: string[] = [];
+    for (const agent of agentsList) {
+      if (agent.knowledge_categories && agent.knowledge_categories.length > 0) {
+        allCategories.push(...agent.knowledge_categories);
+      }
+    }
+    const uniqueCategories = [...new Set(allCategories)];
+
+    // Check if knowledge base is enabled for any agent
+    const kbEnabled = agentsList.some((a) => a.knowledge_base_enabled === true);
+
+    // Build AdkExecutor options
+    const executorOptions = {
+      chatbotId: chatbot.id,
+      companyId: chatbot.companyId,
+      packageId: chatbot.packageId || chatbot.id, // Use package UUID for registry lookup
+      agentConfig: {
+        systemPrompt: primaryAgent.default_system_prompt,
+        modelId: primaryAgent.default_model_id,
+        temperature: primaryAgent.default_temperature,
+        knowledgeBaseEnabled: kbEnabled,
+        knowledgeCategories: uniqueCategories,
+      },
+      agentsListConfig: agentsList,
+    };
+
+    // Create executor
+    const executor = createAdkExecutor(executorOptions);
+
+    // Initialize the executor (load package)
+    if (!executor.initialize()) {
+      console.error(`[AgentRunner] Failed to initialize executor for ${chatbotId}`);
+      return null;
+    }
+
+    // Cache the executor
+    this.executorCache.set(chatbotId, executor);
+
+    console.log(`[AgentRunner] Loaded executor for chatbot ${chatbotId}`);
+    return executor;
+  }
+
+  /**
+   * Load an agent by ID (legacy method - now loads executor)
+   * @deprecated Use loadExecutor instead
+   */
+  async loadAgent(agentId: string): Promise<AdkExecutor | null> {
+    return this.loadExecutor(agentId);
   }
 
   /**
    * Create a new chat session (conversation)
    */
   async createSession(options: CreateSessionOptions): Promise<SessionInfo | null> {
-    // Verify agent exists and is active
-    const agentData = await db
+    // Verify chatbot exists and is active
+    const chatbotData = await db
       .select()
-      .from(agents)
+      .from(chatbots)
       .where(
         and(
-          eq(agents.id, options.agentId),
-          eq(agents.companyId, options.companyId),
-          eq(agents.status, "active")
+          eq(chatbots.id, options.agentId),
+          eq(chatbots.companyId, options.companyId),
+          eq(chatbots.status, "active")
         )
       )
       .limit(1);
 
-    const agent = agentData[0];
-    if (!agent) {
+    const chatbot = chatbotData[0];
+    if (!chatbot) {
       return null;
     }
 
@@ -179,8 +255,8 @@ export class AgentRunnerService {
       .insert(conversations)
       .values({
         companyId: options.companyId,
-        agentId: options.agentId,
-        endUserId: options.endUserId || crypto.randomUUID(), // Temporary - should be proper end user
+        chatbotId: options.agentId,
+        endUserId: options.endUserId || crypto.randomUUID(),
         channel: options.channel,
         status: "active",
         metadata: options.metadata || {},
@@ -196,7 +272,7 @@ export class AgentRunnerService {
     }
 
     // Get greeting message
-    const behavior = agent.behavior as { greeting?: string };
+    const behavior = chatbot.behavior as { greeting?: string };
     const greeting = behavior?.greeting || "Hello! How can I help you today?";
 
     // Save greeting as first message
@@ -209,7 +285,7 @@ export class AgentRunnerService {
 
     return {
       conversationId: conversation.id,
-      agentId: agent.id,
+      agentId: chatbot.id,
       companyId: options.companyId,
       greeting,
     };
@@ -247,9 +323,9 @@ export class AgentRunnerService {
       };
     }
 
-    // Load agent
-    const agent = await this.loadAgent(conversation.agentId);
-    if (!agent) {
+    // Load executor
+    const executor = await this.loadExecutor(conversation.chatbotId);
+    if (!executor) {
       return {
         content: "The agent is currently unavailable. Please try again later.",
         metadata: {},
@@ -276,14 +352,14 @@ export class AgentRunnerService {
       })
       .where(eq(conversations.id, options.conversationId));
 
-    // Load variable context for the agent
-    const variableContext = await this.loadVariableContext(conversation.agentId);
+    // Load variable context
+    const variableContext = await this.loadVariableContext(conversation.chatbotId);
 
     // Build context
     const context: AgentContext = {
       conversationId: options.conversationId,
       companyId: conversation.companyId,
-      agentId: conversation.agentId,
+      agentId: conversation.chatbotId,
       requestId: crypto.randomUUID(),
       message: options.message,
       attachments: options.attachments?.map((a) => ({
@@ -297,8 +373,12 @@ export class AgentRunnerService {
       securedVariables: variableContext.securedVariables,
     };
 
-    // Process message
-    const response = await agent.processMessage(context);
+    // Process message using ADK executor
+    const response = await executor.processMessage({
+      message: options.message,
+      sessionId: options.conversationId,
+      context,
+    });
 
     // Save assistant response
     await db.insert(messagesTable).values({
@@ -375,9 +455,9 @@ export class AgentRunnerService {
       return;
     }
 
-    // Load agent
-    const agent = await this.loadAgent(conversation.agentId);
-    if (!agent) {
+    // Load executor
+    const executor = await this.loadExecutor(conversation.chatbotId);
+    if (!executor) {
       yield {
         type: "error",
         data: {
@@ -398,14 +478,14 @@ export class AgentRunnerService {
       content: options.message,
     });
 
-    // Load variable context for the agent
-    const variableContext = await this.loadVariableContext(conversation.agentId);
+    // Load variable context
+    const variableContext = await this.loadVariableContext(conversation.chatbotId);
 
     // Build context
     const context: AgentContext = {
       conversationId: options.conversationId,
       companyId: conversation.companyId,
-      agentId: conversation.agentId,
+      agentId: conversation.chatbotId,
       requestId: crypto.randomUUID(),
       message: options.message,
       endUserId: conversation.endUserId,
@@ -415,11 +495,15 @@ export class AgentRunnerService {
       securedVariables: variableContext.securedVariables,
     };
 
-    // Stream response
+    // Stream response using ADK executor
     let fullContent = "";
     let metadata: AgentResponse["metadata"];
 
-    for await (const event of agent.processMessageStream(context)) {
+    for await (const event of executor.processMessageStream({
+      message: options.message,
+      sessionId: options.conversationId,
+      context,
+    })) {
       yield event;
 
       if (event.type === "delta") {
@@ -439,7 +523,7 @@ export class AgentRunnerService {
         type: "text",
         content: fullContent,
         tokenCount: metadata?.tokensUsed?.totalTokens,
-        processingTimeMs: metadata?.processingTimeMs,
+        processingTimeMs: metadata?.processingTimeMs ? Math.round(metadata.processingTimeMs) : undefined,
       });
 
       // Update conversation
@@ -519,37 +603,34 @@ export class AgentRunnerService {
   }
 
   /**
-   * Load variable values for an agent
-   * Variables are now stored as JSONB:
-   * - Package variable definitions in agentPackages.variables
-   * - Agent variable values in agents.variableValues
+   * Load variable values for a chatbot
    */
-  private async loadVariableContext(agentId: string): Promise<VariableContext> {
-    // Get agent with its package to read variable definitions and values
-    const agentData = await db
+  private async loadVariableContext(chatbotId: string): Promise<VariableContext> {
+    // Get chatbot with its package to read variable definitions and values
+    const chatbotData = await db
       .select({
-        variableValues: agents.variableValues,
-        packageId: agents.packageId,
-        packageVariables: agentPackages.variables,
+        variableValues: chatbots.variableValues,
+        packageId: chatbots.packageId,
+        packageVariables: chatbotPackages.variables,
       })
-      .from(agents)
-      .leftJoin(agentPackages, eq(agents.packageId, agentPackages.id))
-      .where(eq(agents.id, agentId))
+      .from(chatbots)
+      .leftJoin(chatbotPackages, eq(chatbots.packageId, chatbotPackages.id))
+      .where(eq(chatbots.id, chatbotId))
       .limit(1);
 
-    const agent = agentData[0];
-    if (!agent) {
+    const chatbot = chatbotData[0];
+    if (!chatbot) {
       return createVariableContext([]);
     }
 
-    // Get package variable definitions and agent's values
-    const packageVariablesDefs = (agent.packageVariables as PackageVariableDefinition[]) || [];
-    const agentVariableValues = (agent.variableValues as Record<string, string>) || {};
+    // Get package variable definitions and chatbot's values
+    const packageVariablesDefs = (chatbot.packageVariables as PackageVariableDefinition[]) || [];
+    const chatbotVariableValues = (chatbot.variableValues as Record<string, string>) || {};
 
     // Combine definitions with values
     const variableValues: VariableValue[] = packageVariablesDefs.map((pv) => ({
       name: pv.name,
-      value: agentVariableValues[pv.name] || null,
+      value: chatbotVariableValues[pv.name] || null,
       variableType: pv.variableType,
       dataType: pv.dataType,
     }));
@@ -558,17 +639,17 @@ export class AgentRunnerService {
   }
 
   /**
-   * Invalidate agent cache
+   * Invalidate executor cache for a chatbot
    */
-  invalidateAgent(agentId: string): void {
-    this.agentCache.delete(agentId);
+  invalidateAgent(chatbotId: string): void {
+    this.executorCache.delete(chatbotId);
   }
 
   /**
-   * Clear all agent cache
+   * Clear all executor cache
    */
   clearCache(): void {
-    this.agentCache.clear();
+    this.executorCache.clear();
   }
 }
 

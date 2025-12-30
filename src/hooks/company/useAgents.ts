@@ -39,6 +39,24 @@ export interface AgentVariableValue {
   value: string | null;
 }
 
+// Agent list item stored in agents.agentsList JSONB (matches schema)
+export interface AgentListItemConfig {
+  agent_identifier: string;
+  name: string;
+  designation?: string;
+  routing_prompt?: string;
+  agent_type: "worker" | "supervisor";
+  avatar_url?: string;
+  default_system_prompt: string;
+  default_model_id: string;
+  default_temperature: number;
+  knowledge_base_enabled?: boolean;
+  knowledge_categories?: string[];
+  tools?: unknown[];
+  managed_agent_ids?: string[];
+  sort_order?: number;
+}
+
 // Agent Detail
 export interface AgentDetail {
   id: string;
@@ -48,10 +66,14 @@ export interface AgentDetail {
   description: string | null;
   type: string;
   status: string;
+  // Backward-compatible fields from primary agent in agentsList
   avatarUrl: string | null;
   systemPrompt: string;
   modelId: string;
   temperature: number;
+  knowledgeCategories: string[];
+  // Agents list (JSONB array of agent configs)
+  agentsList?: AgentListItemConfig[];
   behavior: {
     greeting?: string;
     fallbackMessage?: string;
@@ -62,10 +84,10 @@ export interface AgentDetail {
     collectName?: boolean;
     workingHours?: unknown;
     offlineMessage?: string;
+    enabledTools?: Record<string, boolean>;
   };
   escalationEnabled: boolean;
   escalationTriggers: unknown[];
-  knowledgeSourceIds: string[];
   totalConversations: number;
   avgResolutionTime: number | null;
   satisfactionScore: number | null;
@@ -145,6 +167,7 @@ async function createAgent(
     systemPrompt?: string;
     modelId?: string;
     temperature?: number;
+    knowledgeCategories?: string[];
     behavior?: Record<string, unknown>;
     variableValues?: Record<string, string>;
   }}

@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { faqItems } from "@/lib/db/schema";
+import { getProcessingPipeline } from "@/lib/knowledge/processing-pipeline";
 
 export async function GET(
   request: NextRequest,
@@ -118,7 +119,17 @@ export async function PATCH(
       .where(eq(faqItems.id, faqId))
       .returning();
 
-    // TODO: Update vector embedding if question changed
+    // Re-index FAQ if question or answer changed
+    if (body.question !== undefined || body.answer !== undefined || body.category !== undefined) {
+      setImmediate(async () => {
+        try {
+          const pipeline = getProcessingPipeline();
+          await pipeline.processFaq(faqId, { useQdrant: true });
+        } catch (error) {
+          console.error(`Failed to re-index FAQ ${faqId} in Qdrant:`, error);
+        }
+      });
+    }
 
     return NextResponse.json({ faq: updatedFaq });
   } catch (error) {
@@ -168,7 +179,15 @@ export async function DELETE(
       })
       .where(eq(faqItems.id, faqId));
 
-    // TODO: Remove from vector store
+    // Remove from Qdrant vector store
+    setImmediate(async () => {
+      try {
+        const pipeline = getProcessingPipeline();
+        await pipeline.deleteFaqEmbedding(faqId);
+      } catch (error) {
+        console.error(`Failed to remove FAQ ${faqId} from Qdrant:`, error);
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

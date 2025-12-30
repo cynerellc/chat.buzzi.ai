@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   Clock,
@@ -100,6 +101,7 @@ function isExpired(dateString: string) {
 }
 
 export default function TeamPage() {
+  useSetPageTitle("Team");
   const { members, invitations, isLoading, mutate } = useTeam();
   const { invite, isInviting } = useInviteTeamMember();
   const { revoke, isRevoking } = useRevokeInvitation();

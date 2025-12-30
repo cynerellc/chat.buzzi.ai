@@ -4,6 +4,8 @@ import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { knowledgeSources } from "@/lib/db/schema";
+import { triggerBackgroundIndexing } from "@/lib/knowledge/processing-pipeline";
+import { getSupabaseClient, STORAGE_BUCKET } from "@/lib/supabase/client";
 
 export interface KnowledgeSourceListItem {
   id: string;
@@ -11,6 +13,7 @@ export interface KnowledgeSourceListItem {
   description: string | null;
   type: string;
   status: string;
+  category: string | null;
   chunkCount: number;
   tokenCount: number;
   processingError: string | null;
@@ -26,6 +29,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
     const status = searchParams.get("status");
+    const category = searchParams.get("category");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
@@ -46,6 +50,14 @@ export async function GET(request: NextRequest) {
       conditions.push(
         eq(knowledgeSources.status, status as "pending" | "processing" | "indexed" | "failed")
       );
+    }
+
+    if (category) {
+      if (category === "uncategorized") {
+        conditions.push(isNull(knowledgeSources.category));
+      } else {
+        conditions.push(eq(knowledgeSources.category, category));
+      }
     }
 
     // Get total count
@@ -69,6 +81,7 @@ export async function GET(request: NextRequest) {
       description: source.description,
       type: source.type,
       status: source.status,
+      category: source.category,
       chunkCount: source.chunkCount,
       tokenCount: source.tokenCount,
       processingError: source.processingError,
@@ -120,6 +133,7 @@ interface CreateKnowledgeSourceRequest {
   name: string;
   description?: string;
   type: "file" | "url" | "text";
+  category?: string;
   sourceConfig: {
     // For file
     fileName?: string;
@@ -177,12 +191,44 @@ export async function POST(request: NextRequest) {
         name: body.name,
         description: body.description || null,
         type: body.type,
+        category: body.category || null,
         status: "pending",
         sourceConfig: body.sourceConfig,
       })
       .returning();
 
-    // TODO: Trigger async processing job to index the content
+    if (!newSource) {
+      return NextResponse.json(
+        { error: "Failed to create knowledge source" },
+        { status: 500 }
+      );
+    }
+
+    // Trigger background indexing immediately
+    if (body.type === "file" && body.sourceConfig.storagePath) {
+      // For files, download from Supabase and trigger indexing
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .download(body.sourceConfig.storagePath);
+
+      if (!error && data) {
+        const buffer = Buffer.from(await data.arrayBuffer());
+        triggerBackgroundIndexing(newSource.id, "file", {
+          fileBuffer: buffer,
+          fileType: body.sourceConfig.fileType,
+          fileName: body.sourceConfig.fileName,
+        });
+      }
+    } else if (body.type === "url" && body.sourceConfig.url) {
+      triggerBackgroundIndexing(newSource.id, "url", {
+        url: body.sourceConfig.url,
+      });
+    } else if (body.type === "text" && body.sourceConfig.content) {
+      triggerBackgroundIndexing(newSource.id, "text", {
+        content: body.sourceConfig.content,
+      });
+    }
 
     return NextResponse.json({ source: newSource }, { status: 201 });
   } catch (error) {

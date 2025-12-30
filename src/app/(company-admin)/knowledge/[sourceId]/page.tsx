@@ -13,11 +13,10 @@ import {
   Loader2,
   Edit2,
   Trash2,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
 } from "lucide-react";
 
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   Button,
   Input,
@@ -33,7 +32,7 @@ import {
   Textarea,
   addToast,
 } from "@/components/ui";
-import { useKnowledgeSource, useKnowledgeChunks, useUpdateKnowledgeSource, useDeleteKnowledgeSource } from "@/hooks/company";
+import { useKnowledgeSource, useUpdateKnowledgeSource, useDeleteKnowledgeSource } from "@/hooks/company";
 
 type StatusConfig = {
   label: string;
@@ -85,6 +84,7 @@ interface PageProps {
 }
 
 export default function KnowledgeDetailPage({ params }: PageProps) {
+  useSetPageTitle("Knowledge Source");
   const { sourceId } = use(params);
   const router = useRouter();
 
@@ -92,11 +92,8 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [chunksPage, setChunksPage] = useState(1);
-  const [expandedChunks, setExpandedChunks] = useState<Set<string>>(new Set());
 
   const { source, isLoading, mutate } = useKnowledgeSource(sourceId);
-  const { chunks, pagination: chunksPagination, isLoading: isLoadingChunks } = useKnowledgeChunks(sourceId, chunksPage);
   const { updateSource, isUpdating } = useUpdateKnowledgeSource(sourceId);
   const { deleteSource, isDeleting } = useDeleteKnowledgeSource(sourceId);
 
@@ -136,18 +133,6 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
     } catch {
       addToast({ title: "Failed to delete knowledge source", color: "danger" });
     }
-  };
-
-  const toggleChunkExpanded = (chunkId: string) => {
-    setExpandedChunks((prev) => {
-      const next = new Set(prev);
-      if (next.has(chunkId)) {
-        next.delete(chunkId);
-      } else {
-        next.add(chunkId);
-      }
-      return next;
-    });
   };
 
   if (isLoading) {
@@ -317,104 +302,28 @@ export default function KnowledgeDetailPage({ params }: PageProps) {
         </CardBody>
       </Card>
 
-      {/* Chunks */}
+      {/* Indexing Info */}
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Content Chunks ({source.chunkCount})</h2>
+          <h2 className="text-lg font-semibold">Vector Indexing</h2>
         </CardHeader>
-        <CardBody className="p-0">
-          {isLoadingChunks ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <CardBody>
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-lg bg-primary/10">
+              <FileText className="h-6 w-6 text-primary" />
             </div>
-          ) : chunks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-8 w-8 text-muted-foreground/50 mb-2" />
-              <p className="text-muted-foreground">No chunks yet</p>
-              <p className="text-muted-foreground text-sm">
-                Chunks will appear here once the source is processed
+            <div>
+              <p className="font-medium mb-1">
+                {source.chunkCount > 0
+                  ? `${source.chunkCount} chunks indexed in vector database`
+                  : "Content not yet indexed"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This content has been processed and stored in the vector database for semantic search.
+                The AI agent can retrieve relevant information from this source during conversations.
               </p>
             </div>
-          ) : (
-            <>
-              <div className="divide-y divide-divider">
-                {chunks.map((chunk) => {
-                  const isExpanded = expandedChunks.has(chunk.id);
-                  const shouldTruncate = chunk.content.length > 300;
-
-                  return (
-                    <div key={chunk.id} className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="default">Chunk {chunk.chunkIndex + 1}</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {chunk.tokenCount} tokens
-                            </span>
-                            {chunk.vectorId && (
-                              <Badge variant="success" className="text-xs">
-                                Vectorized
-                              </Badge>
-                            )}
-                          </div>
-                          <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
-                            {shouldTruncate && !isExpanded
-                              ? `${chunk.content.slice(0, 300)}...`
-                              : chunk.content}
-                          </pre>
-                          {shouldTruncate && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="mt-2"
-                              onPress={() => toggleChunkExpanded(chunk.id)}
-                            >
-                              {isExpanded ? (
-                                <>
-                                  <ChevronUp className="h-4 w-4 mr-1" />
-                                  Show Less
-                                </>
-                              ) : (
-                                <>
-                                  <ChevronDown className="h-4 w-4 mr-1" />
-                                  Show More
-                                </>
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Pagination */}
-              {(chunksPagination.hasMore || chunksPage > 1) && (
-                <div className="flex items-center justify-center gap-2 p-4 border-t border-divider">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={chunksPage <= 1}
-                    onPress={() => setChunksPage((p) => p - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    Page {chunksPage}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!chunksPagination.hasMore}
-                    onPress={() => setChunksPage((p) => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
+          </div>
         </CardBody>
       </Card>
 

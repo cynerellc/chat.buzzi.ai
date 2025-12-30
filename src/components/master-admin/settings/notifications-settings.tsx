@@ -132,7 +132,6 @@ export function NotificationsSettings({
                         <span className="text-default-400 text-sm">%</span>
                       }
                       className="w-24"
-                      size="sm"
                     />
                   )}
                 </div>
@@ -192,7 +191,6 @@ export function NotificationsSettings({
                       <span className="text-default-400 text-sm">%</span>
                     }
                     className="w-24"
-                    size="sm"
                   />
                 )}
               </div>
@@ -278,7 +276,6 @@ export function NotificationsSettings({
                 value={settings.dailyDigestTime}
                 onValueChange={(v) => onChange({ dailyDigestTime: v })}
                 className="w-32"
-                size="sm"
               />
             )}
           </div>
@@ -298,7 +295,6 @@ export function NotificationsSettings({
                 }}
                 options={weekdayOptions}
                 className="w-40"
-                size="sm"
               />
             )}
           </div>

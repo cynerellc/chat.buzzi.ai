@@ -204,7 +204,7 @@ async function loadIntegration(
     .from(integrations)
     .where(
       and(
-        eq(integrations.companyId, companyId),
+        eq(integrations.chatbotId, companyId),
         eq(integrations.id, webhookId),
         eq(integrations.status, "active")
       )
@@ -297,7 +297,7 @@ async function findOrCreateConversation(
     .where(
       and(
         eq(conversations.companyId, companyId),
-        eq(conversations.agentId, agentId),
+        eq(conversations.chatbotId, agentId),
         eq(conversations.endUserId, endUser.id),
         eq(conversations.status, "active")
       )
@@ -313,7 +313,7 @@ async function findOrCreateConversation(
     .insert(conversations)
     .values({
       companyId,
-      agentId,
+      chatbotId: agentId,
       endUserId: endUser.id,
       channel,
       status: "active",

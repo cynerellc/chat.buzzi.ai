@@ -41,14 +41,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         description: originalAgent.description,
         type: originalAgent.type,
         status: "draft", // Always start as draft
-        avatarUrl: originalAgent.avatarUrl,
-        systemPrompt: originalAgent.systemPrompt,
-        modelId: originalAgent.modelId,
-        temperature: originalAgent.temperature,
+        agentsList: originalAgent.agentsList,
         behavior: originalAgent.behavior,
         escalationEnabled: originalAgent.escalationEnabled,
         escalationTriggers: originalAgent.escalationTriggers,
-        knowledgeSourceIds: originalAgent.knowledgeSourceIds,
+        variableValues: originalAgent.variableValues,
       })
       .returning();
 

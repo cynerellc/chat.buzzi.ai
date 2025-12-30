@@ -10,9 +10,10 @@ interface PackagesGridProps {
   packages: PackageListItem[];
   isLoading: boolean;
   onConfigure: (pkg: PackageListItem) => void;
+  onViewCode: (pkg: PackageListItem) => void;
 }
 
-export function PackagesGrid({ packages, isLoading, onConfigure }: PackagesGridProps) {
+export function PackagesGrid({ packages, isLoading, onConfigure, onViewCode }: PackagesGridProps) {
   if (isLoading) {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -51,6 +52,7 @@ export function PackagesGrid({ packages, isLoading, onConfigure }: PackagesGridP
           key={pkg.id}
           package={pkg}
           onConfigure={onConfigure}
+          onViewCode={onViewCode}
         />
       ))}
     </div>

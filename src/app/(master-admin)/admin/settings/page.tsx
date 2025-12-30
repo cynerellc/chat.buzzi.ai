@@ -13,6 +13,7 @@ import {
   MaintenanceSettings,
 } from "@/components/master-admin/settings";
 import { Button, Tabs, Skeleton, Card, type TabItem } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   useSystemSettings,
   updateSettings,
@@ -22,6 +23,7 @@ import {
 type TabKey = "general" | "email" | "ai" | "security" | "integrations" | "maintenance";
 
 export default function SettingsPage() {
+  useSetPageTitle("Settings");
   const { settings, isLoading, mutate } = useSystemSettings();
   const [activeTab, setActiveTab] = useState<TabKey>("general");
   const [pendingChanges, setPendingChanges] = useState<Partial<SystemSettings>>({});

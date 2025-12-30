@@ -3,11 +3,11 @@
  *
  * This module provides a complete AI agent framework for the chat platform:
  *
- * - LLM Client: Multi-provider support for OpenAI and Anthropic
+ * - LLM Client: Multi-provider support for OpenAI
  * - Tool System: Extensible tool framework with built-in tools
  * - RAG Service: Knowledge retrieval and context injection
  * - History Service: Conversation history management
- * - Base Agent: Core agent implementation
+ * - ADK Executor: Google ADK-based agent execution
  * - Agent Runner: Agent lifecycle and execution management
  *
  * Usage:
@@ -64,14 +64,14 @@ export type { RAGSearchOptions, RAGResult, RAGContext } from "./rag";
 
 // Execution
 export {
-  BaseAgent,
-  createAgent,
   HistoryService,
   createHistoryService,
   defaultHistoryConfig,
   AgentRunnerService,
   getAgentRunner,
   createAgentRunner,
+  AdkExecutor,
+  createAdkExecutor,
 } from "./execution";
 export type {
   CreateSessionOptions,
@@ -79,4 +79,5 @@ export type {
   SendMessageOptions,
   HistoryMessage,
   ConversationHistory,
+  AdkExecutorOptions,
 } from "./execution";

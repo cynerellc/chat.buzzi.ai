@@ -9,20 +9,20 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { companies } from "./companies";
+import { chatbots } from "./chatbots";
 import { chatappSchema } from "./enums";
 
-// Widget Configuration Table (per company)
+// Widget Configuration Table (per chatbot - one config per chatbot)
 export const widgetConfigs = chatappSchema.table(
   "widget_configs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
-    // Company Reference
-    companyId: uuid("company_id")
+    // Chatbot Reference (changed from companyId)
+    chatbotId: uuid("chatbot_id")
       .notNull()
-      .references(() => companies.id, { onDelete: "cascade" })
-      .unique(), // One config per company
+      .references(() => chatbots.id, { onDelete: "cascade" })
+      .unique(), // One config per chatbot
 
     // Appearance
     theme: varchar("theme", { length: 20 }).default("light").notNull(), // light, dark, auto
@@ -78,14 +78,14 @@ export const widgetConfigs = chatappSchema.table(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("widget_configs_company_idx").on(table.companyId)]
+  (table) => [index("widget_configs_chatbot_idx").on(table.chatbotId)]
 );
 
 // Relations
 export const widgetConfigsRelations = relations(widgetConfigs, ({ one }) => ({
-  company: one(companies, {
-    fields: [widgetConfigs.companyId],
-    references: [companies.id],
+  chatbot: one(chatbots, {
+    fields: [widgetConfigs.chatbotId],
+    references: [chatbots.id],
   }),
 }));
 

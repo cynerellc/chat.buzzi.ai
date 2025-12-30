@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       })
       .from(conversations)
       .innerJoin(endUsers, eq(conversations.endUserId, endUsers.id))
-      .innerJoin(agents, eq(conversations.agentId, agents.id))
+      .innerJoin(agents, eq(conversations.chatbotId, agents.id))
       .where(eq(conversations.companyId, company.id))
       .orderBy(desc(conversations.lastMessageAt), desc(conversations.createdAt))
       .limit(limit);

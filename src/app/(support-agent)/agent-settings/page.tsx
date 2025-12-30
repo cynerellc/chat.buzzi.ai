@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   Card,
   Button,
@@ -60,6 +61,7 @@ interface AgentSettings {
 }
 
 export default function AgentSettingsPage() {
+  useSetPageTitle("My Settings");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [settings, setSettings] = useState<AgentSettings | null>(null);
   const [loading, setLoading] = useState(true);

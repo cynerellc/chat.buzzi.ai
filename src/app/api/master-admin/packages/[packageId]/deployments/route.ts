@@ -60,13 +60,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
         const [convCount] = await db
           .select({ count: count() })
           .from(conversations)
-          .where(eq(conversations.agentId, agent.id));
+          .where(eq(conversations.chatbotId, agent.id));
 
         // Get last conversation timestamp
         const [lastConv] = await db
           .select({ updatedAt: conversations.updatedAt })
           .from(conversations)
-          .where(eq(conversations.agentId, agent.id))
+          .where(eq(conversations.chatbotId, agent.id))
           .orderBy(desc(conversations.updatedAt))
           .limit(1);
 

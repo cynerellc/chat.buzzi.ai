@@ -30,7 +30,7 @@ This document defines the PostgreSQL database schema for the Multi-Tenant AI Cha
 // src/db/schema/index.ts
 export * from './companies';
 export * from './users';
-export * from './agent-packages';
+export * from './chatbot-packages';
 export * from './agents';
 export * from './conversations';
 export * from './customers';
@@ -223,7 +223,7 @@ export const verificationTokens = pgTable('chatapp_verification_tokens', {
 ### 3.1 Agent Packages (Master Admin Managed)
 
 ```typescript
-// src/db/schema/agent-packages.ts
+// src/db/schema/chatbot-packages.ts
 import { pgTable, uuid, varchar, text, jsonb, timestamp, boolean, integer } from 'drizzle-orm/pg-core';
 
 export const agentPackages = pgTable('chatapp_agent_packages', {

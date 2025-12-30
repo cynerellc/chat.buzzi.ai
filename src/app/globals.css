@@ -269,3 +269,149 @@ select,
   background-color: rgb(var(--primary)) !important;
   border-radius: 1px !important;
 }
+
+/* Auth Grid Background Animations */
+@keyframes auth-pulse-node {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes auth-pulse-glow {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes auth-grid-node-pulse {
+  0%, 100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes auth-data-flow-h {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(calc(100vw + 100%));
+  }
+}
+
+@keyframes auth-data-flow-v {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(calc(100vh + 100%));
+  }
+}
+
+.auth-pulse-node {
+  animation: auth-pulse-node 4s ease-in-out infinite;
+}
+
+.auth-pulse-glow {
+  animation: auth-pulse-glow 4s ease-in-out infinite;
+}
+
+.auth-grid-node {
+  animation: auth-grid-node-pulse 6s ease-in-out infinite;
+}
+
+.auth-data-flow-h {
+  animation: auth-data-flow-h 8s linear infinite;
+}
+
+.auth-data-flow-v {
+  animation: auth-data-flow-v 10s linear infinite;
+}
+
+/* Enterprise Sidebar Animations */
+@keyframes border-data-flow-h {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(calc(100vw));
+  }
+}
+
+@keyframes border-data-flow-v {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(calc(100vh));
+  }
+}
+
+@keyframes status-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+@keyframes grid-fade {
+  0%, 100% {
+    opacity: 0.02;
+  }
+  50% {
+    opacity: 0.05;
+  }
+}
+
+.border-data-flow-h {
+  animation: border-data-flow-h 6s linear infinite;
+}
+
+.border-data-flow-v {
+  animation: border-data-flow-v 6s linear infinite;
+}
+
+.status-pulse {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+.grid-fade {
+  animation: grid-fade 8s ease-in-out infinite;
+}
+
+/* Sidebar Grid Pattern */
+.sidebar-grid-pattern {
+  background-image:
+    linear-gradient(rgba(var(--primary), 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--primary), 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .sidebar-grid-pattern {
+  background-image:
+    linear-gradient(rgba(var(--primary), 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--primary), 0.05) 1px, transparent 1px);
+}
+
+/* Main content grid pattern */
+.content-grid-pattern {
+  background-image:
+    linear-gradient(rgba(var(--border), 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--border), 0.3) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+}

@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agentPackages, agents, packageAgents, type PackageVariableDefinition } from "@/lib/db/schema";
+import { agentPackages, agents, type PackageVariableDefinition, type AgentListItem } from "@/lib/db/schema";
 import { generateSlug } from "@/lib/utils/slug";
 
 // Response type for list endpoint
@@ -15,16 +15,13 @@ export interface PackageListItem {
   description: string | null;
   category: string | null;
   packageType: "single_agent" | "multi_agent";
-  defaultSystemPrompt: string;
-  defaultModelId: string;
-  defaultTemperature: number;
   defaultBehavior: Record<string, unknown>;
   features: unknown[];
   isActive: boolean;
   isPublic: boolean;
   sortOrder: number;
   agentsCount: number;
-  packageAgentsCount: number;
+  agentsListCount: number;
   variablesCount: number;
   securedVariablesCount: number;
   createdAt: string;
@@ -94,8 +91,8 @@ export async function GET(request: NextRequest) {
     // Get packages
     const orderColumn = sortBy === "name" ? agentPackages.name
       : sortBy === "category" ? agentPackages.category
-      : sortBy === "createdAt" ? agentPackages.createdAt
-      : agentPackages.sortOrder;
+        : sortBy === "createdAt" ? agentPackages.createdAt
+          : agentPackages.sortOrder;
 
     const orderDir = sortOrder === "desc" ? desc(orderColumn) : asc(orderColumn);
 
@@ -131,26 +128,10 @@ export async function GET(request: NextRequest) {
       agentCounts.filter((c) => c.packageId !== null).map((c) => [c.packageId, c.count])
     );
 
-    // Get package agents count for each package
-    let packageAgentCounts: { packageId: string; count: number }[] = [];
-    if (packageIds.length > 0) {
-      packageAgentCounts = await db
-        .select({
-          packageId: packageAgents.packageId,
-          count: count(),
-        })
-        .from(packageAgents)
-        .where(inArray(packageAgents.packageId, packageIds))
-        .groupBy(packageAgents.packageId);
-    }
-
-    const packageAgentCountMap = new Map(
-      packageAgentCounts.map((c) => [c.packageId, c.count])
-    );
-
-    // Variable counts are now computed from the JSONB array in each package
+    // Variable and agents list counts are now computed from the JSONB arrays in each package
     const packagesWithCounts: PackageListItem[] = packages.map((pkg) => {
       const variables = (pkg.variables as PackageVariableDefinition[]) || [];
+      const agentsList = (pkg.agentsList as AgentListItem[]) || [];
       const variablesCount = variables.filter((v) => v.variableType === "variable").length;
       const securedVariablesCount = variables.filter((v) => v.variableType === "secured_variable").length;
 
@@ -160,7 +141,7 @@ export async function GET(request: NextRequest) {
         defaultBehavior: pkg.defaultBehavior as Record<string, unknown>,
         features: pkg.features as unknown[],
         agentsCount: agentCountMap.get(pkg.id) ?? 0,
-        packageAgentsCount: packageAgentCountMap.get(pkg.id) ?? (pkg.packageType === "single_agent" ? 1 : 0),
+        agentsListCount: agentsList.length,
         variablesCount,
         securedVariablesCount,
         createdAt: pkg.createdAt.toISOString(),
@@ -188,19 +169,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Package agent schema for create/update
-const packageAgentSchema = z.object({
-  id: z.string().uuid().optional(),
-  agentIdentifier: z.string().min(1).max(100),
+// Agent list item schema for create/update (matches AgentListItem interface)
+const agentListItemSchema = z.object({
+  agent_identifier: z.string().min(1).max(100),
   name: z.string().min(1).max(255),
-  designation: z.string().max(255).nullable().optional(),
-  agentType: z.enum(["worker", "supervisor"]).default("worker"),
-  systemPrompt: z.string().min(1),
-  modelId: z.string().default("gpt-4o-mini"),
-  temperature: z.number().int().min(0).max(100).default(70),
+  designation: z.string().max(255).optional(),
+  agent_type: z.enum(["worker", "supervisor"]).default("worker"),
+  avatar_url: z.string().max(500).optional(),
+  default_system_prompt: z.string().min(1),
+  default_model_id: z.string().default("gpt-5-mini"),
+  default_temperature: z.number().int().min(0).max(100).default(70),
+  knowledge_categories: z.array(z.string()).default([]),
   tools: z.array(z.unknown()).default([]),
-  managedAgentIds: z.array(z.string()).default([]),
-  sortOrder: z.number().int().default(0),
+  managed_agent_ids: z.array(z.string()).default([]),
+  sort_order: z.number().int().default(0),
 });
 
 // Package variable schema for create/update (matches PackageVariableDefinition)
@@ -224,14 +206,11 @@ const createPackageSchema = z.object({
   description: z.string().optional(),
   category: z.string().max(100).optional(),
   packageType: z.enum(["single_agent", "multi_agent"]).default("single_agent"),
-  // Legacy fields for single agent or backward compatibility
-  defaultSystemPrompt: z.string().optional().default(""),
-  defaultModelId: z.string().default("gpt-4o-mini"),
-  defaultTemperature: z.number().int().min(0).max(100).default(70),
+  // Default behavior shared across all agents in the package
   defaultBehavior: z.record(z.string(), z.unknown()).default({}),
   features: z.array(z.string()).default([]),
-  // Multi-agent support
-  packageAgents: z.array(packageAgentSchema).optional(),
+  // Agents list (stored as JSONB array in agentPackages.agents_list)
+  agentsList: z.array(agentListItemSchema).optional(),
   // Package variables (configurable settings for the package)
   variables: z.array(packageVariableSchema).optional(),
   // Bundle info
@@ -284,7 +263,23 @@ export async function POST(request: NextRequest) {
       placeholder: v.placeholder,
     }));
 
-    // Create the package with variables stored as JSONB
+    // Prepare agents list array for JSONB field
+    const agentsListArray: AgentListItem[] = (validatedData.agentsList || []).map((agent, index) => ({
+      agent_identifier: agent.agent_identifier,
+      name: agent.name,
+      designation: agent.designation,
+      agent_type: agent.agent_type,
+      avatar_url: agent.avatar_url,
+      default_system_prompt: agent.default_system_prompt,
+      default_model_id: agent.default_model_id,
+      default_temperature: agent.default_temperature,
+      knowledge_categories: agent.knowledge_categories,
+      tools: agent.tools,
+      managed_agent_ids: agent.managed_agent_ids,
+      sort_order: agent.sort_order ?? index,
+    }));
+
+    // Create the package with variables and agents_list stored as JSONB
     const [newPackage] = await db
       .insert(agentPackages)
       .values({
@@ -293,9 +288,6 @@ export async function POST(request: NextRequest) {
         description: validatedData.description ?? null,
         category: validatedData.category ?? null,
         packageType: validatedData.packageType,
-        defaultSystemPrompt: validatedData.defaultSystemPrompt,
-        defaultModelId: validatedData.defaultModelId,
-        defaultTemperature: validatedData.defaultTemperature,
         defaultBehavior: validatedData.defaultBehavior,
         features: validatedData.features,
         bundlePath: validatedData.bundlePath ?? null,
@@ -308,6 +300,7 @@ export async function POST(request: NextRequest) {
           sandboxMode: true,
         },
         variables: variablesArray,
+        agentsList: agentsListArray,
         isActive: validatedData.isActive,
         isPublic: validatedData.isPublic,
         sortOrder: validatedData.sortOrder,
@@ -321,38 +314,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create package agents if provided
-    if (validatedData.packageAgents && validatedData.packageAgents.length > 0) {
-      await db.insert(packageAgents).values(
-        validatedData.packageAgents.map((agent, index) => ({
-          packageId: newPackage.id,
-          agentIdentifier: agent.agentIdentifier,
-          name: agent.name,
-          designation: agent.designation ?? null,
-          agentType: agent.agentType as "worker" | "supervisor",
-          systemPrompt: agent.systemPrompt,
-          modelId: agent.modelId,
-          temperature: agent.temperature,
-          tools: agent.tools,
-          managedAgentIds: agent.managedAgentIds,
-          sortOrder: agent.sortOrder ?? index,
-        }))
-      );
-    }
-
-    // Fetch the created package agents
-    const createdAgents = await db
-      .select()
-      .from(packageAgents)
-      .where(eq(packageAgents.packageId, newPackage.id))
-      .orderBy(asc(packageAgents.sortOrder));
-
     return NextResponse.json({
       package: {
         ...newPackage,
-        packageAgents: createdAgents,
-        // Variables are now stored directly in newPackage.variables
+        packageType: newPackage.packageType as "single_agent" | "multi_agent",
+        defaultBehavior: newPackage.defaultBehavior as Record<string, unknown>,
+        features: newPackage.features as unknown[],
+        executionConfig: newPackage.executionConfig as Record<string, unknown>,
+        agentsList: (newPackage.agentsList as AgentListItem[]) || [],
         variables: (newPackage.variables as PackageVariableDefinition[]) || [],
+        createdAt: newPackage.createdAt.toISOString(),
+        updatedAt: newPackage.updatedAt.toISOString(),
       },
     }, { status: 201 });
   } catch (error) {

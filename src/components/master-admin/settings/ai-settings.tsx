@@ -20,10 +20,22 @@ import type { AISettings as AISettingsType } from "@/lib/settings";
 import { testAIConnection } from "@/hooks/master-admin";
 
 const openaiModelOptions = [
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+  // GPT-5 Series (Latest)
+  { value: "gpt-5", label: "GPT-5" },
+  { value: "gpt-5-mini", label: "GPT-5 Mini" },
+  // GPT-4.1 Series
+  { value: "gpt-4.1", label: "GPT-4.1" },
+  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+  // O-Series (Reasoning)
+  { value: "o3", label: "o3 (Reasoning)" },
+  { value: "o3-mini", label: "o3-mini (Reasoning)" },
+  { value: "o4-mini", label: "o4-mini (Reasoning)" },
+  { value: "o1", label: "o1 (Reasoning)" },
+  { value: "o1-mini", label: "o1-mini (Reasoning)" },
+  // GPT-4o (Legacy)
   { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-  { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
 ];
 
 const embeddingModelOptions = [

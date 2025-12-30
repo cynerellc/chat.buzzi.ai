@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const companyWebhooks = await db
       .select()
       .from(webhooks)
-      .where(eq(webhooks.companyId, company.id))
+      .where(eq(webhooks.chatbotId, company.id))
       .orderBy(desc(webhooks.createdAt));
 
     const response: WebhookConfig[] = companyWebhooks.map((webhook) => ({
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const [newWebhook] = await db
       .insert(webhooks)
       .values({
-        companyId: company.id,
+        chatbotId: company.id, // TODO: Should be actual chatbot ID
         name: body.name,
         url: body.url,
         secret,
@@ -153,7 +153,7 @@ export async function PATCH(request: NextRequest) {
     const [existingWebhook] = await db
       .select({ id: webhooks.id })
       .from(webhooks)
-      .where(and(eq(webhooks.id, body.id), eq(webhooks.companyId, company.id)))
+      .where(and(eq(webhooks.id, body.id), eq(webhooks.chatbotId, company.id)))
       .limit(1);
 
     if (!existingWebhook) {
@@ -231,7 +231,7 @@ export async function DELETE(request: NextRequest) {
     const [existingWebhook] = await db
       .select({ id: webhooks.id })
       .from(webhooks)
-      .where(and(eq(webhooks.id, webhookId), eq(webhooks.companyId, company.id)))
+      .where(and(eq(webhooks.id, webhookId), eq(webhooks.chatbotId, company.id)))
       .limit(1);
 
     if (!existingWebhook) {

@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (agentId) {
-      conditions.push(eq(conversations.agentId, agentId));
+      conditions.push(eq(conversations.chatbotId, agentId));
     }
 
     if (channel && channel !== "all") {
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
         lastMessageAt: conversations.lastMessageAt,
         createdAt: conversations.createdAt,
         endUserId: conversations.endUserId,
-        agentId: conversations.agentId,
+        agentId: conversations.chatbotId,
         assignedUserId: conversations.assignedUserId,
       })
       .from(conversations)

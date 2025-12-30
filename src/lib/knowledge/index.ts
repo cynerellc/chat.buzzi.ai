@@ -113,7 +113,6 @@ export {
   processKnowledgeFile,
   processKnowledgeUrl,
   processKnowledgeText,
-  migrateSourceToQdrant,
   type ProcessingOptions,
   type ProcessingProgress,
   type ProcessingStage,

@@ -25,6 +25,7 @@ import {
   UserAvatar,
   type BadgeVariant,
 } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import { startImpersonation } from "@/hooks/master-admin";
 
 const fetcher = async (url: string) => {
@@ -63,6 +64,7 @@ const roleBadgeVariants: Record<string, BadgeVariant> = {
 };
 
 export default function ImpersonationPage({ params }: ImpersonationPageProps) {
+  useSetPageTitle("Impersonate User");
   const { companyId } = use(params);
   const router = useRouter();
   const [selectedUser, setSelectedUser] = useState<CompanyUser | null>(null);

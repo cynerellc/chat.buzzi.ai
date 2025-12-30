@@ -228,3 +228,6 @@ export { Toaster, toast, addToast, useToast, ToastProvider } from "./toast";
 
 // Empty State
 export { EmptyState, type EmptyStateProps } from "./empty-state";
+
+// Tag Input
+export { TagInput, type TagInputProps } from "./tag-input";

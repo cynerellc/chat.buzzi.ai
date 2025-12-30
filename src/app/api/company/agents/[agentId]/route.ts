@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agents, agentPackages, agentVersions, type PackageVariableDefinition } from "@/lib/db/schema";
+import { agents, agentPackages, agentVersions, type PackageVariableDefinition, type AgentListItem } from "@/lib/db/schema";
 
 interface RouteParams {
   params: Promise<{ agentId: string }>;
@@ -23,15 +23,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         description: agents.description,
         type: agents.type,
         status: agents.status,
-        avatarUrl: agents.avatarUrl,
-        systemPrompt: agents.systemPrompt,
-        modelId: agents.modelId,
-        temperature: agents.temperature,
+        agentsList: agents.agentsList,
         behavior: agents.behavior,
         escalationEnabled: agents.escalationEnabled,
         escalationTriggers: agents.escalationTriggers,
-        knowledgeSourceIds: agents.knowledgeSourceIds,
         variableValues: agents.variableValues,
+        businessHours: agents.businessHours,
         totalConversations: agents.totalConversations,
         avgResolutionTime: agents.avgResolutionTime,
         satisfactionScore: agents.satisfactionScore,
@@ -59,6 +56,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
+    // Get primary agent from agents_list for backward compatibility
+    const agentsList = (agent.agentsList as AgentListItem[]) || [];
+    const primaryAgent = agentsList[0];
+
     // Combine package variable definitions with agent's variable values
     const packageVariables = (agent.package?.variables as PackageVariableDefinition[]) || [];
     const agentVariableValues = (agent.variableValues as Record<string, string>) || {};
@@ -81,6 +82,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       agent: {
         ...agent,
+        // Provide backward-compatible fields from primary agent
+        avatarUrl: primaryAgent?.avatar_url ?? null,
+        systemPrompt: primaryAgent?.default_system_prompt ?? "",
+        modelId: primaryAgent?.default_model_id ?? "gpt-5-mini",
+        temperature: primaryAgent?.default_temperature ?? 70,
+        knowledgeCategories: primaryAgent?.knowledge_categories ?? [],
         variableValues: variableValuesWithDefinitions,
         // Also include the raw variable values for editing
         rawVariableValues: agentVariableValues,
@@ -100,14 +107,16 @@ interface UpdateAgentRequest {
   description?: string;
   type?: "support" | "sales" | "general" | "custom";
   status?: "active" | "paused" | "draft";
+  // Agent configuration fields (stored in agentsList[0])
   avatarUrl?: string | null;
   systemPrompt?: string;
   modelId?: string;
   temperature?: number;
+  knowledgeCategories?: string[];
+  // Other fields
   behavior?: Record<string, unknown>;
   escalationEnabled?: boolean;
   escalationTriggers?: unknown[];
-  knowledgeSourceIds?: string[];
   // Variable values are now stored as a simple key-value object
   variableValues?: Record<string, string>;
 }
@@ -145,14 +154,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.description !== undefined) updateData.description = body.description;
     if (body.type !== undefined) updateData.type = body.type;
     if (body.status !== undefined) updateData.status = body.status;
-    if (body.avatarUrl !== undefined) updateData.avatarUrl = body.avatarUrl;
-    if (body.systemPrompt !== undefined) updateData.systemPrompt = body.systemPrompt;
-    if (body.modelId !== undefined) updateData.modelId = body.modelId;
-    if (body.temperature !== undefined) updateData.temperature = body.temperature;
     if (body.behavior !== undefined) updateData.behavior = body.behavior;
     if (body.escalationEnabled !== undefined) updateData.escalationEnabled = body.escalationEnabled;
     if (body.escalationTriggers !== undefined) updateData.escalationTriggers = body.escalationTriggers;
-    if (body.knowledgeSourceIds !== undefined) updateData.knowledgeSourceIds = body.knowledgeSourceIds;
+
     // Variable values are now stored directly in the agent as JSONB
     if (body.variableValues !== undefined) {
       // Merge with existing values (preserve values not being updated)
@@ -160,13 +165,53 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       updateData.variableValues = { ...existingValues, ...body.variableValues };
     }
 
+    // Handle agent configuration fields (stored in agentsList)
+    const hasAgentConfigChanges =
+      body.avatarUrl !== undefined ||
+      body.systemPrompt !== undefined ||
+      body.modelId !== undefined ||
+      body.temperature !== undefined ||
+      body.knowledgeCategories !== undefined;
+
+    if (hasAgentConfigChanges) {
+      const currentAgentsList = (existingAgent.agentsList as AgentListItem[]) || [];
+      const primaryAgent = currentAgentsList[0] || {
+        agent_identifier: "main",
+        name: existingAgent.name,
+        agent_type: "worker" as const,
+        default_system_prompt: "",
+        default_model_id: "gpt-5-mini",
+        default_temperature: 70,
+        knowledge_categories: [],
+        tools: [],
+        sort_order: 0,
+      };
+
+      // Update primary agent with new values
+      const updatedPrimaryAgent: AgentListItem = {
+        ...primaryAgent,
+        avatar_url: body.avatarUrl !== undefined ? (body.avatarUrl ?? undefined) : primaryAgent.avatar_url,
+        default_system_prompt: body.systemPrompt !== undefined ? body.systemPrompt : primaryAgent.default_system_prompt,
+        default_model_id: body.modelId !== undefined ? body.modelId : primaryAgent.default_model_id,
+        default_temperature: body.temperature !== undefined ? body.temperature : primaryAgent.default_temperature,
+        knowledge_categories: body.knowledgeCategories !== undefined ? body.knowledgeCategories : primaryAgent.knowledge_categories,
+      };
+
+      // Replace primary agent in list, keep others
+      updateData.agentsList = [updatedPrimaryAgent, ...currentAgentsList.slice(1)];
+    }
+
+    // Get current system prompt for version comparison
+    const currentAgentsList = (existingAgent.agentsList as AgentListItem[]) || [];
+    const currentSystemPrompt = currentAgentsList[0]?.default_system_prompt ?? "";
+
     // If systemPrompt changed, create a version
-    if (body.systemPrompt && body.systemPrompt !== existingAgent.systemPrompt) {
+    if (body.systemPrompt && body.systemPrompt !== currentSystemPrompt) {
       // Get latest version number
       const [latestVersion] = await db
         .select({ version: agentVersions.version })
         .from(agentVersions)
-        .where(eq(agentVersions.agentId, agentId))
+        .where(eq(agentVersions.chatbotId, agentId))
         .orderBy(agentVersions.version)
         .limit(1);
 
@@ -174,17 +219,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       // Create version snapshot
       await db.insert(agentVersions).values({
-        agentId,
+        chatbotId: agentId,
         version: nextVersion,
         changelog: "System prompt updated",
         systemPrompt: body.systemPrompt,
-        modelId: body.modelId || existingAgent.modelId,
-        temperature: body.temperature ?? existingAgent.temperature,
+        modelId: body.modelId || currentAgentsList[0]?.default_model_id || "gpt-5-mini",
+        temperature: body.temperature ?? currentAgentsList[0]?.default_temperature ?? 70,
         behavior: body.behavior || existingAgent.behavior,
       });
     }
 
-    // Update the agent (variable values are now part of updateData if provided)
+    // Update the agent
     const [updatedAgent] = await db
       .update(agents)
       .set(updateData)

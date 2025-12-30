@@ -110,7 +110,7 @@ export function EmptyState({
             </Button>
           )}
           {secondaryAction && (
-            <Button variant="light" onPress={secondaryAction.onClick}>
+            <Button variant="ghost" onPress={secondaryAction.onClick}>
               {secondaryAction.label}
             </Button>
           )}

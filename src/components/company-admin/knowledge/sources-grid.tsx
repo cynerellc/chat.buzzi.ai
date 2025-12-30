@@ -165,13 +165,14 @@ export function SourcesGrid({
         const StatusIcon = status.icon;
         const TypeIcon = typeIcons[source.type] || FileText;
 
+        const defaultStatusColor = { bg: "bg-muted", text: "text-muted-foreground" };
         const statusColors: Record<string, { bg: string; text: string }> = {
-          pending: { bg: "bg-muted", text: "text-muted-foreground" },
+          pending: defaultStatusColor,
           processing: { bg: "bg-blue-500/10", text: "text-blue-500" },
           indexed: { bg: "bg-success/10", text: "text-success" },
           failed: { bg: "bg-destructive/10", text: "text-destructive" },
         };
-        const statusStyle = statusColors[source.status] ?? statusColors.pending;
+        const statusStyle = statusColors[source.status] ?? defaultStatusColor;
 
         const dropdownItems: DropdownMenuItemData[] = [
           { key: "view", label: "View Details", icon: Eye },

@@ -6,8 +6,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { agents } from "@/lib/db/schema/agents";
+import { agents } from "@/lib/db/schema/chatbots";
 import { companies } from "@/lib/db/schema/companies";
+import { widgetConfigs } from "@/lib/db/schema/widgets";
 import { eq, and } from "drizzle-orm";
 
 const DEFAULT_CONFIG = {
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
     const agentResult = await db
       .select({
         name: agents.name,
-        avatarUrl: agents.avatarUrl,
+        agentsList: agents.agentsList,
         behavior: agents.behavior,
         status: agents.status,
       })
@@ -92,8 +93,21 @@ export async function GET(request: NextRequest) {
     }
 
     const agent = agentResult[0];
+    const agentsListData = (agent.agentsList as { avatar_url?: string }[] | null) || [];
+    const avatarUrl = agentsListData[0]?.avatar_url || null;
     const behavior = (agent.behavior as { greeting?: string; widgetConfig?: Record<string, unknown> }) ?? {};
     const storedConfig = behavior.widgetConfig ?? {};
+
+    // Fetch widget config for this chatbot
+    const widgetConfigResult = await db
+      .select({
+        enableVoiceMessages: widgetConfigs.enableVoiceMessages,
+      })
+      .from(widgetConfigs)
+      .where(eq(widgetConfigs.chatbotId, agentId))
+      .limit(1);
+
+    const widgetConfig = widgetConfigResult[0];
 
     // Merge default config with stored config
     const config = {
@@ -101,8 +115,10 @@ export async function GET(request: NextRequest) {
       ...storedConfig,
       // Always use agent-specific values
       title: agent.name,
-      avatarUrl: agent.avatarUrl,
+      avatarUrl,
       welcomeMessage: behavior.greeting ?? DEFAULT_CONFIG.title,
+      // Include voice feature flag from widget config
+      enableVoice: widgetConfig?.enableVoiceMessages ?? false,
     };
 
     // Set CORS headers

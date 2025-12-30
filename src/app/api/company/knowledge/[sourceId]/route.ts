@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { knowledgeSources } from "@/lib/db/schema";
+import { deleteChunksBySource } from "@/lib/knowledge/qdrant-client";
 
 export interface KnowledgeSourceDetail {
   id: string;
@@ -180,7 +181,7 @@ export async function DELETE(
       );
     }
 
-    // Soft delete the source (chunks will remain but be orphaned)
+    // Soft delete the source
     await db
       .update(knowledgeSources)
       .set({
@@ -189,7 +190,16 @@ export async function DELETE(
       })
       .where(eq(knowledgeSources.id, sourceId));
 
-    // TODO: Clean up vector store entries
+    // Delete chunks from Qdrant vector store in background
+    setImmediate(async () => {
+      try {
+        console.log(`[Knowledge Delete] Removing chunks for source ${sourceId} from Qdrant...`);
+        await deleteChunksBySource(sourceId);
+        console.log(`[Knowledge Delete] Successfully removed chunks for source ${sourceId}`);
+      } catch (error) {
+        console.error(`[Knowledge Delete] Failed to remove chunks for source ${sourceId}:`, error);
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

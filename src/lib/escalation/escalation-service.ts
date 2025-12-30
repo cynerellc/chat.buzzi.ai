@@ -10,7 +10,7 @@
 
 import { db } from "@/lib/db";
 import { escalations, conversations, messages } from "@/lib/db/schema/conversations";
-import { agents } from "@/lib/db/schema/agents";
+import { agents } from "@/lib/db/schema/chatbots";
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
   TriggerDetector,
@@ -114,7 +114,7 @@ export class EscalationService {
       .select({
         id: conversations.id,
         companyId: conversations.companyId,
-        agentId: conversations.agentId,
+        agentId: conversations.chatbotId,
         status: conversations.status,
       })
       .from(conversations)
@@ -376,7 +376,7 @@ export class EscalationService {
         createdAt: escalations.createdAt,
         convId: conversations.id,
         endUserId: conversations.endUserId,
-        agentId: conversations.agentId,
+        agentId: conversations.chatbotId,
         messageCount: conversations.messageCount,
         sentiment: conversations.sentiment,
       })

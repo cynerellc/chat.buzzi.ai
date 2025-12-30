@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
             email: users.email,
           })
           .from(users)
-          .where(sql`${users.id} = ANY(${uploaderIds})`)
+          .where(inArray(users.id, uploaderIds))
       : [];
 
     const uploaderMap = new Map(uploaders.map((u) => [u.id, u]));

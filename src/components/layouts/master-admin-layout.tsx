@@ -8,6 +8,7 @@ import {
   BarChart3,
   FileText,
   Settings,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode } from "react";
@@ -19,6 +20,7 @@ import { type SidebarSection } from "./sidebar";
 const masterAdminSections: SidebarSection[] = [
   {
     key: "main",
+    title: "Overview",
     items: [
       { key: "dashboard", label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
       { key: "companies", label: "Companies", href: "/admin/companies", icon: Building2 },
@@ -26,46 +28,64 @@ const masterAdminSections: SidebarSection[] = [
   },
   {
     key: "management",
-    title: "Management",
+    title: "Platform",
     items: [
       { key: "plans", label: "Subscription Plans", href: "/admin/plans", icon: CreditCard },
-      { key: "packages", label: "Agent Packages", href: "/admin/packages", icon: Package },
+      { key: "packages", label: "Chatbot Packages", href: "/admin/packages", icon: Package },
     ],
   },
   {
     key: "analytics",
-    title: "Analytics & Logs",
+    title: "Monitoring",
     items: [
-      { key: "analytics", label: "Platform Analytics", href: "/admin/analytics", icon: BarChart3 },
+      { key: "analytics", label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
       { key: "audit", label: "Audit Logs", href: "/admin/audit", icon: FileText },
     ],
   },
   {
     key: "settings",
-    title: "Settings",
+    title: "System",
     items: [
-      { key: "settings", label: "System Settings", href: "/admin/settings", icon: Settings },
+      { key: "settings", label: "Settings", href: "/admin/settings", icon: Settings },
     ],
   },
 ];
 
-// Logo component
+// Logo component - Master Admin style
 function MasterAdminLogo() {
   return (
-    <Link href="/admin/dashboard" className="flex items-center gap-2">
-      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-        <span className="text-white font-bold text-sm">CB</span>
+    <Link href="/admin/dashboard" className="flex items-center gap-3 group">
+      {/* Logo mark */}
+      <div className="relative">
+        <div className="w-9 h-9 rounded bg-gradient-to-br from-destructive to-destructive/80 flex items-center justify-center shadow-lg shadow-destructive/20">
+          <Shield size={16} className="text-destructive-foreground/90" strokeWidth={1.5} />
+        </div>
+        {/* Subtle glow effect */}
+        <div className="absolute inset-0 rounded bg-destructive/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
-      <span className="font-bold text-lg">Chat Buzzi</span>
+
+      {/* Text */}
+      <div className="flex flex-col min-w-0">
+        <span className="font-semibold text-sm text-foreground truncate leading-tight">
+          Chat Buzzi
+        </span>
+        <span className="text-[10px] text-destructive/70 uppercase tracking-[0.15em] font-medium">
+          Master Admin
+        </span>
+      </div>
     </Link>
   );
 }
 
 function MasterAdminLogoCollapsed() {
   return (
-    <Link href="/admin/dashboard">
-      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-        <span className="text-white font-bold text-sm">CB</span>
+    <Link href="/admin/dashboard" className="group">
+      <div className="relative">
+        <div className="w-9 h-9 rounded bg-gradient-to-br from-destructive to-destructive/80 flex items-center justify-center shadow-lg shadow-destructive/20">
+          <Shield size={16} className="text-destructive-foreground/90" strokeWidth={1.5} />
+        </div>
+        {/* Subtle glow effect */}
+        <div className="absolute inset-0 rounded bg-destructive/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </Link>
   );
@@ -82,9 +102,6 @@ export function MasterAdminLayout({ children }: MasterAdminLayoutProps) {
         logo: <MasterAdminLogo />,
         logoCollapsed: <MasterAdminLogoCollapsed />,
         sections: masterAdminSections,
-      }}
-      headerProps={{
-        title: "Master Admin",
       }}
     >
       {children}

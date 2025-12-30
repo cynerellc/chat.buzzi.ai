@@ -237,7 +237,7 @@ export default createAgentPackage("package_id", orchestratorAgent);
 
 **Directory Structure:**
 ```text
-/agent-packages
+/chatbot-packages
   /[package_id]
     - index.js          # Entry point (compiled bundle)
     - agents/           # Agent definitions
@@ -251,7 +251,7 @@ export default createAgentPackage("package_id", orchestratorAgent);
                                         │
 2. Runner Service:                      ▼
    ├─ Identifies package_id
-   ├─ Checks /agent-packages/[package_id] folder
+   ├─ Checks /chatbot-packages/[package_id] folder
    │   └─ If exists: Load from disk
    │   └─ If not: Check local cache, then download from Supabase Storage
    ├─ Spins up Worker Thread (or reuses warm one)

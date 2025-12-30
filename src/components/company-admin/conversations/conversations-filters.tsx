@@ -61,7 +61,7 @@ export function ConversationsFilters({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const agentOptions = [
-    { value: "", label: "All Agents" },
+    { value: "all", label: "All Agents" },
     ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
   ];
 
@@ -124,10 +124,10 @@ export function ConversationsFilters({
 
             <Select
               options={agentOptions}
-              selectedKeys={new Set([agentFilter || ""])}
+              selectedKeys={new Set([agentFilter || "all"])}
               onSelectionChange={(keys) => {
                 const selected = Array.from(keys)[0];
-                onAgentFilterChange(selected as string);
+                onAgentFilterChange(selected === "all" ? "" : (selected as string));
               }}
               className="w-[180px]"
               placeholder="All Agents"

@@ -273,7 +273,6 @@ export function QuickActionsPanel({
                     placeholder="Enter tag..."
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
-                    size="sm"
                     onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
                     className="flex-1"
                   />

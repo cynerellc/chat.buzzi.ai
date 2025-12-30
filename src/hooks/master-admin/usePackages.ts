@@ -15,19 +15,21 @@ const fetcher = async (url: string) => {
 // Re-export types for convenience
 export type { PackageListItem, PackageDetails };
 
-// Package Agent type for agents within a package
-export interface PackageAgentData {
-  id?: string;
-  agentIdentifier: string;
+// Agent list item stored in agentPackages.agents_list JSONB (snake_case to match DB)
+export interface AgentListItemData {
+  agent_identifier: string;
   name: string;
   designation?: string;
-  agentType: "worker" | "supervisor";
-  systemPrompt: string;
-  modelId: string;
-  temperature: number;
-  tools?: string[];
-  managedAgentIds?: string[];
-  sortOrder: number;
+  routing_prompt?: string; // Brief description for supervisor routing decisions (labeled "Duties" in UI)
+  agent_type: "worker" | "supervisor";
+  avatar_url?: string;
+  default_system_prompt: string;
+  default_model_id: string;
+  default_temperature: number;
+  knowledge_categories?: string[];
+  tools?: unknown[];
+  managed_agent_ids?: string[];
+  sort_order?: number;
 }
 
 export interface UsePackagesParams {
@@ -143,8 +145,8 @@ export interface CreatePackageData {
   isActive?: boolean;
   isPublic?: boolean;
   sortOrder?: number;
-  // Package agents configuration
-  packageAgents?: PackageAgentData[];
+  // Agents list stored as JSONB in package
+  agentsList?: AgentListItemData[];
 }
 
 export async function createPackage(data: CreatePackageData): Promise<PackageListItem> {
@@ -188,8 +190,8 @@ export interface UpdatePackageData {
   isActive?: boolean;
   isPublic?: boolean;
   sortOrder?: number;
-  // Package agents configuration
-  packageAgents?: PackageAgentData[];
+  // Agents list stored as JSONB in package
+  agentsList?: AgentListItemData[];
 }
 
 export async function updatePackage(packageId: string, data: UpdatePackageData): Promise<PackageListItem> {

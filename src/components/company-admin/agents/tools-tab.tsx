@@ -9,6 +9,7 @@ import {
   Database,
   Ticket,
   Settings,
+  FolderOpen,
 } from "lucide-react";
 
 import {
@@ -18,9 +19,11 @@ import {
   CardBody,
   Badge,
   Switch,
+  Checkbox,
 } from "@/components/ui";
 
 import type { AgentDetail } from "@/hooks/company/useAgents";
+import { useKnowledgeCategories } from "@/hooks/company/useKnowledge";
 
 interface ToolsTabProps {
   agent: AgentDetail;
@@ -95,27 +98,46 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function ToolsTab({ agent, onSave, isSaving }: ToolsTabProps) {
-  const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({
-    knowledgeSearch: true,
-    escalateToHuman: true,
-    sendEmail: false,
-    scheduleMeeting: false,
-    crmLookup: false,
-    createTicket: false,
-  });
+  const { categories } = useKnowledgeCategories();
 
-  useEffect(() => {
-    // In a real app, tools config would be stored in agent.behavior or a separate field
-    // For now, we'll use defaults
-  }, [agent]);
+  // Initialize tools with defaults, merged with agent's config
+  const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>(
+    () => ({
+      knowledgeSearch: true,
+      escalateToHuman: true,
+      sendEmail: false,
+      scheduleMeeting: false,
+      crmLookup: false,
+      createTicket: false,
+      ...((agent.behavior as { enabledTools?: Record<string, boolean> })
+        ?.enabledTools ?? {}),
+    })
+  );
+
+  // Initialize selected categories from agent's config
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
+    () => new Set(agent.knowledgeCategories ?? [])
+  );
 
   const handleToggle = (toolId: string, enabled: boolean) => {
     setEnabledTools((prev) => ({ ...prev, [toolId]: enabled }));
   };
 
+  const handleCategoryToggle = (categoryName: string, checked: boolean) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(categoryName);
+      } else {
+        next.delete(categoryName);
+      }
+      return next;
+    });
+  };
+
   const handleSave = async () => {
-    // In a real app, this would save the tools configuration
     await onSave({
+      knowledgeCategories: Array.from(selectedCategories),
       behavior: {
         ...(agent.behavior as Record<string, unknown>),
         enabledTools,
@@ -154,50 +176,83 @@ export function ToolsTab({ agent, onSave, isSaving }: ToolsTabProps) {
               <div className="space-y-4">
                 {tools.map((tool) => {
                   const Icon = tool.icon;
+                  const isKnowledgeSearch = tool.id === "knowledgeSearch";
+                  const showCategoryFilter = isKnowledgeSearch && tool.enabled && categories.length > 0;
+
                   return (
-                    <div
-                      key={tool.id}
-                      className="flex items-start justify-between rounded-lg border p-4"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{tool.name}</span>
+                    <div key={tool.id} className="space-y-0">
+                      <div className="flex items-start justify-between rounded-lg border p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{tool.name}</span>
+                              {tool.requiresIntegration && (
+                                <Badge variant="secondary">
+                                  Requires integration
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {tool.description}
+                            </p>
                             {tool.requiresIntegration && (
-                              <Badge variant="secondary">
-                                Requires integration
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Requires: {tool.requiresIntegration}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            isSelected={tool.enabled}
+                            onValueChange={(checked) =>
+                              handleToggle(tool.id, checked)
+                            }
+                            isDisabled={!!tool.requiresIntegration}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            isDisabled
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Category Filter for Knowledge Search */}
+                      {showCategoryFilter && (
+                        <div className="ml-4 border-l-2 border-muted pl-4 py-3 bg-muted/30 rounded-b-lg -mt-1">
+                          <div className="flex items-center gap-2 mb-3">
+                            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Filter by categories</span>
+                            {selectedCategories.size === 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                All categories
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {tool.description}
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Select categories to limit knowledge search. Leave empty to search all.
                           </p>
-                          {tool.requiresIntegration && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Requires: {tool.requiresIntegration}
-                            </p>
-                          )}
+                          <div className="grid grid-cols-2 gap-2">
+                            {categories.map((category) => (
+                              <Checkbox
+                                key={category.name}
+                                isSelected={selectedCategories.has(category.name)}
+                                onValueChange={(checked) =>
+                                  handleCategoryToggle(category.name, checked)
+                                }
+                              >
+                                <span className="text-sm">{category.name}</span>
+                              </Checkbox>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          isSelected={tool.enabled}
-                          onValueChange={(checked) =>
-                            handleToggle(tool.id, checked)
-                          }
-                          isDisabled={!!tool.requiresIntegration}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          isDisabled
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      )}
                     </div>
                   );
                 })}

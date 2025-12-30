@@ -11,6 +11,7 @@ import {
   Users,
   Layers,
   ArrowRight,
+  Code,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -20,7 +21,14 @@ import { Badge, Button, Card, type BadgeVariant } from "@/components/ui";
 interface PackageCardProps {
   package: PackageListItem;
   onConfigure: (pkg: PackageListItem) => void;
+  onViewCode: (pkg: PackageListItem) => void;
 }
+
+const defaultCategoryConfig = {
+  icon: Settings,
+  gradient: "from-violet-500/20 to-violet-600/10",
+  iconBg: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+};
 
 const categoryConfig: Record<string, { icon: typeof Bot; gradient: string; iconBg: string }> = {
   support: {
@@ -38,18 +46,14 @@ const categoryConfig: Record<string, { icon: typeof Bot; gradient: string; iconB
     gradient: "from-amber-500/20 to-amber-600/10",
     iconBg: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   },
-  custom: {
-    icon: Settings,
-    gradient: "from-violet-500/20 to-violet-600/10",
-    iconBg: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
-  },
+  custom: defaultCategoryConfig,
 };
 
-export function PackageCard({ package: pkg, onConfigure }: PackageCardProps) {
-  const category = categoryConfig[pkg.category ?? "custom"] ?? categoryConfig.custom;
+export function PackageCard({ package: pkg, onConfigure, onViewCode }: PackageCardProps) {
+  const category = categoryConfig[pkg.category ?? "custom"] ?? defaultCategoryConfig;
   const Icon = category.icon;
   const isMultiAgent = pkg.packageType === "multi_agent";
-  const packageAgentsCount = pkg.packageAgentsCount ?? 1;
+  const agentsListCount = pkg.agentsListCount ?? 1;
 
   return (
     <motion.div
@@ -74,7 +78,7 @@ export function PackageCard({ package: pkg, onConfigure }: PackageCardProps) {
               {isMultiAgent ? (
                 <>
                   <Users size={11} />
-                  {packageAgentsCount} Agents
+                  {agentsListCount} Agents
                 </>
               ) : (
                 <>
@@ -123,6 +127,14 @@ export function PackageCard({ package: pkg, onConfigure }: PackageCardProps) {
           >
             Configure
             <ArrowRight size={14} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full mt-2"
+            onPress={() => onViewCode(pkg)}
+          >
+            <Code size={14} className="mr-1" />
+            View Code
           </Button>
         </div>
       </Card>

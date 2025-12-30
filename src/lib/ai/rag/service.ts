@@ -12,12 +12,8 @@
  * - Source citation
  */
 
-import { db } from "@/lib/db";
-import { knowledgeChunks, knowledgeSources } from "@/lib/db/schema/knowledge";
-import { eq, and, inArray, ilike, or } from "drizzle-orm";
-
-// Import vector-based RAG service when available
-import { searchKnowledge, buildKnowledgeContext } from "@/lib/knowledge";
+// Import vector-based RAG service
+import { searchKnowledge } from "@/lib/knowledge";
 
 import type { RAGConfig, RAGSource, ToolResult, AgentContext } from "../types";
 
@@ -29,7 +25,7 @@ export interface RAGSearchOptions {
   query: string;
   companyId: string;
   sourceIds?: string[];
-  categoryIds?: string[];
+  categories?: string[]; // Category names for filtering
   limit?: number;
   threshold?: number;
 }
@@ -72,171 +68,56 @@ export class RAGService {
       query,
       companyId,
       sourceIds,
-      categoryIds: _categoryIds, // TODO: Implement category filtering
+      categories,
       limit = this.config.maxResults,
       threshold = this.config.relevanceThreshold,
     } = options;
 
     try {
-      // Try vector-based semantic search first
-      try {
-        const vectorContext = await searchKnowledge(query, companyId, {
-          limit,
-          minScore: threshold,
-          sources: sourceIds,
-          searchFaqs: true,
+      // Use vector-based semantic search via Qdrant
+      const vectorContext = await searchKnowledge(query, companyId, {
+        limit,
+        minScore: threshold,
+        sources: sourceIds,
+        categories,
+        searchFaqs: true,
+      });
+
+      // Convert vector results to RAGResult format
+      const results: RAGResult[] = vectorContext.chunks.map((chunk) => ({
+        id: chunk.sourceId + "-" + chunk.chunkIndex,
+        content: chunk.content,
+        similarity: chunk.score,
+        source: {
+          id: chunk.sourceId,
+          fileName: chunk.sourceName ?? "Unknown",
+          category: chunk.sourceType,
+          chunkIndex: chunk.chunkIndex,
+          relevanceScore: chunk.score,
+        },
+        metadata: chunk.metadata,
+      }));
+
+      // Add FAQ results as synthetic chunks with high relevance
+      for (const faq of vectorContext.faqs) {
+        results.push({
+          id: "faq-" + faq.id,
+          content: `Q: ${faq.question}\nA: ${faq.answer}`,
+          similarity: faq.score,
+          source: {
+            id: faq.id,
+            fileName: "FAQ",
+            category: faq.category ?? "General",
+            relevanceScore: faq.score,
+          },
         });
-
-        if (vectorContext.chunks.length > 0 || vectorContext.faqs.length > 0) {
-          // Convert vector results to RAGResult format
-          const results: RAGResult[] = vectorContext.chunks.map((chunk) => ({
-            id: chunk.sourceId + "-" + chunk.chunkIndex,
-            content: chunk.content,
-            similarity: chunk.score,
-            source: {
-              id: chunk.sourceId,
-              fileName: chunk.sourceName ?? "Unknown",
-              category: chunk.sourceType,
-              chunkIndex: chunk.chunkIndex,
-              relevanceScore: chunk.score,
-            },
-            metadata: chunk.metadata,
-          }));
-
-          // Add FAQ results as synthetic chunks with high relevance
-          for (const faq of vectorContext.faqs) {
-            results.push({
-              id: "faq-" + faq.id,
-              content: `Q: ${faq.question}\nA: ${faq.answer}`,
-              similarity: faq.score,
-              source: {
-                id: faq.id,
-                fileName: "FAQ",
-                category: faq.category ?? "General",
-                relevanceScore: faq.score,
-              },
-            });
-          }
-
-          return results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
-        }
-      } catch (vectorError) {
-        // Vector search failed (maybe no embeddings yet), fall back to keyword search
-        console.debug("Vector search not available, using keyword fallback:", vectorError);
       }
 
-      // Fallback: keyword-based search
-      return this.keywordSearch(options);
+      return results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
     } catch (error) {
       console.error("RAG search error:", error);
       return [];
     }
-  }
-
-  /**
-   * Fallback keyword-based search when vector search is not available
-   */
-  private async keywordSearch(options: RAGSearchOptions): Promise<RAGResult[]> {
-    const {
-      query,
-      companyId,
-      sourceIds,
-      limit = this.config.maxResults,
-      threshold = this.config.relevanceThreshold,
-    } = options;
-
-    // Get knowledge sources for the company
-    const sourceConditions = [eq(knowledgeSources.companyId, companyId)];
-
-    if (sourceIds && sourceIds.length > 0) {
-      sourceConditions.push(inArray(knowledgeSources.id, sourceIds));
-    }
-
-    const sources = await db
-      .select()
-      .from(knowledgeSources)
-      .where(and(...sourceConditions));
-
-    if (sources.length === 0) {
-      return [];
-    }
-
-    const sourceIdList = sources.map((s) => s.id);
-
-    // Search chunks using text matching
-    // Split query into keywords for better matching
-    const keywords = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((k) => k.length > 2);
-
-    if (keywords.length === 0) {
-      return [];
-    }
-
-    // Build search conditions
-    const searchConditions = keywords.map((keyword) =>
-      ilike(knowledgeChunks.content, `%${keyword}%`)
-    );
-
-    const chunks = await db
-      .select({
-        chunk: knowledgeChunks,
-        source: knowledgeSources,
-      })
-      .from(knowledgeChunks)
-      .innerJoin(
-        knowledgeSources,
-        eq(knowledgeChunks.sourceId, knowledgeSources.id)
-      )
-      .where(
-        and(
-          inArray(knowledgeChunks.sourceId, sourceIdList),
-          or(...searchConditions)
-        )
-      )
-      .limit(limit * 2); // Get more than needed for filtering
-
-    // Calculate relevance scores based on keyword matches
-    const results: RAGResult[] = chunks.map(({ chunk, source }) => {
-      const content = chunk.content.toLowerCase();
-      let matchCount = 0;
-
-      for (const keyword of keywords) {
-        if (content.includes(keyword)) {
-          matchCount++;
-        }
-      }
-
-      // Simple relevance score based on keyword match percentage
-      const similarity = matchCount / keywords.length;
-
-      // Get category from source metadata if available
-      const sourceMetadata = source.metadata as Record<string, unknown> | null;
-      const category = sourceMetadata?.category as string | undefined;
-
-      return {
-        id: chunk.id,
-        content: chunk.content,
-        similarity,
-        source: {
-          id: source.id,
-          fileName: source.name,
-          category,
-          chunkIndex: chunk.chunkIndex,
-          relevanceScore: similarity,
-        },
-        metadata: chunk.metadata as Record<string, unknown>,
-      };
-    });
-
-    // Filter by threshold and sort by relevance
-    const filteredResults = results
-      .filter((r) => r.similarity >= threshold)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
-
-    return filteredResults;
   }
 
   /**
@@ -301,13 +182,12 @@ export class RAGService {
       context: AgentContext
     ): Promise<ToolResult> => {
       const query = params.query as string;
-      const _category = params.category as string | undefined; // TODO: Use category filtering
       const maxResults = (params.maxResults as number) || this.config.maxResults;
 
       const results = await this.search({
         query,
         companyId: context.companyId,
-        sourceIds: this.config.categoryIds,
+        categories: this.config.categories,
         limit: maxResults,
       });
 
@@ -363,5 +243,5 @@ export const defaultRAGConfig: RAGConfig = {
   enabled: false,
   maxResults: 5,
   relevanceThreshold: 0.5,
-  categoryIds: [],
+  categories: [],
 };

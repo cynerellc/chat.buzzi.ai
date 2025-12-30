@@ -7,7 +7,7 @@ import { widgetConfigs } from "@/lib/db/schema";
 
 export interface WidgetConfigResponse {
   id: string;
-  companyId: string;
+  chatbotId: string;
   // Appearance
   theme: string;
   position: string;
@@ -83,15 +83,16 @@ export async function GET() {
     let [config] = await db
       .select()
       .from(widgetConfigs)
-      .where(eq(widgetConfigs.companyId, company.id))
+      .where(eq(widgetConfigs.chatbotId, company.id))
       .limit(1);
 
     // If no config exists, create a default one
+    // TODO: This route should be restructured to take chatbotId as a param
     if (!config) {
       const [newConfig] = await db
         .insert(widgetConfigs)
         .values({
-          companyId: company.id,
+          chatbotId: company.id, // Temporary - should be actual chatbot ID
           companyName: company.name,
           logoUrl: company.logoUrl,
           primaryColor: company.primaryColor || "#6437F3",
@@ -107,7 +108,7 @@ export async function GET() {
 
     const response: WidgetConfigResponse = {
       id: config.id,
-      companyId: config.companyId,
+      chatbotId: config.chatbotId,
       // Appearance
       theme: config.theme,
       position: config.position,
@@ -225,15 +226,16 @@ export async function PATCH(request: NextRequest) {
     let [existingConfig] = await db
       .select({ id: widgetConfigs.id })
       .from(widgetConfigs)
-      .where(eq(widgetConfigs.companyId, company.id))
+      .where(eq(widgetConfigs.chatbotId, company.id))
       .limit(1);
 
     if (!existingConfig) {
       // Create default config first
+      // TODO: This route should be restructured to take chatbotId as a param
       [existingConfig] = await db
         .insert(widgetConfigs)
         .values({
-          companyId: company.id,
+          chatbotId: company.id, // Temporary - should be actual chatbot ID
           companyName: company.name,
         })
         .returning({ id: widgetConfigs.id });
@@ -294,7 +296,7 @@ export async function PATCH(request: NextRequest) {
     const [updatedConfig] = await db
       .update(widgetConfigs)
       .set(updateData)
-      .where(eq(widgetConfigs.companyId, company.id))
+      .where(eq(widgetConfigs.chatbotId, company.id))
       .returning();
 
     if (!updatedConfig) {
@@ -303,7 +305,7 @@ export async function PATCH(request: NextRequest) {
 
     const response: WidgetConfigResponse = {
       id: updatedConfig.id,
-      companyId: updatedConfig.companyId,
+      chatbotId: updatedConfig.chatbotId,
       theme: updatedConfig.theme,
       position: updatedConfig.position,
       primaryColor: updatedConfig.primaryColor,

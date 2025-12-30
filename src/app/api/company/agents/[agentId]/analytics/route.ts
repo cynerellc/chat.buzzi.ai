@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from(conversations)
       .where(
         and(
-          eq(conversations.agentId, agentId),
+          eq(conversations.chatbotId, agentId),
           gte(conversations.createdAt, startDate)
         )
       );
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from(conversations)
       .where(
         and(
-          eq(conversations.agentId, agentId),
+          eq(conversations.chatbotId, agentId),
           eq(conversations.resolutionType, "ai"),
           gte(conversations.resolvedAt, startDate)
         )
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from(conversations)
       .where(
         and(
-          eq(conversations.agentId, agentId),
+          eq(conversations.chatbotId, agentId),
           eq(conversations.resolutionType, "human"),
           gte(conversations.resolvedAt, startDate)
         )
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from(conversations)
       .where(
         and(
-          eq(conversations.agentId, agentId),
+          eq(conversations.chatbotId, agentId),
           eq(conversations.resolutionType, "abandoned"),
           gte(conversations.resolvedAt, startDate)
         )
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from(conversations)
       .where(
         and(
-          eq(conversations.agentId, agentId),
+          eq(conversations.chatbotId, agentId),
           eq(conversations.resolutionType, "escalated"),
           gte(conversations.resolvedAt, startDate)
         )
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .from(conversations)
         .where(
           and(
-            eq(conversations.agentId, agentId),
+            eq(conversations.chatbotId, agentId),
             gte(conversations.createdAt, date),
             sql`${conversations.createdAt} < ${nextDate}`
           )

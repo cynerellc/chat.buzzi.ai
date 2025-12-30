@@ -2,7 +2,7 @@
 
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 
 import type { UserRole } from "@/lib/auth/role-utils";
 
@@ -33,98 +33,91 @@ export function useAuth() {
   const isLoading = status === "loading";
   const isAuthenticated = status === "authenticated" && !!user;
 
-  const login = useCallback(
-    async (email: string, password: string, callbackUrl?: string) => {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
+  // Use refs to avoid complex callback dependencies
+  const routerRef = useRef(router);
+  const userRoleRef = useRef(user?.role);
+  const updateRef = useRef(update);
 
-      if (result?.error) {
-        throw new Error(result.error);
-      }
+  useEffect(() => {
+    routerRef.current = router;
+    userRoleRef.current = user?.role;
+    updateRef.current = update;
+  }, [router, user?.role, update]);
 
-      // If there's a specific callback URL, use it
-      if (callbackUrl) {
-        router.push(callbackUrl);
-        return result;
-      }
+  const login = async (email: string, password: string, callbackUrl?: string) => {
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
 
-      // Otherwise, get smart redirect from API
-      try {
-        const redirectResponse = await fetch("/api/auth/redirect");
-        if (redirectResponse.ok) {
-          const { redirectUrl } = await redirectResponse.json();
-          router.push(redirectUrl);
-        } else {
-          // Fallback to basic redirect
-          router.push(getDashboardUrl(user?.role));
-        }
-      } catch {
-        // Fallback to basic redirect
-        router.push(getDashboardUrl(user?.role));
-      }
+    if (result?.error) {
+      throw new Error(result.error);
+    }
 
+    // If there's a specific callback URL, use it
+    if (callbackUrl) {
+      routerRef.current.push(callbackUrl);
       return result;
-    },
-    [router, user?.role]
-  );
+    }
 
-  const loginWithGoogle = useCallback(
-    async (callbackUrl?: string) => {
-      await signIn("google", {
-        callbackUrl: callbackUrl ?? getDashboardUrl(user?.role),
-      });
-    },
-    [user?.role]
-  );
+    // Otherwise, get smart redirect from API
+    try {
+      const redirectResponse = await fetch("/api/auth/redirect");
+      if (redirectResponse.ok) {
+        const { redirectUrl } = await redirectResponse.json();
+        routerRef.current.push(redirectUrl);
+      } else {
+        // Fallback to basic redirect
+        routerRef.current.push(getDashboardUrl(userRoleRef.current));
+      }
+    } catch {
+      // Fallback to basic redirect
+      routerRef.current.push(getDashboardUrl(userRoleRef.current));
+    }
 
-  const loginWithGitHub = useCallback(
-    async (callbackUrl?: string) => {
-      await signIn("github", {
-        callbackUrl: callbackUrl ?? getDashboardUrl(user?.role),
-      });
-    },
-    [user?.role]
-  );
+    return result;
+  };
 
-  const logout = useCallback(async () => {
+  const loginWithGoogle = async (callbackUrl?: string) => {
+    await signIn("google", {
+      callbackUrl: callbackUrl ?? getDashboardUrl(userRoleRef.current),
+    });
+  };
+
+  const loginWithGitHub = async (callbackUrl?: string) => {
+    await signIn("github", {
+      callbackUrl: callbackUrl ?? getDashboardUrl(userRoleRef.current),
+    });
+  };
+
+  const logout = async () => {
     await signOut({ callbackUrl: "/login" });
-  }, []);
+  };
 
   // Check if user has the required base role
   // Note: company-specific permissions (company_admin, support_agent) are checked via company context
-  const hasRole = useCallback(
-    (role: UserRole): boolean => {
-      if (!user) return false;
+  const hasRole = (role: UserRole): boolean => {
+    if (!user) return false;
 
-      const roleHierarchy: Record<UserRole, number> = {
-        "chatapp.master_admin": 2,
-        "chatapp.user": 1,
-      };
+    const roleHierarchy: Record<UserRole, number> = {
+      "chatapp.master_admin": 2,
+      "chatapp.user": 1,
+    };
 
-      return roleHierarchy[user.role] >= roleHierarchy[role];
-    },
-    [user]
-  );
+    return roleHierarchy[user.role] >= roleHierarchy[role];
+  };
 
-  const isMasterAdmin = useMemo(() => user?.role === "chatapp.master_admin", [user]);
+  const isMasterAdmin = user?.role === "chatapp.master_admin";
 
   // Note: These now only check if user is master_admin (god mode)
   // For company-specific permission checks, use useCompanyContext hook
-  const isCompanyAdmin = useMemo(
-    () => user?.role === "chatapp.master_admin",
-    [user]
-  );
-  const isSupportAgent = useMemo(
-    () => user?.role === "chatapp.master_admin",
-    [user]
-  );
+  const isCompanyAdmin = user?.role === "chatapp.master_admin";
+  const isSupportAgent = user?.role === "chatapp.master_admin";
 
-  const refreshSession = useCallback(async () => {
-    await update();
-  }, [update]);
+  const refreshSession = async () => {
+    await updateRef.current();
+  };
 
   return {
     user,

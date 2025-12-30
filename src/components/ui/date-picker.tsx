@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { forwardRef, useState } from "react";
-import { DayPicker, type DayPickerSingleProps } from "react-day-picker";
+import { DayPicker, type PropsBase, type PropsSingle } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
@@ -11,16 +11,21 @@ import { Popover, PopoverContent, PopoverRoot, PopoverTrigger } from "./popover"
 import { Label } from "./input";
 
 // Calendar component using react-day-picker
-export interface CalendarProps extends Omit<DayPickerSingleProps, "mode"> {
-  className?: string;
-}
+// Combine base props with single-selection props, excluding mode (we force "single")
+export type CalendarProps = Omit<PropsBase, "mode"> & Omit<PropsSingle, "mode">;
 
 export function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+  // Extract only the props that DayPicker expects, excluding mode which we handle
+  const { selected, onSelect, required, ...baseProps } = props;
   return (
     <DayPicker
       mode="single"
+      selected={selected}
+      onSelect={onSelect}
+      required={required}
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
+      {...baseProps}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
@@ -55,7 +60,6 @@ export function Calendar({ className, classNames, showOutsideDays = true, ...pro
         day_hidden: "invisible",
         ...classNames,
       }}
-      {...props}
     />
   );
 }

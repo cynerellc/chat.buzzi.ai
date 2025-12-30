@@ -28,7 +28,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     return (
       <IconButton
         icon={Sun}
-        variant="light"
+        variant="ghost"
         size="sm"
         aria-label="Toggle theme"
         className={className}
@@ -51,7 +51,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   return (
     <IconButton
       icon={Icon}
-      variant="light"
+      variant="ghost"
       size="sm"
       aria-label={`Current theme: ${theme}. Click to toggle.`}
       onPress={toggleTheme}
@@ -97,7 +97,7 @@ export function ThemeSelector({ className }: ThemeSelectorProps) {
         <Button
           key={option.value}
           size="sm"
-          variant={theme === option.value ? "solid" : "light"}
+          variant={theme === option.value ? "default" : "ghost"}
           color={theme === option.value ? "primary" : "default"}
           leftIcon={option.icon}
           onPress={() => setTheme(option.value)}

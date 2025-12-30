@@ -23,17 +23,29 @@ export async function GET() {
     today.setHours(0, 0, 0, 0);
 
     // Get all agents for the company
-    const companyAgents = await db
+    const companyAgentsRaw = await db
       .select({
         id: agents.id,
         name: agents.name,
-        avatarUrl: agents.avatarUrl,
+        agentsList: agents.agentsList,
         status: agents.status,
         type: agents.type,
       })
       .from(agents)
       .where(eq(agents.companyId, company.id))
       .orderBy(agents.name);
+
+    // Map to include avatarUrl from agentsList[0]
+    const companyAgents = companyAgentsRaw.map((agent) => {
+      const agentsListData = (agent.agentsList as { avatar_url?: string }[] | null) || [];
+      return {
+        id: agent.id,
+        name: agent.name,
+        avatarUrl: agentsListData[0]?.avatar_url || null,
+        status: agent.status,
+        type: agent.type,
+      };
+    });
 
     // Get conversation stats for each agent
     const agentOverviews: AgentOverview[] = await Promise.all(
@@ -44,7 +56,7 @@ export async function GET() {
           .from(conversations)
           .where(
             and(
-              eq(conversations.agentId, agent.id),
+              eq(conversations.chatbotId, agent.id),
               gte(conversations.createdAt, today)
             )
           );
@@ -55,7 +67,7 @@ export async function GET() {
           .from(conversations)
           .where(
             and(
-              eq(conversations.agentId, agent.id),
+              eq(conversations.chatbotId, agent.id),
               eq(conversations.resolutionType, "ai"),
               gte(conversations.resolvedAt, today)
             )
@@ -67,7 +79,7 @@ export async function GET() {
           .from(conversations)
           .where(
             and(
-              eq(conversations.agentId, agent.id),
+              eq(conversations.chatbotId, agent.id),
               sql`${conversations.resolutionType} IS NOT NULL`,
               gte(conversations.resolvedAt, today)
             )

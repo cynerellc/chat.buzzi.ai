@@ -149,9 +149,9 @@ export function CannedResponsesPicker({
             Press <kbd className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-medium">Esc</kbd> to close
           </span>
         </ModalHeader>
-        <ModalBody className="p-0" onKeyDown={handleKeyDown}>
+        <ModalBody className="p-0">
           {/* Search Input */}
-          <div className="p-4 border-b border-border/50 sticky top-0 bg-card z-10">
+          <div className="p-4 border-b border-border/50 sticky top-0 bg-card z-10" onKeyDown={handleKeyDown}>
             <Input
               ref={searchInputRef}
               placeholder="Search responses..."
@@ -170,7 +170,6 @@ export function CannedResponsesPicker({
                   </motion.button>
                 )
               }
-              size="sm"
               autoFocus
             />
             <p className="text-xs text-muted-foreground mt-2">

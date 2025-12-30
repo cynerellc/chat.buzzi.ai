@@ -8,6 +8,7 @@ import {
   type ComponentPropsWithoutRef,
   type ElementRef,
   useCallback,
+  useState,
 } from "react";
 
 import { cn } from "@/lib/utils";
@@ -101,8 +102,20 @@ export function Tabs({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Internal state for uncontrolled mode
+  const [internalSelectedKey, setInternalSelectedKey] = useState(items[0]?.key);
+
+  // Determine if we're in controlled mode
+  const isControlled = selectedKey !== undefined || syncWithUrl;
+
   const urlSelectedKey = syncWithUrl ? searchParams.get(urlParam) ?? items[0]?.key : undefined;
-  const effectiveSelectedKey = syncWithUrl ? urlSelectedKey : selectedKey ?? items[0]?.key;
+
+  // Use internal state when uncontrolled, otherwise use external state
+  const effectiveSelectedKey = syncWithUrl
+    ? urlSelectedKey
+    : selectedKey !== undefined
+      ? selectedKey
+      : internalSelectedKey;
 
   const handleValueChange = useCallback(
     (value: string) => {
@@ -110,10 +123,13 @@ export function Tabs({
         const params = new URLSearchParams(searchParams.toString());
         params.set(urlParam, value);
         router.push(`${pathname}?${params.toString()}`);
+      } else if (!isControlled) {
+        // Update internal state in uncontrolled mode
+        setInternalSelectedKey(value);
       }
       onSelectionChange?.(value);
     },
-    [syncWithUrl, urlParam, router, pathname, searchParams, onSelectionChange]
+    [syncWithUrl, urlParam, router, pathname, searchParams, onSelectionChange, isControlled]
   );
 
   return (

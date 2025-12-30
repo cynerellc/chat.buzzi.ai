@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { agents } from "./agents";
+import { chatbots } from "./chatbots";
 import { companies } from "./companies";
 import {
   channelTypeEnum,
@@ -80,9 +80,9 @@ export const conversations = chatappSchema.table(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    agentId: uuid("agent_id")
+    chatbotId: uuid("chatbot_id")
       .notNull()
-      .references(() => agents.id),
+      .references(() => chatbots.id),
     endUserId: uuid("end_user_id")
       .notNull()
       .references(() => endUsers.id),
@@ -129,7 +129,7 @@ export const conversations = chatappSchema.table(
   },
   (table) => [
     index("conversations_company_idx").on(table.companyId),
-    index("conversations_agent_idx").on(table.agentId),
+    index("conversations_chatbot_idx").on(table.chatbotId),
     index("conversations_end_user_idx").on(table.endUserId),
     index("conversations_status_idx").on(table.status),
     index("conversations_assigned_user_idx").on(table.assignedUserId),
@@ -348,9 +348,9 @@ export const conversationsRelations = relations(conversations, ({ one, many }) =
     fields: [conversations.companyId],
     references: [companies.id],
   }),
-  agent: one(agents, {
-    fields: [conversations.agentId],
-    references: [agents.id],
+  chatbot: one(chatbots, {
+    fields: [conversations.chatbotId],
+    references: [chatbots.id],
   }),
   endUser: one(endUsers, {
     fields: [conversations.endUserId],

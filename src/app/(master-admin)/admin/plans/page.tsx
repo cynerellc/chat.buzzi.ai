@@ -6,9 +6,11 @@ import { useState } from "react";
 import { PageHeader } from "@/components/layouts";
 import { PlanEditorModal, PlansGrid } from "@/components/master-admin/plans";
 import { Button } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import { usePlans, type PlanListItem } from "@/hooks/master-admin";
 
 export default function PlansPage() {
+  useSetPageTitle("Subscription Plans");
   const { plans, isLoading, refresh } = usePlans();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanListItem | null>(null);

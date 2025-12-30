@@ -84,14 +84,14 @@ export async function GET() {
     const companyIntegrations = await db
       .select()
       .from(integrations)
-      .where(eq(integrations.companyId, company.id))
+      .where(eq(integrations.chatbotId, company.id))
       .orderBy(desc(integrations.createdAt));
 
     // Get webhooks
     const companyWebhooks = await db
       .select()
       .from(webhooks)
-      .where(eq(webhooks.companyId, company.id))
+      .where(eq(webhooks.chatbotId, company.id))
       .orderBy(desc(webhooks.createdAt));
 
     const integrationsList: IntegrationItem[] = companyIntegrations.map((i) => ({
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
     const [webhook] = await db
       .insert(webhooks)
       .values({
-        companyId: company.id,
+        chatbotId: company.id, // TODO: Should be actual chatbot ID
         name: body.name,
         description: body.description || null,
         url: body.url,

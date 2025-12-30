@@ -23,6 +23,7 @@ import {
   Input,
   addToast,
 } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   useConversation,
   useConversationMessages,
@@ -57,6 +58,7 @@ interface PageProps {
 }
 
 export default function ConversationDetailPage({ params }: PageProps) {
+  useSetPageTitle("Conversation");
   const router = useRouter();
   const { conversationId } = use(params);
 

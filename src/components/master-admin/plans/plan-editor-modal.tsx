@@ -187,7 +187,7 @@ export function PlanEditorModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="2xl">
+    <Modal isOpen={isOpen} onClose={handleClose} size="xl">
       <ModalContent>
         <ModalHeader>
           {isEditMode ? "Edit Subscription Plan" : "Create Subscription Plan"}

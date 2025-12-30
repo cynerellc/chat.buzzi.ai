@@ -58,7 +58,6 @@ export function SystemPromptEditor({
         value={value}
         onValueChange={onChange}
         minRows={8}
-        maxRows={20}
         placeholder="You are a helpful customer support agent for {company_name}..."
         classNames={{
           input: "font-mono text-sm",

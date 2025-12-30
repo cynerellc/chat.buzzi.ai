@@ -29,6 +29,7 @@ export interface SearchOptions {
   limit?: number;
   minScore?: number;
   sources?: string[]; // Filter by source IDs
+  categories?: string[]; // Filter by category names
   includeMetadata?: boolean;
   searchFaqs?: boolean;
   rerank?: boolean;
@@ -244,6 +245,7 @@ Keep queries concise and focused on the original intent.`,
       const hits = await searchChunks(embedding, companyId, {
         limit: (options.limit ?? 5) * 2, // Get more results for merging
         sourceIds: options.sources,
+        categories: options.categories,
         scoreThreshold: options.minScore ?? 0.7,
       });
 
@@ -371,7 +373,7 @@ Consider:
             content: `Query: "${query}"
 
 Passages:
-${topResults.map((r, i) => `[${i}] ${r.content.slice(0, 500)}`).join("\n\n")}`,
+${topResults.map((r, i) => `[${i}] ${r.content.slice(0, 1000)}`).join("\n\n")}`,
           },
         ],
         temperature: 0,
@@ -381,11 +383,19 @@ ${topResults.map((r, i) => `[${i}] ${r.content.slice(0, 500)}`).join("\n\n")}`,
       const content = response.choices[0]?.message?.content ?? "[]";
       const scores = JSON.parse(content) as number[];
 
-      // Apply new scores
-      const scored = topResults.map((result, i) => ({
-        ...result,
-        score: (scores[i] ?? result.score) * result.score, // Combine with original score
-      }));
+      // Apply new scores using weighted blend
+      // LLM score adjusts but doesn't completely override semantic similarity
+      // - LLM score 0.0 = 0.5x multiplier (halves score, doesn't zero it)
+      // - LLM score 0.5 = 1.0x multiplier (no change)
+      // - LLM score 1.0 = 1.5x multiplier (50% boost)
+      const scored = topResults.map((result, i) => {
+        const llmScore = scores[i] ?? 0.5; // Default to neutral if missing
+        const boostFactor = 0.5 + llmScore; // Range: 0.5 to 1.5
+        return {
+          ...result,
+          score: Math.min(1, result.score * boostFactor),
+        };
+      });
 
       // Add back any results not in top 10
       const remaining = results.slice(10).map((r) => ({

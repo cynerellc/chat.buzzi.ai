@@ -1,10 +1,11 @@
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
+import { useState, useCallback } from "react";
 
 import type { KnowledgeSourceListItem } from "@/app/api/company/knowledge/route";
 import type { KnowledgeSourceDetail } from "@/app/api/company/knowledge/[sourceId]/route";
-import type { ChunkItem } from "@/app/api/company/knowledge/[sourceId]/chunks/route";
 import type { FaqListItem } from "@/app/api/company/knowledge/faq/route";
+import type { CategoryWithCounts } from "@/app/api/company/knowledge/categories/route";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -12,6 +13,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 export interface KnowledgeFilters {
   type?: string;
   status?: string;
+  category?: string;
   page?: number;
   limit?: number;
 }
@@ -36,6 +38,9 @@ function buildKnowledgeUrl(filters: KnowledgeFilters): string {
   }
   if (filters.status && filters.status !== "all") {
     params.append("status", filters.status);
+  }
+  if (filters.category) {
+    params.append("category", filters.category);
   }
   if (filters.page) {
     params.append("page", filters.page.toString());
@@ -83,36 +88,12 @@ export function useKnowledgeSource(sourceId: string | null) {
   };
 }
 
-// Knowledge Chunks Hook
-interface ChunksResponse {
-  chunks: ChunkItem[];
-  pagination: {
-    page: number;
-    limit: number;
-    hasMore: boolean;
-  };
-}
-
-export function useKnowledgeChunks(sourceId: string | null, page: number = 1) {
-  const { data, error, isLoading, mutate } = useSWR<ChunksResponse>(
-    sourceId ? `/api/company/knowledge/${sourceId}/chunks?page=${page}` : null,
-    fetcher
-  );
-
-  return {
-    chunks: data?.chunks ?? [],
-    pagination: data?.pagination ?? { page: 1, limit: 20, hasMore: false },
-    isLoading,
-    isError: error,
-    mutate,
-  };
-}
-
 // Create Knowledge Source Mutation
 interface CreateKnowledgeSourceArgs {
   name: string;
   description?: string;
   type: "file" | "url" | "text";
+  category?: string;
   sourceConfig: {
     fileName?: string;
     fileType?: string;
@@ -382,3 +363,197 @@ export function useDeleteFaq(faqId: string) {
     error,
   };
 }
+
+// ==========================================
+// Knowledge Categories Hooks
+// ==========================================
+
+interface CategoriesResponse {
+  categories: CategoryWithCounts[];
+}
+
+export function useKnowledgeCategories() {
+  const { data, error, isLoading, mutate } = useSWR<CategoriesResponse>(
+    "/api/company/knowledge/categories",
+    fetcher,
+    { refreshInterval: 60000 }
+  );
+
+  return {
+    categories: data?.categories ?? [],
+    isLoading,
+    isError: error,
+    mutate,
+  };
+}
+
+// Create Category Mutation
+interface CreateCategoryArgs {
+  name: string;
+}
+
+async function createCategory(
+  url: string,
+  { arg }: { arg: CreateCategoryArgs }
+) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(arg),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to create category");
+  }
+
+  return response.json();
+}
+
+export function useCreateKnowledgeCategory() {
+  const { trigger, isMutating, error } = useSWRMutation(
+    "/api/company/knowledge/categories",
+    createCategory
+  );
+
+  return {
+    createCategory: trigger,
+    isCreating: isMutating,
+    error,
+  };
+}
+
+// Delete Category Mutation (by name)
+async function deleteCategory(
+  url: string,
+  { arg }: { arg: { name: string } }
+) {
+  const response = await fetch(`${url}?name=${encodeURIComponent(arg.name)}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to delete category");
+  }
+
+  return response.json();
+}
+
+export function useDeleteKnowledgeCategory() {
+  const { trigger, isMutating, error } = useSWRMutation(
+    "/api/company/knowledge/categories",
+    deleteCategory
+  );
+
+  return {
+    deleteCategory: trigger,
+    isDeleting: isMutating,
+    error,
+  };
+}
+
+// ==========================================
+// File Upload Hook
+// ==========================================
+
+interface UploadResult {
+  storagePath: string;
+  publicUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}
+
+export function useFileUpload() {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState<Error | null>(null);
+
+  const uploadFile = useCallback(async (file: File): Promise<UploadResult> => {
+    setIsUploading(true);
+    setUploadProgress(0);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/company/knowledge/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to upload file");
+      }
+
+      setUploadProgress(100);
+      return await response.json();
+    } catch (err) {
+      const uploadError = err instanceof Error ? err : new Error("Upload failed");
+      setError(uploadError);
+      throw uploadError;
+    } finally {
+      setIsUploading(false);
+    }
+  }, []);
+
+  return {
+    uploadFile,
+    isUploading,
+    uploadProgress,
+    error,
+  };
+}
+
+// ==========================================
+// Reindex All Hook
+// ==========================================
+
+interface ReindexResult {
+  message: string;
+  results: {
+    sources?: {
+      total: number;
+      success: number;
+      failed: number;
+      errors?: { sourceId: string; name: string; error: string }[];
+    };
+    faqs?: {
+      processed: number;
+      failed: number;
+    };
+  };
+}
+
+async function reindexAll(url: string) {
+  const response = await fetch(url, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to reindex knowledge base");
+  }
+
+  return response.json();
+}
+
+export function useReindexAll() {
+  const { trigger, isMutating, error, data } = useSWRMutation<ReindexResult>(
+    "/api/company/knowledge/reindex",
+    reindexAll
+  );
+
+  return {
+    reindex: trigger,
+    isReindexing: isMutating,
+    result: data,
+    error,
+  };
+}
+
+// Re-export types
+export type { CategoryWithCounts };

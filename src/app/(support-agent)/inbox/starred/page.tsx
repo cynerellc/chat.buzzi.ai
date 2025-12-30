@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   Card,
   Badge,
@@ -69,6 +70,7 @@ interface ConversationsResponse {
 }
 
 export default function StarredInboxPage() {
+  useSetPageTitle("Starred");
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);

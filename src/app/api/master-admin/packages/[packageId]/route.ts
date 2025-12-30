@@ -1,28 +1,10 @@
-import { eq, count, and, isNull, asc, notInArray } from "drizzle-orm";
+import { eq, count, and, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agentPackages, agents, packageAgents, type PackageVariableDefinition } from "@/lib/db/schema";
-
-// Package agent response type
-export interface PackageAgentDetails {
-  id: string;
-  packageId: string;
-  agentIdentifier: string;
-  name: string;
-  designation: string | null;
-  agentType: "worker" | "supervisor";
-  systemPrompt: string;
-  modelId: string;
-  temperature: number;
-  tools: unknown[];
-  managedAgentIds: string[];
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import { agentPackages, agents, type PackageVariableDefinition, type AgentListItem } from "@/lib/db/schema";
 
 // Package variable response type (matches PackageVariableDefinition from schema)
 export type PackageVariableDetails = PackageVariableDefinition;
@@ -35,9 +17,6 @@ export interface PackageDetails {
   description: string | null;
   category: string | null;
   packageType: "single_agent" | "multi_agent";
-  defaultSystemPrompt: string;
-  defaultModelId: string;
-  defaultTemperature: number;
   defaultBehavior: Record<string, unknown>;
   features: unknown[];
   bundlePath: string | null;
@@ -48,7 +27,7 @@ export interface PackageDetails {
   isPublic: boolean;
   sortOrder: number;
   agentsCount: number;
-  packageAgents: PackageAgentDetails[];
+  agentsList: AgentListItem[];
   variables: PackageVariableDetails[];
   createdAt: string;
   updatedAt: string;
@@ -86,13 +65,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         )
       );
 
-    // Get package agents
-    const pkgAgents = await db
-      .select()
-      .from(packageAgents)
-      .where(eq(packageAgents.packageId, packageId))
-      .orderBy(asc(packageAgents.sortOrder));
-
     const response: PackageDetails = {
       ...pkg,
       packageType: pkg.packageType as "single_agent" | "multi_agent",
@@ -100,15 +72,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       features: pkg.features as unknown[],
       executionConfig: pkg.executionConfig as Record<string, unknown>,
       agentsCount: countResult?.count ?? 0,
-      packageAgents: pkgAgents.map((agent) => ({
-        ...agent,
-        agentType: agent.agentType as "worker" | "supervisor",
-        tools: agent.tools as unknown[],
-        managedAgentIds: agent.managedAgentIds as string[],
-        createdAt: agent.createdAt.toISOString(),
-        updatedAt: agent.updatedAt.toISOString(),
-      })),
-      // Variables are now stored directly in the package as JSONB
+      // Agents list is now stored directly in the package as JSONB
+      agentsList: (pkg.agentsList as AgentListItem[]) || [],
+      // Variables are also stored directly in the package as JSONB
       variables: (pkg.variables as PackageVariableDefinition[]) || [],
       createdAt: pkg.createdAt.toISOString(),
       updatedAt: pkg.updatedAt.toISOString(),
@@ -124,19 +90,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// Package agent schema for update
-const packageAgentSchema = z.object({
-  id: z.string().uuid().optional(),
-  agentIdentifier: z.string().min(1).max(100),
+// Agent list item schema for update (matches AgentListItem interface)
+const agentListItemSchema = z.object({
+  agent_identifier: z.string().min(1).max(100),
   name: z.string().min(1).max(255),
-  designation: z.string().max(255).nullable().optional(),
-  agentType: z.enum(["worker", "supervisor"]).default("worker"),
-  systemPrompt: z.string().min(1),
-  modelId: z.string().default("gpt-4o-mini"),
-  temperature: z.number().int().min(0).max(100).default(70),
+  designation: z.string().max(255).optional(),
+  agent_type: z.enum(["worker", "supervisor"]).default("worker"),
+  avatar_url: z.string().max(500).optional(),
+  default_system_prompt: z.string().min(1),
+  default_model_id: z.string().default("gpt-5-mini"),
+  default_temperature: z.number().int().min(0).max(100).default(70),
+  knowledge_categories: z.array(z.string()).default([]),
   tools: z.array(z.unknown()).default([]),
-  managedAgentIds: z.array(z.string()).default([]),
-  sortOrder: z.number().int().default(0),
+  managed_agent_ids: z.array(z.string()).default([]),
+  sort_order: z.number().int().default(0),
 });
 
 // Package variable schema for update (matches PackageVariableDefinition)
@@ -160,12 +127,9 @@ const updatePackageSchema = z.object({
   description: z.string().nullable().optional(),
   category: z.string().max(100).nullable().optional(),
   packageType: z.enum(["single_agent", "multi_agent"]).optional(),
-  defaultSystemPrompt: z.string().optional(),
-  defaultModelId: z.string().optional(),
-  defaultTemperature: z.number().int().min(0).max(100).optional(),
   defaultBehavior: z.record(z.string(), z.unknown()).optional(),
   features: z.array(z.string()).optional(),
-  packageAgents: z.array(packageAgentSchema).optional(),
+  agentsList: z.array(agentListItemSchema).optional(),
   variables: z.array(packageVariableSchema).optional(),
   bundlePath: z.string().max(500).nullable().optional(),
   bundleVersion: z.string().max(50).optional(),
@@ -209,9 +173,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (validatedData.description !== undefined) updateData.description = validatedData.description;
     if (validatedData.category !== undefined) updateData.category = validatedData.category;
     if (validatedData.packageType !== undefined) updateData.packageType = validatedData.packageType;
-    if (validatedData.defaultSystemPrompt !== undefined) updateData.defaultSystemPrompt = validatedData.defaultSystemPrompt;
-    if (validatedData.defaultModelId !== undefined) updateData.defaultModelId = validatedData.defaultModelId;
-    if (validatedData.defaultTemperature !== undefined) updateData.defaultTemperature = validatedData.defaultTemperature;
     if (validatedData.defaultBehavior !== undefined) updateData.defaultBehavior = validatedData.defaultBehavior;
     if (validatedData.features !== undefined) updateData.features = validatedData.features;
     if (validatedData.bundlePath !== undefined) updateData.bundlePath = validatedData.bundlePath;
@@ -236,85 +197,30 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }));
     }
 
+    // Agents list is now stored directly in the package as JSONB array
+    if (validatedData.agentsList !== undefined) {
+      updateData.agentsList = validatedData.agentsList.map((agent, index) => ({
+        agent_identifier: agent.agent_identifier,
+        name: agent.name,
+        designation: agent.designation,
+        agent_type: agent.agent_type,
+        avatar_url: agent.avatar_url,
+        default_system_prompt: agent.default_system_prompt,
+        default_model_id: agent.default_model_id,
+        default_temperature: agent.default_temperature,
+        knowledge_categories: agent.knowledge_categories,
+        tools: agent.tools,
+        managed_agent_ids: agent.managed_agent_ids,
+        sort_order: agent.sort_order ?? index,
+      }));
+    }
+
     // Update the package
     const [updatedPackage] = await db
       .update(agentPackages)
       .set(updateData)
       .where(eq(agentPackages.id, packageId))
       .returning();
-
-    // Handle package agents updates if provided
-    if (validatedData.packageAgents !== undefined) {
-      const incomingAgents = validatedData.packageAgents;
-      const incomingIds = incomingAgents
-        .filter((a) => a.id)
-        .map((a) => a.id as string);
-
-      // Delete agents that are no longer in the list
-      if (incomingIds.length > 0) {
-        await db
-          .delete(packageAgents)
-          .where(
-            and(
-              eq(packageAgents.packageId, packageId),
-              notInArray(packageAgents.id, incomingIds)
-            )
-          );
-      } else {
-        // Delete all existing agents if none have IDs
-        await db
-          .delete(packageAgents)
-          .where(eq(packageAgents.packageId, packageId));
-      }
-
-      // Upsert agents
-      for (let i = 0; i < incomingAgents.length; i++) {
-        const agent = incomingAgents[i];
-        if (!agent) continue;
-
-        if (agent.id) {
-          // Update existing agent
-          await db
-            .update(packageAgents)
-            .set({
-              agentIdentifier: agent.agentIdentifier,
-              name: agent.name,
-              designation: agent.designation ?? null,
-              agentType: agent.agentType as "worker" | "supervisor",
-              systemPrompt: agent.systemPrompt,
-              modelId: agent.modelId,
-              temperature: agent.temperature,
-              tools: agent.tools,
-              managedAgentIds: agent.managedAgentIds,
-              sortOrder: agent.sortOrder ?? i,
-              updatedAt: new Date(),
-            })
-            .where(eq(packageAgents.id, agent.id));
-        } else {
-          // Insert new agent
-          await db.insert(packageAgents).values({
-            packageId,
-            agentIdentifier: agent.agentIdentifier,
-            name: agent.name,
-            designation: agent.designation ?? null,
-            agentType: agent.agentType as "worker" | "supervisor",
-            systemPrompt: agent.systemPrompt,
-            modelId: agent.modelId,
-            temperature: agent.temperature,
-            tools: agent.tools,
-            managedAgentIds: agent.managedAgentIds,
-            sortOrder: agent.sortOrder ?? i,
-          });
-        }
-      }
-    }
-
-    // Fetch updated package agents
-    const pkgAgents = await db
-      .select()
-      .from(packageAgents)
-      .where(eq(packageAgents.packageId, packageId))
-      .orderBy(asc(packageAgents.sortOrder));
 
     if (!updatedPackage) {
       return NextResponse.json({ error: "Failed to update package" }, { status: 500 });
@@ -323,16 +229,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       package: {
         ...updatedPackage,
-        packageAgents: pkgAgents.map((agent) => ({
-          ...agent,
-          agentType: agent.agentType as "worker" | "supervisor",
-          tools: agent.tools as unknown[],
-          managedAgentIds: agent.managedAgentIds as string[],
-          createdAt: agent.createdAt.toISOString(),
-          updatedAt: agent.updatedAt.toISOString(),
-        })),
+        packageType: updatedPackage.packageType as "single_agent" | "multi_agent",
+        defaultBehavior: updatedPackage.defaultBehavior as Record<string, unknown>,
+        features: updatedPackage.features as unknown[],
+        executionConfig: updatedPackage.executionConfig as Record<string, unknown>,
+        // Agents list is now stored directly in the package as JSONB
+        agentsList: (updatedPackage.agentsList as AgentListItem[]) || [],
         // Variables are now stored directly in the package as JSONB
         variables: (updatedPackage.variables as PackageVariableDefinition[]) || [],
+        createdAt: updatedPackage.createdAt.toISOString(),
+        updatedAt: updatedPackage.updatedAt.toISOString(),
       },
     });
   } catch (error) {
@@ -393,12 +299,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Hard delete package agents first (cascade should handle this, but being explicit)
-    await db
-      .delete(packageAgents)
-      .where(eq(packageAgents.packageId, packageId));
-
-    // Hard delete if no agents
+    // Hard delete if no agents (agents_list is stored in package JSONB, no separate table)
     await db
       .delete(agentPackages)
       .where(eq(agentPackages.id, packageId));

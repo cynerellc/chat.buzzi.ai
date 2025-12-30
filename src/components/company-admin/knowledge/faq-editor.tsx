@@ -94,7 +94,7 @@ function FAQEditorInner({
       : question || answer;
 
   const categoryOptions = [
-    { value: "", label: "No Category" },
+    { value: "none", label: "No Category" },
     ...categories.map((c) => ({ value: c, label: c })),
   ];
 
@@ -146,10 +146,10 @@ function FAQEditorInner({
             <Select
               label="Category"
               options={categoryOptions}
-              selectedKeys={new Set([category])}
+              selectedKeys={new Set([category || "none"])}
               onSelectionChange={(keys) => {
                 const selected = Array.from(keys)[0];
-                setCategory(selected as string);
+                setCategory(selected === "none" ? "" : (selected as string));
               }}
             />
 

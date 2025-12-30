@@ -60,11 +60,18 @@ export function AnalyticsTab({ agentId }: AnalyticsTabProps) {
     );
   }
 
+  const resolutionBreakdown = analytics.resolutionBreakdown ?? {
+    ai: 0,
+    human: 0,
+    abandoned: 0,
+    escalated: 0,
+  };
+
   const totalResolved =
-    analytics.resolutionBreakdown.ai +
-    analytics.resolutionBreakdown.human +
-    analytics.resolutionBreakdown.abandoned +
-    analytics.resolutionBreakdown.escalated;
+    resolutionBreakdown.ai +
+    resolutionBreakdown.human +
+    resolutionBreakdown.abandoned +
+    resolutionBreakdown.escalated;
 
   return (
     <div className="space-y-6">
@@ -148,25 +155,25 @@ export function AnalyticsTab({ agentId }: AnalyticsTabProps) {
           <CardBody className="space-y-4">
             <ResolutionBar
               label="AI Resolved"
-              count={analytics.resolutionBreakdown.ai}
+              count={resolutionBreakdown.ai}
               total={totalResolved}
               color="bg-success"
             />
             <ResolutionBar
               label="Human Resolved"
-              count={analytics.resolutionBreakdown.human}
+              count={resolutionBreakdown.human}
               total={totalResolved}
               color="bg-primary"
             />
             <ResolutionBar
               label="Escalated"
-              count={analytics.resolutionBreakdown.escalated}
+              count={resolutionBreakdown.escalated}
               total={totalResolved}
               color="bg-warning"
             />
             <ResolutionBar
               label="Abandoned"
-              count={analytics.resolutionBreakdown.abandoned}
+              count={resolutionBreakdown.abandoned}
               total={totalResolved}
               color="bg-default-400"
             />

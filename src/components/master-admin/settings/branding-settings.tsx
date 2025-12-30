@@ -66,7 +66,6 @@ function ColorPicker({ label, value, onChange, description }: ColorPickerProps) 
           value={value}
           onValueChange={onChange}
           placeholder="#000000"
-          size="sm"
           className="flex-1"
         />
       </div>
@@ -137,7 +136,6 @@ function ImageUpload({ label, description, value, onChange, previewSize = "md" }
         placeholder="Or enter image URL"
         value={value}
         onValueChange={onChange}
-        size="sm"
       />
     </div>
   );

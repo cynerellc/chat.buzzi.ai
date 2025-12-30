@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { endUsers, conversations } from "@/lib/db/schema/conversations";
-import { agents } from "@/lib/db/schema/agents";
+import { agents } from "@/lib/db/schema/chatbots";
 import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, desc, sql, avg, count } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -53,7 +53,7 @@ export async function GET(
     }
 
     // Get conversations with agent info
-    const customerConversations = await db
+    const customerConversationsRaw = await db
       .select({
         id: conversations.id,
         subject: conversations.subject,
@@ -68,13 +68,26 @@ export async function GET(
         agent: {
           id: agents.id,
           name: agents.name,
-          avatarUrl: agents.avatarUrl,
+          agentsList: agents.agentsList,
         },
       })
       .from(conversations)
-      .leftJoin(agents, eq(conversations.agentId, agents.id))
+      .leftJoin(agents, eq(conversations.chatbotId, agents.id))
       .where(eq(conversations.endUserId, customerId))
       .orderBy(desc(conversations.createdAt));
+
+    // Map to extract avatarUrl from agentsList
+    const customerConversations = customerConversationsRaw.map((conv) => {
+      const agentsListData = (conv.agent?.agentsList as { avatar_url?: string }[] | null) || [];
+      return {
+        ...conv,
+        agent: conv.agent ? {
+          id: conv.agent.id,
+          name: conv.agent.name,
+          avatarUrl: agentsListData[0]?.avatar_url || null,
+        } : null,
+      };
+    });
 
     // Calculate stats
     const statsResult = await db

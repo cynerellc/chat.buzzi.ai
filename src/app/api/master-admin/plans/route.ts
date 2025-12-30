@@ -1,4 +1,4 @@
-import { eq, sql, count, and, isNull, asc, desc, or, ilike } from "drizzle-orm";
+import { eq, count, and, isNull, asc, desc, or, ilike, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
           .from(companySubscriptions)
           .where(
             and(
-              sql`${companySubscriptions.planId} = ANY(${planIds})`,
+              inArray(companySubscriptions.planId, planIds),
               isNull(companySubscriptions.cancelledAt)
             )
           )

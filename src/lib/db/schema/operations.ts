@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { agents } from "./agents";
+import { chatbots } from "./chatbots";
 import { companies } from "./companies";
 import { channelTypeEnum, chatappSchema } from "./enums";
 import { users } from "./users";
@@ -26,10 +26,10 @@ export const channelConfigs = chatappSchema.table(
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
 
-    // Agent Reference
-    agentId: uuid("agent_id")
+    // Chatbot Reference
+    chatbotId: uuid("chatbot_id")
       .notNull()
-      .references(() => agents.id, { onDelete: "cascade" }),
+      .references(() => chatbots.id, { onDelete: "cascade" }),
 
     // Channel Info
     channel: channelTypeEnum("channel").notNull(),
@@ -57,9 +57,9 @@ export const channelConfigs = chatappSchema.table(
   },
   (table) => [
     index("channel_configs_company_idx").on(table.companyId),
-    index("channel_configs_agent_idx").on(table.agentId),
+    index("channel_configs_chatbot_idx").on(table.chatbotId),
     index("channel_configs_channel_idx").on(table.channel),
-    index("channel_configs_agent_channel_idx").on(table.agentId, table.channel),
+    index("channel_configs_chatbot_channel_idx").on(table.chatbotId, table.channel),
   ]
 );
 
@@ -125,8 +125,8 @@ export const usageRecords = chatappSchema.table(
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
 
-    // Agent Reference (optional - for per-agent tracking)
-    agentId: uuid("agent_id").references(() => agents.id, { onDelete: "set null" }),
+    // Chatbot Reference (optional - for per-chatbot tracking)
+    chatbotId: uuid("chatbot_id").references(() => chatbots.id, { onDelete: "set null" }),
 
     // Usage Type
     usageType: varchar("usage_type", { length: 50 }).notNull(),
@@ -158,7 +158,7 @@ export const usageRecords = chatappSchema.table(
   },
   (table) => [
     index("usage_records_company_idx").on(table.companyId),
-    index("usage_records_agent_idx").on(table.agentId),
+    index("usage_records_chatbot_idx").on(table.chatbotId),
     index("usage_records_type_idx").on(table.usageType),
     index("usage_records_created_at_idx").on(table.createdAt),
     index("usage_records_billing_period_idx").on(
@@ -218,9 +218,9 @@ export const channelConfigsRelations = relations(channelConfigs, ({ one }) => ({
     fields: [channelConfigs.companyId],
     references: [companies.id],
   }),
-  agent: one(agents, {
-    fields: [channelConfigs.agentId],
-    references: [agents.id],
+  chatbot: one(chatbots, {
+    fields: [channelConfigs.chatbotId],
+    references: [chatbots.id],
   }),
 }));
 
@@ -246,9 +246,9 @@ export const usageRecordsRelations = relations(usageRecords, ({ one }) => ({
     fields: [usageRecords.companyId],
     references: [companies.id],
   }),
-  agent: one(agents, {
-    fields: [usageRecords.agentId],
-    references: [agents.id],
+  chatbot: one(chatbots, {
+    fields: [usageRecords.chatbotId],
+    references: [chatbots.id],
   }),
 }));
 

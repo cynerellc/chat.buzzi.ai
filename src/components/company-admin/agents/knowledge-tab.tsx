@@ -4,50 +4,21 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   FileText,
-  Link as LinkIcon,
-  FileType,
+  FolderOpen,
   Plus,
-  Search,
-  Check,
-  Clock,
-  AlertCircle,
-  Loader2,
   ExternalLink,
 } from "lucide-react";
-import useSWR from "swr";
 
 import {
   Button,
   Card,
   CardHeader,
   CardBody,
-  Badge,
-  Skeleton,
-  Input,
   Checkbox,
 } from "@/components/ui";
 
 import type { AgentDetail } from "@/hooks/company/useAgents";
-
-interface KnowledgeSource {
-  id: string;
-  name: string;
-  type: "file" | "url" | "text";
-  status: "pending" | "processing" | "indexed" | "failed";
-  chunkCount: number;
-  tokenCount: number;
-  createdAt: string;
-}
-
-interface KnowledgeResponse {
-  sources: KnowledgeSource[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+import { useKnowledgeCategories } from "@/hooks/company/useKnowledge";
 
 interface KnowledgeTabProps {
   agent: AgentDetail;
@@ -55,113 +26,60 @@ interface KnowledgeTabProps {
   isSaving: boolean;
 }
 
-type StatusConfig = {
-  label: string;
-  variant: "default" | "success" | "warning" | "danger" | "info";
-  icon: React.ComponentType<{ className?: string }>;
-};
-
-const defaultStatusConfig: StatusConfig = { label: "Pending", variant: "default", icon: Clock };
-
-const statusConfig: Record<string, StatusConfig> = {
-  pending: defaultStatusConfig,
-  processing: { label: "Processing", variant: "info", icon: Loader2 },
-  indexed: { label: "Indexed", variant: "success", icon: Check },
-  failed: { label: "Failed", variant: "danger", icon: AlertCircle },
-};
-
-const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  file: FileText,
-  url: LinkIcon,
-  text: FileType,
-};
-
-function getStatusConfig(status: string): StatusConfig {
-  return statusConfig[status] ?? defaultStatusConfig;
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toString();
-}
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
 export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
-  const [searchValue, setSearchValue] = useState("");
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(
-    new Set(agent.knowledgeSourceIds || [])
+  const { categories, isLoading } = useKnowledgeCategories();
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
+    new Set(agent.knowledgeCategories || [])
   );
 
-  const { data, isLoading } = useSWR<KnowledgeResponse>(
-    `/api/company/knowledge?limit=100`,
-    fetcher
-  );
-
-  const sources = data?.sources ?? [];
-  const filteredSources = sources.filter(
-    (source) =>
-      source.name.toLowerCase().includes(searchValue.toLowerCase()) &&
-      source.status === "indexed"
-  );
-
-  const handleToggleSource = (sourceId: string) => {
-    const newSelected = new Set(selectedSources);
-    if (newSelected.has(sourceId)) {
-      newSelected.delete(sourceId);
+  const handleToggleCategory = (categoryName: string) => {
+    const newSelected = new Set(selectedCategories);
+    if (newSelected.has(categoryName)) {
+      newSelected.delete(categoryName);
     } else {
-      newSelected.add(sourceId);
+      newSelected.add(categoryName);
     }
-    setSelectedSources(newSelected);
+    setSelectedCategories(newSelected);
   };
 
   const handleSave = async () => {
     await onSave({
-      knowledgeSourceIds: Array.from(selectedSources),
+      knowledgeCategories: Array.from(selectedCategories),
     });
   };
 
   const hasChanges = () => {
-    const currentIds = new Set(agent.knowledgeSourceIds || []);
-    if (currentIds.size !== selectedSources.size) return true;
-    for (const id of selectedSources) {
-      if (!currentIds.has(id)) return true;
+    const currentCategories = new Set(agent.knowledgeCategories || []);
+    if (currentCategories.size !== selectedCategories.size) return true;
+    for (const cat of selectedCategories) {
+      if (!currentCategories.has(cat)) return true;
     }
     return false;
   };
 
-  const selectedCount = selectedSources.size;
-  const totalTokens = filteredSources
-    .filter((s) => selectedSources.has(s.id))
-    .reduce((sum, s) => sum + s.tokenCount, 0);
+  const selectedCount = selectedCategories.size;
 
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardBody className="p-4">
-            <p className="text-sm text-muted-foreground">Selected Sources</p>
-            <p className="text-2xl font-bold">{selectedCount}</p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="p-4">
-            <p className="text-sm text-muted-foreground">Total Tokens</p>
-            <p className="text-2xl font-bold">{formatTokenCount(totalTokens)}</p>
-          </CardBody>
-        </Card>
-      </div>
+      <Card>
+        <CardBody className="p-4">
+          <p className="text-sm text-muted-foreground">Selected Categories</p>
+          <p className="text-2xl font-bold">
+            {selectedCount === 0 ? "All" : selectedCount}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {selectedCount === 0
+              ? "Agent will search all knowledge sources"
+              : `Agent will search ${selectedCount} ${selectedCount === 1 ? "category" : "categories"}`}
+          </p>
+        </CardBody>
+      </Card>
 
-      {/* Knowledge Sources */}
+      {/* Knowledge Categories */}
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Knowledge Sources</h2>
+          <h2 className="text-lg font-semibold">Knowledge Categories</h2>
           <Button
             variant="outline"
             size="sm"
@@ -175,80 +93,54 @@ export function KnowledgeTab({ agent, onSave, isSaving }: KnowledgeTabProps) {
         </CardHeader>
         <CardBody className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Select knowledge sources to include in this agent&apos;s context.
-            The agent will use these sources to answer questions.
+            Select knowledge categories to include in this agent&apos;s context.
+            Leave empty to search all categories.
           </p>
 
-          <Input
-            placeholder="Search sources..."
-            value={searchValue}
-            onValueChange={setSearchValue}
-            startContent={<Search className="h-4 w-4 text-muted-foreground" />}
-          />
-
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
-                  <Skeleton className="h-5 w-5" />
-                  <Skeleton className="h-10 w-10 rounded-lg" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-              ))}
+            <div className="py-8 text-center text-muted-foreground">
+              Loading categories...
             </div>
-          ) : filteredSources.length === 0 ? (
+          ) : categories.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-              <p>No indexed knowledge sources found</p>
+              <p>No knowledge categories found</p>
               <Button
                 variant="outline"
                 size="sm"
                 className="mt-4"
                 asChild
               >
-                <Link href="/knowledge/new">Add Your First Source</Link>
+                <Link href="/knowledge">Create a Category</Link>
               </Button>
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredSources.map((source) => {
-                const status = getStatusConfig(source.status);
-                const StatusIcon = status.icon;
-                const TypeIcon = typeIcons[source.type] || FileText;
-                const isSelected = selectedSources.has(source.id);
+              {categories.map((category) => {
+                const isSelected = selectedCategories.has(category.name);
 
                 return (
                   <div
-                    key={source.id}
+                    key={category.name}
                     className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
                       isSelected ? "border-primary bg-primary/5" : "hover:bg-muted"
                     }`}
-                    onClick={() => handleToggleSource(source.id)}
+                    onClick={() => handleToggleCategory(category.name)}
                   >
                     <Checkbox
                       isSelected={isSelected}
-                      onValueChange={() => handleToggleSource(source.id)}
+                      onValueChange={() => handleToggleCategory(category.name)}
                     />
 
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <TypeIcon className="h-5 w-5" />
+                      <FolderOpen className="h-5 w-5" />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{source.name}</span>
-                        <Badge variant={status.variant}>
-                          <StatusIcon className={`h-3 w-3 mr-1 ${source.status === "processing" ? "animate-spin" : ""}`} />
-                          {status.label}
-                        </Badge>
-                      </div>
+                      <span className="font-medium">{category.name}</span>
                       <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                        <span className="capitalize">{source.type}</span>
-                        <span>{source.chunkCount} chunks</span>
-                        <span>{formatTokenCount(source.tokenCount)} tokens</span>
+                        <span>{category.sourceCount} sources</span>
+                        <span>{category.faqCount} FAQs</span>
                       </div>
                     </div>
                   </div>

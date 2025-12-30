@@ -9,6 +9,7 @@
 
 import { useEffect, useState, useRef, useCallback, FormEvent } from "react";
 import { cn } from "@/lib/utils";
+import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 
 // ============================================================================
 // Types
@@ -43,6 +44,8 @@ interface Message {
   content: string;
   timestamp: Date;
   status?: "sending" | "sent" | "error";
+  isNotification?: boolean;
+  targetAgentName?: string;
 }
 
 interface Session {
@@ -61,12 +64,34 @@ export default function WidgetPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [thinkingText, setThinkingText] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const sendMessageRef = useRef<(content: string) => void>(() => {});
+
+  // Voice recording for push-to-talk
+  const handleVoiceTranscript = useCallback((text: string) => {
+    if (text.trim()) {
+      sendMessageRef.current(text);
+    }
+  }, []);
+
+  const {
+    isRecording,
+    isSupported: isVoiceSupported,
+    transcript: voiceTranscript,
+    duration: recordingDuration,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+  } = useVoiceRecording({
+    onTranscript: handleVoiceTranscript,
+    maxDuration: 60,
+  });
 
   // Get config from URL params
   useEffect(() => {
@@ -230,12 +255,46 @@ export default function WidgetPage() {
       setIsConnected(true);
     });
 
-    eventSource.addEventListener("thinking", () => {
+    eventSource.addEventListener("thinking", (event) => {
       setIsTyping(true);
+      // Parse thinking text if available
+      try {
+        const data = JSON.parse(event.data);
+        if (data.content) {
+          setThinkingText(data.content);
+        }
+      } catch {
+        // No thinking text, just show indicator
+        setThinkingText(null);
+      }
+    });
+
+    eventSource.addEventListener("notification", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.message) {
+          // Add notification message to chat
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `notification-${Date.now()}`,
+              role: "system",
+              content: data.message,
+              timestamp: new Date(),
+              isNotification: true,
+              targetAgentName: data.targetAgentName,
+            },
+          ]);
+        }
+      } catch {
+        // Ignore parsing errors
+      }
     });
 
     eventSource.addEventListener("delta", (event) => {
       const data = JSON.parse(event.data);
+      // Clear thinking text when we start receiving content
+      setThinkingText(null);
       // Handle streaming delta updates
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
@@ -255,6 +314,7 @@ export default function WidgetPage() {
     eventSource.addEventListener("complete", (event) => {
       const data = JSON.parse(event.data);
       setIsTyping(false);
+      setThinkingText(null);
 
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
@@ -370,6 +430,11 @@ export default function WidgetPage() {
     [session]
   );
 
+  // Keep sendMessageRef in sync for voice recording callback
+  useEffect(() => {
+    sendMessageRef.current = handleSendMessage;
+  }, [handleSendMessage]);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     handleSendMessage(inputValue);
@@ -481,41 +546,75 @@ export default function WidgetPage() {
           isDark ? "bg-zinc-900" : "bg-gray-50"
         )}
       >
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={cn(
-              "flex",
-              message.role === "user" ? "justify-end" : "justify-start"
-            )}
-          >
+        {messages.map((message) => {
+          // Render notification messages differently
+          if (message.isNotification) {
+            return (
+              <div
+                key={message.id}
+                className="flex justify-center my-3"
+              >
+                <div
+                  className={cn(
+                    "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm",
+                    isDark ? "bg-zinc-800/80 text-zinc-300" : "bg-gray-100 text-gray-600"
+                  )}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0"
+                  >
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                  <span>{message.content}</span>
+                </div>
+              </div>
+            );
+          }
+
+          return (
             <div
+              key={message.id}
               className={cn(
-                "max-w-[85%] rounded-2xl px-4 py-2.5",
-                message.role === "user"
-                  ? "rounded-br-sm text-white"
-                  : cn(
-                      "rounded-bl-sm",
-                      isDark ? "bg-zinc-800" : "bg-white shadow-sm"
-                    ),
-                message.status === "sending" && "opacity-70"
+                "flex",
+                message.role === "user" ? "justify-end" : "justify-start"
               )}
-              style={
-                message.role === "user"
-                  ? { backgroundColor: config.primaryColor }
-                  : undefined
-              }
             >
-              {message.content || (
-                <span className="inline-flex gap-1">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
-                </span>
-              )}
+              <div
+                className={cn(
+                  "max-w-[85%] rounded-2xl px-4 py-2.5",
+                  message.role === "user"
+                    ? "rounded-br-sm text-white"
+                    : cn(
+                        "rounded-bl-sm",
+                        isDark ? "bg-zinc-800" : "bg-white shadow-sm"
+                      ),
+                  message.status === "sending" && "opacity-70"
+                )}
+                style={
+                  message.role === "user"
+                    ? { backgroundColor: config.primaryColor }
+                    : undefined
+                }
+              >
+                {message.content || (
+                  <span className="inline-flex gap-1">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {isTyping && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex justify-start">
@@ -525,11 +624,47 @@ export default function WidgetPage() {
                 isDark ? "bg-zinc-800" : "bg-white shadow-sm"
               )}
             >
-              <span className="inline-flex gap-1">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
-              </span>
+              {thinkingText ? (
+                <div className="space-y-1.5">
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-medium",
+                      isDark ? "text-zinc-400" : "text-gray-500"
+                    )}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="animate-pulse"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4" />
+                      <path d="M12 8h.01" />
+                    </svg>
+                    <span>Thinking...</span>
+                  </div>
+                  <p
+                    className={cn(
+                      "text-sm italic",
+                      isDark ? "text-zinc-300" : "text-gray-600"
+                    )}
+                  >
+                    {thinkingText}
+                  </p>
+                </div>
+              ) : (
+                <span className="inline-flex gap-1">
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -545,12 +680,129 @@ export default function WidgetPage() {
           isDark ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-white"
         )}
       >
+        {/* Recording Overlay */}
+        {isRecording && (
+          <div
+            className={cn(
+              "mb-3 rounded-xl p-4",
+              isDark ? "bg-zinc-800" : "bg-gray-100"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div
+                  className="h-10 w-10 rounded-full flex items-center justify-center animate-pulse"
+                  style={{ backgroundColor: `${config.primaryColor}20` }}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={config.primaryColor}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </div>
+                <span
+                  className="absolute -top-1 -right-1 flex h-3 w-3"
+                >
+                  <span
+                    className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                    style={{ backgroundColor: "#ef4444" }}
+                  />
+                  <span
+                    className="relative inline-flex rounded-full h-3 w-3"
+                    style={{ backgroundColor: "#ef4444" }}
+                  />
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium">Recording...</span>
+                  <span className={cn("text-xs", isDark ? "text-zinc-400" : "text-gray-500")}>
+                    {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
+                  </span>
+                </div>
+                {voiceTranscript && (
+                  <p className={cn("text-sm truncate", isDark ? "text-zinc-300" : "text-gray-600")}>
+                    {voiceTranscript}
+                  </p>
+                )}
+                {!voiceTranscript && (
+                  <p className={cn("text-sm italic", isDark ? "text-zinc-500" : "text-gray-400")}>
+                    Speak now...
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={cancelRecording}
+                className={cn(
+                  "rounded-full p-2 transition-colors",
+                  isDark ? "hover:bg-zinc-700 text-zinc-400" : "hover:bg-gray-200 text-gray-500"
+                )}
+                aria-label="Cancel recording"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className={cn("text-xs mt-2 text-center", isDark ? "text-zinc-500" : "text-gray-400")}>
+              Release to send • Click X to cancel
+            </p>
+          </div>
+        )}
+
         <div
           className={cn(
             "flex items-end gap-2 rounded-2xl px-4 py-2",
-            isDark ? "bg-zinc-800" : "bg-gray-100"
+            isDark ? "bg-zinc-800" : "bg-gray-100",
+            isRecording && "opacity-50 pointer-events-none"
           )}
         >
+          {/* Push-to-talk microphone button */}
+          {config.enableVoice && isVoiceSupported && (
+            <button
+              type="button"
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={stopRecording}
+              onTouchStart={startRecording}
+              onTouchEnd={stopRecording}
+              className={cn(
+                "rounded-full p-2 transition-colors shrink-0",
+                isRecording
+                  ? "text-white"
+                  : isDark
+                  ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
+                  : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+              )}
+              style={isRecording ? { backgroundColor: config.primaryColor } : undefined}
+              aria-label="Hold to record voice message"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            </button>
+          )}
           <textarea
             ref={inputRef}
             value={inputValue}

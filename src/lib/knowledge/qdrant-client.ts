@@ -16,6 +16,7 @@ export interface QdrantConfig {
 export interface VectorPayload {
   sourceId: string;
   companyId: string;
+  category?: string | null;
   content: string;
   chunkIndex: number;
   tokenCount: number;
@@ -147,7 +148,7 @@ export class QdrantService {
    * Create payload indexes for efficient filtering
    */
   private async createIndexes(collectionName: string): Promise<void> {
-    const indexes = ["companyId", "sourceId"];
+    const indexes = ["companyId", "sourceId", "category"];
 
     for (const fieldName of indexes) {
       try {
@@ -385,13 +386,40 @@ export async function searchChunks(
   options: {
     limit?: number;
     sourceIds?: string[];
+    categories?: string[];
     scoreThreshold?: number;
   } = {}
 ): Promise<SearchHit<VectorPayload>[]> {
   const service = getQdrantService();
 
+  const mustConditions: QdrantCondition[] = [
+    { key: "companyId", match: { value: companyId } },
+  ];
+
+  // Filter by category names if provided
+  if (options.categories && options.categories.length > 0) {
+    // Create a should clause within must to match any of the categories
+    const categoryFilter: QdrantFilter = {
+      should: options.categories.map((category) => ({
+        key: "category",
+        match: { value: category },
+      })),
+    };
+    // Wrap in a nested filter for proper AND behavior with company filter
+    return service.search<VectorPayload>({
+      collectionName: COLLECTIONS.KNOWLEDGE_CHUNKS,
+      vector,
+      limit: options.limit ?? 10,
+      filter: {
+        must: mustConditions,
+        should: categoryFilter.should,
+      },
+      scoreThreshold: options.scoreThreshold ?? 0.7,
+    });
+  }
+
   const filter: QdrantFilter = {
-    must: [{ key: "companyId", match: { value: companyId } }],
+    must: mustConditions,
   };
 
   if (options.sourceIds && options.sourceIds.length > 0) {

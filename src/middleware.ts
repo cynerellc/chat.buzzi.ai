@@ -18,6 +18,7 @@ const publicRoutes = [
   "/api/widget",
   "/widget",
   "/widget-demo",
+  "/embed-widget",
 ];
 
 // Routes that require master_admin role

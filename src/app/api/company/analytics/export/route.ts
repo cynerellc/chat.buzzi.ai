@@ -76,13 +76,13 @@ export async function POST(request: NextRequest) {
     // Get agent breakdown
     const agentStats = await db
       .select({
-        agentId: conversations.agentId,
+        agentId: conversations.chatbotId,
         agentName: agents.name,
         totalConversations: count(),
         avgMessageCount: sql<number>`AVG(${conversations.messageCount})`.as("avg_messages"),
       })
       .from(conversations)
-      .leftJoin(agents, eq(conversations.agentId, agents.id))
+      .leftJoin(agents, eq(conversations.chatbotId, agents.id))
       .where(
         and(
           eq(conversations.companyId, company.id),
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
           lte(conversations.createdAt, endDate)
         )
       )
-      .groupBy(conversations.agentId, agents.name);
+      .groupBy(conversations.chatbotId, agents.name);
 
     // Format data for export
     const exportData = {

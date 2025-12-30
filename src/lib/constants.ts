@@ -160,3 +160,30 @@ export const DATE_FORMATS = {
   INPUT: "yyyy-MM-dd",
   ISO: "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
 } as const;
+
+// AI Model Options for agent configuration
+export const MODEL_OPTIONS = [
+  // OpenAI GPT-5 Series (Latest - Dec 2025)
+  { value: "gpt-5", label: "GPT-5" },
+  { value: "gpt-5-mini", label: "GPT-5 Mini" },
+  // OpenAI GPT-4.1 Series
+  { value: "gpt-4.1", label: "GPT-4.1" },
+  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+  // OpenAI O-Series (Reasoning)
+  { value: "o3", label: "o3 (Reasoning)" },
+  { value: "o3-mini", label: "o3-mini (Reasoning)" },
+  { value: "o4-mini", label: "o4-mini (Reasoning)" },
+  { value: "o1", label: "o1 (Reasoning)" },
+  { value: "o1-mini", label: "o1-mini (Reasoning)" },
+  // OpenAI GPT-4o (Legacy)
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+  // Anthropic Models
+  { value: "claude-sonnet-4", label: "Claude Sonnet 4" },
+  { value: "claude-opus-4", label: "Claude Opus 4" },
+  { value: "claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet" },
+  { value: "claude-3-5-haiku-latest", label: "Claude 3.5 Haiku" },
+] as const;
+
+export type ModelId = (typeof MODEL_OPTIONS)[number]["value"];

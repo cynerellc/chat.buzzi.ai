@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const [widgetConfig] = await db
       .select()
       .from(widgetConfigs)
-      .where(eq(widgetConfigs.companyId, company.id))
+      .where(eq(widgetConfigs.chatbotId, company.id))
       .limit(1);
 
     // Generate embed code

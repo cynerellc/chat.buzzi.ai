@@ -99,24 +99,19 @@ describe("Database Schema", () => {
       expect(getTableName(schema.companySubscriptions)).toBe("company_subscriptions");
     });
 
-    it("should export agent packages table", () => {
+    it("should export chatbot packages table (agentPackages alias)", () => {
       expect(schema.agentPackages).toBeDefined();
-      expect(getTableName(schema.agentPackages)).toBe("agent_packages");
+      expect(getTableName(schema.agentPackages)).toBe("chatbot_packages");
     });
 
-    it("should export agents table", () => {
+    it("should export chatbots table (agents alias)", () => {
       expect(schema.agents).toBeDefined();
-      expect(getTableName(schema.agents)).toBe("agents");
+      expect(getTableName(schema.agents)).toBe("chatbots");
     });
 
     it("should export knowledge sources table", () => {
       expect(schema.knowledgeSources).toBeDefined();
       expect(getTableName(schema.knowledgeSources)).toBe("knowledge_sources");
-    });
-
-    it("should export knowledge chunks table", () => {
-      expect(schema.knowledgeChunks).toBeDefined();
-      expect(getTableName(schema.knowledgeChunks)).toBe("knowledge_chunks");
     });
 
     it("should export FAQ items table", () => {
@@ -255,19 +250,25 @@ describe("Database Schema", () => {
         id: "test-id",
         companyId: "company-id",
         packageId: null,
+        packageType: "single_agent",
         name: "Test Agent",
         description: null,
         type: "support",
         status: "draft",
-        avatarUrl: null,
-        systemPrompt: "You are a helpful assistant",
-        modelId: "gpt-4o-mini",
-        temperature: 70,
+        agentsList: [{
+          agent_identifier: "main",
+          name: "Test Agent",
+          agent_type: "worker",
+          default_system_prompt: "You are a helpful assistant",
+          default_model_id: "gpt-4o-mini",
+          default_temperature: 70,
+          sort_order: 0,
+        }],
         behavior: {},
         businessHours: null,
         escalationEnabled: true,
         escalationTriggers: [],
-        knowledgeSourceIds: [],
+        variableValues: {},
         totalConversations: 0,
         avgResolutionTime: null,
         satisfactionScore: null,
@@ -282,7 +283,7 @@ describe("Database Schema", () => {
       const conversation: schema.Conversation = {
         id: "test-id",
         companyId: "company-id",
-        agentId: "agent-id",
+        chatbotId: "chatbot-id",
         endUserId: "end-user-id",
         channel: "web",
         status: "active",

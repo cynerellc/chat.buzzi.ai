@@ -13,6 +13,7 @@ import {
   EditCompanyModal,
 } from "@/components/master-admin/companies";
 import { Button, Card, ConfirmationDialog } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   deleteCompanies,
   updateCompaniesStatus,
@@ -23,6 +24,7 @@ import {
 import type { SortDescriptor } from "@/components/ui";
 
 export default function CompaniesPage() {
+  useSetPageTitle("Companies");
   // Filters state
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");

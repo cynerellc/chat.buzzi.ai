@@ -43,12 +43,16 @@ interface TeamGridProps {
   onRemoveMember: (member: TeamMember) => void;
 }
 
+const defaultStatusConfig = { color: "text-muted-foreground", bg: "bg-muted", dot: "bg-muted-foreground" };
+
 const statusConfig: Record<string, { color: string; bg: string; dot: string }> = {
   active: { color: "text-success", bg: "bg-success/10", dot: "bg-success" },
-  inactive: { color: "text-muted-foreground", bg: "bg-muted", dot: "bg-muted-foreground" },
+  inactive: defaultStatusConfig,
   pending: { color: "text-warning", bg: "bg-warning/10", dot: "bg-warning" },
   suspended: { color: "text-destructive", bg: "bg-destructive/10", dot: "bg-destructive" },
 };
+
+const defaultRoleConfig = { icon: Shield, color: "text-muted-foreground", bg: "bg-muted", label: "Member" };
 
 const roleConfig: Record<string, { icon: typeof ShieldCheck; color: string; bg: string; label: string }> = {
   "chatapp.company_admin": { icon: ShieldCheck, color: "text-primary", bg: "bg-primary/10", label: "Admin" },
@@ -56,12 +60,19 @@ const roleConfig: Record<string, { icon: typeof ShieldCheck; color: string; bg: 
   "chatapp.support_agent": { icon: Shield, color: "text-muted-foreground", bg: "bg-muted", label: "Support Agent" },
 };
 
+const statusToBadgeVariant: Record<string, "success" | "warning" | "danger" | "default" | "info"> = {
+  active: "success",
+  inactive: "default",
+  pending: "warning",
+  suspended: "danger",
+};
+
 function getRoleConfig(role: string) {
-  return roleConfig[role] ?? { icon: Shield, color: "text-muted-foreground", bg: "bg-muted", label: role };
+  return roleConfig[role] ?? defaultRoleConfig;
 }
 
 function getStatusConfig(status: string) {
-  return statusConfig[status] ?? statusConfig.inactive;
+  return statusConfig[status] ?? defaultStatusConfig;
 }
 
 function formatDate(dateString: string | null) {
@@ -306,7 +317,7 @@ export function TeamList({
                         <Badge variant="info" className="shrink-0">You</Badge>
                       )}
                       <Badge
-                        variant={statusColors[member.status] || "default"}
+                        variant={statusToBadgeVariant[member.status] ?? "default"}
                         className="capitalize shrink-0"
                       >
                         {member.status}
@@ -318,8 +329,12 @@ export function TeamList({
 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    {getRoleIcon(member.role)}
-                    <span className="text-sm">{getRoleLabel(member.role)}</span>
+                    {(() => {
+                      const roleInfo = getRoleConfig(member.role);
+                      const RoleIcon = roleInfo.icon;
+                      return <RoleIcon className={cn("h-4 w-4", roleInfo.color)} />;
+                    })()}
+                    <span className="text-sm">{getRoleConfig(member.role).label}</span>
                   </div>
 
                   <span className="text-xs text-default-400">

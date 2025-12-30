@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { conversations, endUsers, messages, escalations } from "@/lib/db/schema/conversations";
-import { agents } from "@/lib/db/schema/agents";
+import { agents } from "@/lib/db/schema/chatbots";
 import { users } from "@/lib/db/schema/users";
 import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, desc } from "drizzle-orm";
@@ -65,7 +65,7 @@ export async function GET(
         agent: {
           id: agents.id,
           name: agents.name,
-          avatarUrl: agents.avatarUrl,
+          agentsList: agents.agentsList,
         },
         // Assigned user info
         assignedUser: {
@@ -76,7 +76,7 @@ export async function GET(
       })
       .from(conversations)
       .leftJoin(endUsers, eq(conversations.endUserId, endUsers.id))
-      .leftJoin(agents, eq(conversations.agentId, agents.id))
+      .leftJoin(agents, eq(conversations.chatbotId, agents.id))
       .leftJoin(users, eq(conversations.assignedUserId, users.id))
       .where(
         and(
@@ -177,9 +177,18 @@ export async function GET(
         )
       );
 
+    // Extract avatarUrl from agentsList
+    const agentsListData = (conversation.agent?.agentsList as { avatar_url?: string }[] | null) || [];
+    const agentAvatarUrl = agentsListData[0]?.avatar_url || null;
+
     return NextResponse.json({
       conversation: {
         ...conversation,
+        agent: conversation.agent ? {
+          id: conversation.agent.id,
+          name: conversation.agent.name,
+          avatarUrl: agentAvatarUrl,
+        } : null,
         isStarred: (conversation.metadata as Record<string, unknown> | null)?.starred === true,
       },
       messages: messageList,

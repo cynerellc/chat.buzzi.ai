@@ -49,11 +49,11 @@ export function FormActions({
     <div className={cn("flex items-center gap-3 pt-4", alignClasses[align], className)}>
       {align === "between" && showDelete && onDelete && (
         <Button
-          variant="light"
-          color="danger"
+          variant="ghost"
           leftIcon={Trash2}
           onPress={onDelete}
           isDisabled={isLoading || isDisabled}
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           {deleteLabel}
         </Button>
@@ -64,7 +64,7 @@ export function FormActions({
 
         {onCancel && (
           <Button
-            variant="bordered"
+            variant="outline"
             leftIcon={X}
             onPress={onCancel}
             isDisabled={isLoading}

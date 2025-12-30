@@ -217,8 +217,8 @@ export default createAgentPackage("agent_package_id", orchestratorAgent);
 
 **Directory Structure**:
 ```text
-src/agent-packages
-  /[package_id]  
+src/chatbot-packages
+  /[package_id]
     - index.js          # Entry point
     - agents/           # Agents
     - tools/            # Custom tools
@@ -228,7 +228,7 @@ src/agent-packages
 1. **Platform receives message** -> Routes to `Agent Runner Service`.
 2. **Runner Service**:
    - Identifies `package_id`.
-   - If '/agent-packages/[package_id]' folder exists then load the agent from there. else Checks local cache for the Agent's code bundle. if missing, downloads from Supabase Storage.
+   - If '/chatbot-packages/[package_id]' folder exists then load the agent from there. else Checks local cache for the Agent's code bundle. if missing, downloads from Supabase Storage.
    - Spins up a **Worker Thread** (or reuses a warm one).
    - Injects the `context` (User message, History, RAG results).
 3. **Agent Logic**: Executes synchronously or asynchronously within the thread.

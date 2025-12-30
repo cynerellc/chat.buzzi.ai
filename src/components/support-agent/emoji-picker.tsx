@@ -156,7 +156,6 @@ export function EmojiPicker({
                 </button>
               )
             }
-            size="sm"
             className="text-sm"
           />
         </div>

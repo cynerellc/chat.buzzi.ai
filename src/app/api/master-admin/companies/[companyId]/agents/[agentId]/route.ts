@@ -1,4 +1,4 @@
-import { eq, and, count, sql, isNull } from "drizzle-orm";
+import { eq, and, count, isNull, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,6 +6,7 @@ import { requireMasterAdmin } from "@/lib/auth/guards";
 import { createAuditLog } from "@/lib/audit/logger";
 import { db } from "@/lib/db";
 import { agents, agentPackages, conversations, messages } from "@/lib/db/schema";
+import type { AgentListItem } from "@/lib/db/schema/chatbots";
 
 interface RouteContext {
   params: Promise<{ companyId: string; agentId: string }>;
@@ -22,11 +23,29 @@ export interface AgentDetails {
   temperature: number;
   behavior: Record<string, unknown>;
   status: string;
+  escalationEnabled: boolean;
   conversationCount: number;
   messageCount: number;
   createdAt: string;
   updatedAt: string;
+  agentsList: AgentListItem[];
 }
+
+const agentListItemSchema = z.object({
+  agent_identifier: z.string(),
+  name: z.string(),
+  designation: z.string().optional(),
+  avatar_url: z.string().optional(),
+  agent_type: z.enum(["worker", "supervisor"]),
+  default_system_prompt: z.string(),
+  default_model_id: z.string(),
+  default_temperature: z.number().min(0).max(100),
+  knowledge_base_enabled: z.boolean().optional(),
+  knowledge_categories: z.array(z.string()).optional(),
+  tools: z.array(z.unknown()).optional(),
+  managed_agent_ids: z.array(z.string()).optional(),
+  sort_order: z.number().optional(),
+});
 
 const updateAgentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -37,6 +56,8 @@ const updateAgentSchema = z.object({
   temperature: z.number().int().min(0).max(100).optional(),
   behavior: z.record(z.string(), z.unknown()).optional(),
   status: z.enum(["draft", "active", "paused", "archived"]).optional(),
+  agentsList: z.array(agentListItemSchema).optional(),
+  escalationEnabled: z.boolean().optional(),
 });
 
 /**
@@ -49,18 +70,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { companyId, agentId } = await context.params;
 
     // Get agent with package info
-    const [agent] = await db
+    const [agentRow] = await db
       .select({
         id: agents.id,
         name: agents.name,
         description: agents.description,
         packageId: agents.packageId,
         packageName: agentPackages.name,
-        systemPrompt: agents.systemPrompt,
-        modelId: agents.modelId,
-        temperature: agents.temperature,
+        agentsList: agents.agentsList,
         behavior: agents.behavior,
         status: agents.status,
+        escalationEnabled: agents.escalationEnabled,
         createdAt: agents.createdAt,
         updatedAt: agents.updatedAt,
         companyId: agents.companyId,
@@ -76,21 +96,31 @@ export async function GET(request: NextRequest, context: RouteContext) {
       )
       .limit(1);
 
-    if (!agent) {
+    if (!agentRow) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
+
+    // Extract config from agentsList[0]
+    const agentsListData = (agentRow.agentsList as { default_system_prompt: string; default_model_id: string; default_temperature: number }[] | null) || [];
+    const primaryAgent = agentsListData[0];
+    const agent = {
+      ...agentRow,
+      systemPrompt: primaryAgent?.default_system_prompt || "",
+      modelId: primaryAgent?.default_model_id || "gpt-5-mini",
+      temperature: primaryAgent?.default_temperature ?? 70,
+    };
 
     // Get conversation count
     const [convCount] = await db
       .select({ count: count() })
       .from(conversations)
-      .where(eq(conversations.agentId, agentId));
+      .where(eq(conversations.chatbotId, agentId));
 
     // Get message count
     const agentConversations = await db
       .select({ id: conversations.id })
       .from(conversations)
-      .where(eq(conversations.agentId, agentId));
+      .where(eq(conversations.chatbotId, agentId));
 
     let msgCount = 0;
     if (agentConversations.length > 0) {
@@ -98,7 +128,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       const [messagesCount] = await db
         .select({ count: count() })
         .from(messages)
-        .where(sql`${messages.conversationId} = ANY(${conversationIds})`);
+        .where(inArray(messages.conversationId, conversationIds));
       msgCount = messagesCount?.count ?? 0;
     }
 
@@ -113,10 +143,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       temperature: agent.temperature,
       behavior: (agent.behavior as Record<string, unknown>) ?? {},
       status: agent.status,
+      escalationEnabled: agent.escalationEnabled,
       conversationCount: convCount?.count ?? 0,
       messageCount: msgCount,
       createdAt: agent.createdAt.toISOString(),
       updatedAt: agent.updatedAt.toISOString(),
+      agentsList: (agentRow.agentsList as AgentListItem[]) ?? [],
     };
 
     return NextResponse.json(response);
@@ -190,6 +222,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (data.temperature !== undefined) updateData.temperature = data.temperature;
     if (data.behavior !== undefined) updateData.behavior = data.behavior;
     if (data.status !== undefined) updateData.status = data.status;
+    if (data.agentsList !== undefined) updateData.agentsList = data.agentsList;
+    if (data.escalationEnabled !== undefined) updateData.escalationEnabled = data.escalationEnabled;
 
     // Update agent
     const [updatedAgent] = await db

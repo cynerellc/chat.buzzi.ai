@@ -37,6 +37,7 @@ interface AgentCardProps {
   onDuplicate: (agentId: string) => void;
   onDelete: (agentId: string) => void;
   onStatusChange: (agentId: string, status: "active" | "paused") => void;
+  basePath?: string;
 }
 
 const statusConfig: Record<string, { label: string; variant: "success" | "warning" | "default"; dot: string; bg: string }> = {
@@ -57,6 +58,7 @@ export function AgentCard({
   onDuplicate,
   onDelete,
   onStatusChange,
+  basePath = "/agents",
 }: AgentCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const defaultStatus = { label: "Draft", variant: "default" as const, dot: "bg-muted-foreground", bg: "bg-muted" };
@@ -65,7 +67,7 @@ export function AgentCard({
 
   const dropdownItems: DropdownMenuItemData[] = useMemo(() => {
     const items: DropdownMenuItemData[] = [
-      { key: "edit", label: "Edit", icon: Pencil, href: `/agents/${agent.id}` },
+      { key: "edit", label: "Edit", icon: Pencil, href: `${basePath}/${agent.id}` },
       { key: "duplicate", label: "Duplicate", icon: Copy },
     ];
 
@@ -76,11 +78,11 @@ export function AgentCard({
       items.push({ key: "resume", label: "Resume", icon: Play });
     }
 
-    items.push({ key: "analytics", label: "View Analytics", icon: BarChart3, href: `/agents/${agent.id}?tab=analytics` });
+    items.push({ key: "analytics", label: "View Analytics", icon: BarChart3, href: `${basePath}/${agent.id}?tab=analytics` });
     items.push({ key: "delete", label: "Delete", icon: Trash2, isDanger: true });
 
     return items;
-  }, [agent.id, agent.status]);
+  }, [agent.id, agent.status, basePath]);
 
   const handleDropdownAction = (key: Key) => {
     switch (key) {
@@ -193,9 +195,9 @@ export function AgentCard({
               className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors"
               asChild
             >
-              <Link href={`/agents/${agent.id}`}>
+              <Link href={`${basePath}/${agent.id}`}>
                 <Pencil size={14} />
-                Configure Agent
+                Configure Chatbot
               </Link>
             </Button>
           </CardFooter>
@@ -209,8 +211,8 @@ export function AgentCard({
           onDelete(agent.id);
           setShowDeleteDialog(false);
         }}
-        title="Delete Agent"
-        message={`Are you sure you want to delete "${agent.name}"? This action cannot be undone. All conversation history associated with this agent will be preserved but the agent will no longer be available.`}
+        title="Delete Chatbot"
+        message={`Are you sure you want to delete "${agent.name}"? This action cannot be undone. All conversation history associated with this chatbot will be preserved but the chatbot will no longer be available.`}
         confirmLabel="Delete"
         isDanger
       />

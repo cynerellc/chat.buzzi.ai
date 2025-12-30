@@ -122,23 +122,53 @@ export class DocumentProcessor {
 
   /**
    * Process PDF documents
+   * Uses unpdf which works in serverless/edge environments without web workers
    */
   private async processPdf(buffer: Buffer): Promise<ProcessedDocument> {
     try {
-      // Dynamic import to avoid issues in edge runtime
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParseModule = await import("pdf-parse") as any;
-      const pdfParse = pdfParseModule.default ?? pdfParseModule;
-      const data = await pdfParse(buffer);
+      console.log("[DocumentProcessor] Starting PDF processing with unpdf...");
+      console.log("[DocumentProcessor] Buffer length:", buffer.length);
 
-      const content = this.cleanText(data.text);
+      // Dynamic import unpdf - designed for serverless environments
+      const { extractText, getDocumentProxy } = await import("unpdf");
 
+      // Convert Buffer to Uint8Array
+      const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      console.log("[DocumentProcessor] Uint8Array length:", uint8Array.length);
+
+      // Extract text from PDF
+      console.log("[DocumentProcessor] Extracting text...");
+      const { text, totalPages } = await extractText(uint8Array, { mergePages: true });
+      console.log("[DocumentProcessor] Extraction complete:", {
+        textLength: text?.length || 0,
+        totalPages,
+      });
+
+      // Try to get metadata
+      let title: string | undefined;
+      let author: string | undefined;
+      try {
+        console.log("[DocumentProcessor] Getting document metadata...");
+        const pdf = await getDocumentProxy(uint8Array);
+        const metadata = await pdf.getMetadata();
+        const info = metadata?.info as Record<string, unknown> | undefined;
+        title = info?.Title as string | undefined;
+        author = info?.Author as string | undefined;
+        console.log("[DocumentProcessor] Metadata:", { title, author });
+      } catch (metaError) {
+        console.log("[DocumentProcessor] Metadata extraction failed (non-fatal):", metaError);
+      }
+
+      const content = this.cleanText(text || "");
+      console.log("[DocumentProcessor] Cleaned content length:", content.length);
+
+      console.log("[DocumentProcessor] PDF processing complete!");
       return {
         content,
         metadata: {
-          title: data.info?.Title,
-          author: data.info?.Author,
-          pageCount: data.numpages,
+          title,
+          author,
+          pageCount: totalPages,
           wordCount: this.countWords(content),
           charCount: content.length,
           fileType: "pdf",
@@ -146,6 +176,7 @@ export class DocumentProcessor {
         },
       };
     } catch (error) {
+      console.error("[DocumentProcessor] PDF processing error:", error);
       throw new DocumentProcessingError(
         `Failed to process PDF: ${error instanceof Error ? error.message : "Unknown error"}`,
         "pdf"

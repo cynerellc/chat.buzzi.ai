@@ -46,9 +46,10 @@ export const Slider = forwardRef<ElementRef<typeof SliderPrimitive.Root>, Slider
   ) => {
     const sizes = sizeClasses[size];
     const currentValue = value ?? defaultValue ?? [0];
+    const firstValue = currentValue[0] ?? 0;
     const displayValue = formatValue
-      ? formatValue(currentValue[0])
-      : currentValue[0];
+      ? formatValue(firstValue)
+      : firstValue;
 
     return (
       <div className="space-y-2">

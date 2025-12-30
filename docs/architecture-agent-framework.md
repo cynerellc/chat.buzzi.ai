@@ -74,7 +74,7 @@ This document details the architecture of the Pluggable Agent Framework - a syst
 ### 2.1 Package Layout
 
 ```
-agent-packages/
+chatbot-packages/
 └── company_{company_id}_{agent_name}_v{version}.zip
     ├── index.js              # Entry point (compiled)
     ├── index.js.map          # Source map (optional)

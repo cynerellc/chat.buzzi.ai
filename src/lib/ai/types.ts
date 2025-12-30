@@ -5,7 +5,7 @@
  * including agent configuration, context, responses, and tool definitions.
  */
 
-import type { Agent } from "@/lib/db/schema/agents";
+import type { Agent } from "@/lib/db/schema/chatbots";
 
 // ============================================================================
 // LLM Configuration Types
@@ -23,9 +23,17 @@ export interface LLMConfig {
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string;
+  content: string | null;
   name?: string; // For tool messages
   toolCallId?: string; // For tool result messages
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>; // For assistant messages with tool calls
 }
 
 export interface LLMToolCall {
@@ -266,7 +274,7 @@ export interface RAGConfig {
   enabled: boolean;
   maxResults: number;
   relevanceThreshold: number;
-  categoryIds?: string[];
+  categories?: string[]; // Category names for RAG filtering
 }
 
 export interface HistoryConfig {
@@ -293,6 +301,7 @@ export interface BehaviorConfig {
 export interface AgentConfig {
   // Identity
   agentId: string;
+  agentIdentifier: string; // Agent identifier within the package
   companyId: string;
   agentName: string;
 
@@ -319,9 +328,6 @@ export interface AgentConfig {
   // Escalation
   escalationEnabled: boolean;
   escalationTriggers: EscalationTrigger[];
-
-  // Knowledge sources
-  knowledgeSourceIds: string[];
 }
 
 // ============================================================================
@@ -360,7 +366,8 @@ export type StreamEventType =
   | "tool_result"
   | "delta"
   | "complete"
-  | "error";
+  | "error"
+  | "notification";
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -410,12 +417,24 @@ export interface ErrorEvent extends StreamEvent {
   };
 }
 
+export interface NotificationEvent extends StreamEvent {
+  type: "notification";
+  data: {
+    message: string;
+    targetAgentId?: string;
+    targetAgentName?: string;
+    previousAgentId?: string | null;
+    level?: "info" | "warning" | "success";
+  };
+}
+
 export type AgentStreamEvent =
   | ThinkingEvent
   | ToolCallEvent
   | DeltaEvent
   | CompleteEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | NotificationEvent;
 
 // ============================================================================
 // Error Types
@@ -490,32 +509,51 @@ export class ContextLimitError extends AgentError {
 
 /**
  * Convert database agent to AgentConfig
+ * Uses the first agent in agents_list for configuration, or falls back to defaults
  */
-export function agentToConfig(agent: Agent, companyApiKeys?: { openai?: string; anthropic?: string }): AgentConfig {
+export function agentToConfig(
+  agent: Agent,
+  companyApiKeys?: { openai?: string; anthropic?: string },
+  agentIdentifier?: string
+): AgentConfig {
   const behavior = agent.behavior as BehaviorConfig;
   const escalationTriggers = agent.escalationTriggers as EscalationTrigger[];
-  const knowledgeSourceIds = agent.knowledgeSourceIds as string[];
+  const agentsList = agent.agentsList || [];
+
+  // Find the specified agent or use the first one
+  const agentConfig = agentIdentifier
+    ? agentsList.find((a) => a.agent_identifier === agentIdentifier)
+    : agentsList[0];
+
+  // Default values if no agent in list
+  const systemPrompt = agentConfig?.default_system_prompt || "";
+  const modelId = agentConfig?.default_model_id || "gpt-4o-mini";
+  const temperature = agentConfig?.default_temperature ?? 70;
+  const knowledgeBaseEnabled = agentConfig?.knowledge_base_enabled ?? false;
+  const knowledgeCategories = agentConfig?.knowledge_categories || [];
+  const identifier = agentConfig?.agent_identifier || "main";
 
   // Determine provider from model ID
-  const provider: LLMProvider = agent.modelId.startsWith("claude") ? "anthropic" : "openai";
+  const provider: LLMProvider = modelId.startsWith("claude") ? "anthropic" : "openai";
 
   return {
     agentId: agent.id,
+    agentIdentifier: identifier,
     companyId: agent.companyId,
-    agentName: agent.name,
-    systemPrompt: agent.systemPrompt,
+    agentName: agentConfig?.name || agent.name,
+    systemPrompt,
     llmConfig: {
       provider,
-      model: agent.modelId,
-      temperature: agent.temperature / 100, // Convert from 0-100 to 0-1
+      model: modelId,
+      temperature: temperature / 100, // Convert from 0-100 to 0-1
       maxTokens: 4096,
       apiKey: provider === "openai" ? companyApiKeys?.openai : companyApiKeys?.anthropic,
     },
     ragConfig: {
-      enabled: knowledgeSourceIds.length > 0,
+      enabled: knowledgeBaseEnabled,
       maxResults: 5,
       relevanceThreshold: 0.7,
-      categoryIds: knowledgeSourceIds,
+      categories: knowledgeCategories.length > 0 ? knowledgeCategories : undefined,
     },
     enabledTools: ["search_knowledge", "request_human_handover"],
     historyConfig: {
@@ -526,6 +564,5 @@ export function agentToConfig(agent: Agent, companyApiKeys?: { openai?: string; 
     behavior,
     escalationEnabled: agent.escalationEnabled,
     escalationTriggers,
-    knowledgeSourceIds,
   };
 }

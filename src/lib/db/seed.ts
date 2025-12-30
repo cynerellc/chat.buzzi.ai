@@ -7,8 +7,8 @@ import * as schema from "./schema";
 // Seed script for development/testing
 async function seed() {
   const connectionString = process.env.DATABASE_URL;
-  const adminEmail = process.env.ADMIN_USERNAME || "admin@buzzi.ai";
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  const adminEmail = "admin@buzzi.ai";
+  const adminPassword = "aaaaaa";
 
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is not set");
@@ -125,26 +125,18 @@ async function seed() {
       .returning();
     console.log(`   ✓ Created ${plans.length} subscription plans\n`);
 
-    // 2. Create Agent Packages (templates)
-    console.log("🤖 Creating agent packages...");
+    // 2. Create Chatbot Packages (templates)
+    console.log("🤖 Creating chatbot packages...");
     const packages = await db
       .insert(schema.agentPackages)
       .values([
         {
+          id: "9f62b375-d70d-48a2-a9cd-8b6a8abe8e77",
           name: "Customer Support Agent",
           slug: "customer-support",
           description: "General customer support assistant",
           category: "Support",
-          defaultSystemPrompt: `You are a helpful customer support assistant. Your goal is to help customers with their questions and issues.
-
-Guidelines:
-- Be friendly, professional, and empathetic
-- Provide accurate information based on the knowledge base
-- If you don't know something, say so and offer to escalate to a human
-- Keep responses concise but helpful
-- Always ask clarifying questions if needed`,
-          defaultModelId: "gpt-4o-mini",
-          defaultTemperature: 70,
+          packageType: "single_agent",
           defaultBehavior: {
             greeting: "Hello! How can I help you today?",
             fallbackMessage:
@@ -152,23 +144,55 @@ Guidelines:
             maxTurnsBeforeEscalation: 10,
           },
           features: ["knowledge_base", "escalation", "sentiment_analysis"],
+          variables: [
+            {
+              name: "COMPANY_NAME",
+              displayName: "Company Name",
+              description: "Your company name to use in greetings and responses",
+              variableType: "variable",
+              dataType: "string",
+              defaultValue: "Our Company",
+              required: true,
+              placeholder: "Enter your company name",
+            },
+            {
+              name: "SUPPORT_EMAIL",
+              displayName: "Support Email",
+              description: "Email address for escalated support requests",
+              variableType: "variable",
+              dataType: "string",
+              required: false,
+              placeholder: "support@example.com",
+            },
+          ],
+          agentsList: [
+            {
+              agent_identifier: "support-main",
+              name: "Support Agent",
+              agent_type: "worker",
+              default_system_prompt: `You are a helpful customer support assistant. Your goal is to help customers with their questions and issues.
+
+Guidelines:
+- Be friendly, professional, and empathetic
+- Provide accurate information based on the knowledge base
+- If you don't know something, say so and offer to escalate to a human
+- Keep responses concise but helpful
+- Always ask clarifying questions if needed`,
+              default_model_id: "gpt-4o-mini",
+              default_temperature: 70,
+              tools: ["knowledge_lookup", "save_lead_info"],
+              sort_order: 0,
+            },
+          ],
           sortOrder: 0,
         },
         {
+          id: "1c33f609-ae08-4340-9dbb-e82cebed608a",
           name: "Sales Assistant",
           slug: "sales-assistant",
           description: "Help qualify leads and answer product questions",
           category: "Sales",
-          defaultSystemPrompt: `You are a knowledgeable sales assistant. Your goal is to help potential customers understand our products and services.
-
-Guidelines:
-- Be enthusiastic but not pushy
-- Focus on understanding customer needs
-- Highlight relevant features and benefits
-- Collect contact information when appropriate
-- Qualify leads based on budget, timeline, and needs`,
-          defaultModelId: "gpt-4o-mini",
-          defaultTemperature: 75,
+          packageType: "multi_agent",
           defaultBehavior: {
             greeting: "Hi there! Looking to learn more about our products?",
             fallbackMessage:
@@ -178,58 +202,90 @@ Guidelines:
             collectName: true,
           },
           features: ["knowledge_base", "lead_capture", "calendar_booking"],
+          variables: [
+            {
+              name: "COMPANY_NAME",
+              displayName: "Company Name",
+              description: "Your company name for personalized interactions",
+              variableType: "variable",
+              dataType: "string",
+              defaultValue: "Our Company",
+              required: true,
+              placeholder: "Enter your company name",
+            },
+            {
+              name: "SALES_EMAIL",
+              displayName: "Sales Email",
+              description: "Email for qualified leads to contact",
+              variableType: "variable",
+              dataType: "string",
+              required: false,
+              placeholder: "sales@example.com",
+            },
+            {
+              name: "CRM_API_KEY",
+              displayName: "CRM API Key",
+              description: "API key for CRM integration to save leads",
+              variableType: "secured_variable",
+              dataType: "string",
+              required: false,
+              placeholder: "Enter your CRM API key",
+            },
+            {
+              name: "CALENDAR_LINK",
+              displayName: "Calendar Booking Link",
+              description: "Link for scheduling demos or meetings",
+              variableType: "variable",
+              dataType: "string",
+              required: false,
+              placeholder: "https://calendly.com/your-link",
+            },
+          ],
+          agentsList: [
+            {
+              agent_identifier: "orchestrator",
+              name: "Sales Orchestrator",
+              agent_type: "supervisor",
+              default_system_prompt: `You route sales inquiries to the appropriate specialist. Analyze the customer's question and delegate to the most suitable agent.`,
+              default_model_id: "gpt-4o",
+              default_temperature: 50,
+              managed_agent_ids: ["salesman", "accounts"],
+              sort_order: 0,
+            },
+            {
+              agent_identifier: "salesman",
+              name: "Sales Representative",
+              agent_type: "worker",
+              default_system_prompt: `You are a knowledgeable sales assistant. Your goal is to help potential customers understand our products and services.
+
+Guidelines:
+- Be enthusiastic but not pushy
+- Focus on understanding customer needs
+- Highlight relevant features and benefits
+- Collect contact information when appropriate
+- Qualify leads based on budget, timeline, and needs`,
+              default_model_id: "gpt-4o-mini",
+              default_temperature: 75,
+              tools: ["save_lead_info"],
+              sort_order: 1,
+            },
+            {
+              agent_identifier: "accounts",
+              name: "Accounts Specialist",
+              agent_type: "worker",
+              default_system_prompt: `You generate quotations from pricing in the knowledge base. Be accurate and professional when providing pricing information.`,
+              default_model_id: "gpt-4o-mini",
+              default_temperature: 60,
+              tools: ["generate_quotation"],
+              knowledge_categories: ["pricing", "products"],
+              sort_order: 2,
+            },
+          ],
           sortOrder: 1,
-        },
-        {
-          name: "Technical Support Agent",
-          slug: "technical-support",
-          description: "Technical troubleshooting and documentation help",
-          category: "Support",
-          defaultSystemPrompt: `You are a technical support specialist. Your goal is to help users troubleshoot technical issues and find relevant documentation.
-
-Guidelines:
-- Ask for specific error messages and steps to reproduce
-- Provide step-by-step solutions when possible
-- Reference documentation when available
-- Escalate complex issues that require code access
-- Be patient and thorough`,
-          defaultModelId: "gpt-4o",
-          defaultTemperature: 60,
-          defaultBehavior: {
-            greeting: "Hello! I'm here to help with technical questions.",
-            fallbackMessage:
-              "This seems to require deeper investigation. Let me connect you with our technical team.",
-            maxTurnsBeforeEscalation: 15,
-          },
-          features: ["knowledge_base", "code_snippets", "escalation"],
-          sortOrder: 2,
-        },
-        {
-          name: "FAQ Bot",
-          slug: "faq-bot",
-          description: "Quick answers to frequently asked questions",
-          category: "General",
-          defaultSystemPrompt: `You are a helpful FAQ assistant. Your goal is to quickly answer common questions from the FAQ database.
-
-Guidelines:
-- Provide direct, concise answers
-- Quote from the FAQ when relevant
-- Suggest related questions the user might have
-- Offer to connect to a human if the question isn't in the FAQ`,
-          defaultModelId: "gpt-4o-mini",
-          defaultTemperature: 50,
-          defaultBehavior: {
-            greeting: "Hi! I can help answer your questions.",
-            fallbackMessage:
-              "I don't have an answer for that in my FAQ database. Would you like to speak with a human?",
-            maxTurnsBeforeEscalation: 5,
-          },
-          features: ["faq_matching", "escalation"],
-          sortOrder: 3,
         },
       ])
       .returning();
-    console.log(`   ✓ Created ${packages.length} agent packages\n`);
+    console.log(`   ✓ Created ${packages.length} chatbot packages\n`);
 
     // 3. Create a demo company
     console.log("🏢 Creating demo company...");
@@ -275,13 +331,7 @@ Guidelines:
 
     // 5. Create master admin user
     console.log("👤 Creating master admin user...");
-    let hashedPassword: string | null = null;
-    if (adminPassword) {
-      hashedPassword = await bcrypt.hash(adminPassword, 10);
-      console.log(`   Using password from ADMIN_PASSWORD env variable`);
-    } else {
-      console.log(`   ⚠️ No ADMIN_PASSWORD set - admin will need to use OAuth or reset password`);
-    }
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
     const masterAdminResult = await db
       .insert(schema.users)
       .values({
@@ -301,6 +351,7 @@ Guidelines:
 
     // 6. Create demo company admin
     console.log("👤 Creating company admin user...");
+    const demoPassword = await bcrypt.hash("aaaaaa", 10);
     const companyAdminResult = await db
       .insert(schema.users)
       .values({
@@ -309,6 +360,7 @@ Guidelines:
         role: "chatapp.user",
         status: "active",
         isActive: true,
+        hashedPassword: demoPassword,
       })
       .returning();
     const companyAdmin = companyAdminResult[0];
@@ -334,6 +386,7 @@ Guidelines:
         role: "chatapp.user",
         status: "active",
         isActive: true,
+        hashedPassword: demoPassword,
       })
       .returning();
     const supportAgent = supportAgentResult[0];
@@ -360,15 +413,14 @@ Guidelines:
       .values({
         companyId: demoCompany.id,
         packageId: supportPackage.id,
+        packageType: supportPackage.packageType,
         name: "Support Bot",
         description: "Demo customer support agent",
         type: "support",
         status: "active",
-        systemPrompt: supportPackage.defaultSystemPrompt,
-        modelId: supportPackage.defaultModelId,
-        temperature: supportPackage.defaultTemperature,
         behavior: supportPackage.defaultBehavior,
         escalationEnabled: true,
+        agentsList: supportPackage.agentsList,
       })
       .returning();
     const agent = agentResult[0];
@@ -379,10 +431,10 @@ Guidelines:
 
     console.log("✅ Seed completed successfully!\n");
     console.log("Demo Credentials:");
-    console.log(`  Master Admin: ${adminEmail}${adminPassword ? " (password set from ADMIN_PASSWORD)" : ""}`);
-    console.log("  Company Admin: admin@demo.com");
-    console.log("  Support Agent: agent@demo.com");
-    console.log("\n(Note: Company admin and support agent have no passwords set. Use OAuth or set passwords manually.)\n");
+    console.log(`  Master Admin: ${adminEmail} (password: aaaaaa)`);
+    console.log("  Company Admin: admin@demo.com (password: aaaaaa)");
+    console.log("  Support Agent: agent@demo.com (password: aaaaaa)");
+    console.log("");
   } catch (error) {
     console.error("❌ Seed failed:", error);
     throw error;

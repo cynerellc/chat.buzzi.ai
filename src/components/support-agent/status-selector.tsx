@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Circle, ChevronDown, Clock, Headphones, Moon, Check, type LucideIcon } from "lucide-react";
 import { Dropdown, Button, Chip } from "@/components/ui";
-import type { DropdownMenuItem } from "@/components/ui";
+import type { DropdownMenuItemData } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export type AgentStatus = "online" | "away" | "busy" | "offline";
@@ -114,7 +114,7 @@ export function StatusSelector({
   const currentConfig = STATUS_CONFIG[status];
   const Icon = currentConfig.icon;
 
-  const dropdownItems: DropdownMenuItem[] = Object.entries(STATUS_CONFIG).map(
+  const dropdownItems: DropdownMenuItemData[] = Object.entries(STATUS_CONFIG).map(
     ([key, config]) => ({
       key,
       label: config.label,
@@ -127,7 +127,7 @@ export function StatusSelector({
       trigger={
         <Button
           variant="ghost"
-          size={size}
+          size={size === "md" ? "default" : size}
           className={cn(
             "gap-2.5 px-3 hover:bg-muted/50 transition-all duration-200",
             loading && "opacity-50 pointer-events-none",
@@ -180,7 +180,7 @@ export function StatusSelectorCompact({
       onClick={() => {
         const statuses: AgentStatus[] = ["online", "away", "busy", "offline"];
         const currentIndex = statuses.indexOf(status);
-        const nextStatus = statuses[(currentIndex + 1) % statuses.length];
+        const nextStatus = statuses[(currentIndex + 1) % statuses.length] as AgentStatus;
         onStatusChange?.(nextStatus);
       }}
       className={cn(

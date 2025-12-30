@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   Card,
   Button,
@@ -91,6 +92,7 @@ interface CustomerProfileData {
 type TabFilter = "all" | "active" | "resolved";
 
 export default function CustomerProfilePage() {
+  useSetPageTitle("Customer Profile");
   const params = useParams();
   const router = useRouter();
   const customerId = params.customerId as string;

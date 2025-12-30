@@ -21,6 +21,7 @@ interface AgentsGridProps {
   onDuplicate: (agentId: string) => void;
   onDelete: (agentId: string) => void;
   onStatusChange: (agentId: string, status: "active" | "paused") => void;
+  basePath?: string;
 }
 
 export function AgentsGrid({
@@ -31,6 +32,7 @@ export function AgentsGrid({
   onDuplicate,
   onDelete,
   onStatusChange,
+  basePath = "/agents",
 }: AgentsGridProps) {
   if (isLoading) {
     return (
@@ -86,7 +88,7 @@ export function AgentsGrid({
       {viewMode === "grid" ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {/* Create New Agent Card */}
-          <Link href="/agents/new">
+          <Link href={`${basePath}/new`}>
             <Card className="flex h-full min-h-[200px] cursor-pointer items-center justify-center border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
               <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -100,7 +102,7 @@ export function AgentsGrid({
             </Card>
           </Link>
 
-          {/* Agent Cards */}
+          {/* Chatbot Cards */}
           {agents.map((agent) => (
             <AgentCard
               key={agent.id}
@@ -108,6 +110,7 @@ export function AgentsGrid({
               onDuplicate={onDuplicate}
               onDelete={onDelete}
               onStatusChange={onStatusChange}
+              basePath={basePath}
             />
           ))}
 
@@ -116,9 +119,9 @@ export function AgentsGrid({
             <Card className="col-span-full flex min-h-[200px] items-center justify-center">
               <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
                 <Bot className="h-12 w-12 text-muted-foreground" />
-                <p className="text-muted-foreground">No agents found</p>
+                <p className="text-muted-foreground">No chatbots found</p>
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/agents/new">Create your first agent</Link>
+                  <Link href={`${basePath}/new`}>Create your first chatbot</Link>
                 </Button>
               </CardBody>
             </Card>
@@ -126,31 +129,29 @@ export function AgentsGrid({
         </div>
       ) : (
         <div className="space-y-2">
-          {/* Create New Agent Row */}
-          <Link href="/agents/new">
+          {/* Create New Chatbot Row */}
+          <Link href={`${basePath}/new`}>
             <Card className="cursor-pointer border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
               <CardBody className="flex items-center gap-4 p-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                   <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <span className="font-medium">Create Agent</span>
+                  <span className="font-medium">Create Chatbot</span>
                   <p className="text-sm text-muted-foreground">
-                    Add a new AI agent
+                    Add a new AI chatbot
                   </p>
                 </div>
               </CardBody>
             </Card>
           </Link>
 
-          {/* Agent List Rows */}
+          {/* Chatbot List Rows */}
           {agents.map((agent) => (
             <AgentListRow
               key={agent.id}
               agent={agent}
-              onDuplicate={onDuplicate}
-              onDelete={onDelete}
-              onStatusChange={onStatusChange}
+              basePath={basePath}
             />
           ))}
 
@@ -159,7 +160,7 @@ export function AgentsGrid({
             <Card className="flex min-h-[100px] items-center justify-center">
               <CardBody className="flex items-center gap-4 p-6">
                 <Bot className="h-8 w-8 text-muted-foreground" />
-                <p className="text-muted-foreground">No agents found</p>
+                <p className="text-muted-foreground">No chatbots found</p>
               </CardBody>
             </Card>
           )}
@@ -172,11 +173,10 @@ export function AgentsGrid({
 // List view row component
 function AgentListRow({
   agent,
+  basePath = "/agents",
 }: {
   agent: AgentListItem;
-  onDuplicate: (agentId: string) => void;
-  onDelete: (agentId: string) => void;
-  onStatusChange: (agentId: string, status: "active" | "paused") => void;
+  basePath?: string;
 }) {
   const statusColors = {
     active: "bg-success",
@@ -220,7 +220,7 @@ function AgentListRow({
             <p className="text-sm text-muted-foreground">AI resolved</p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/agents/${agent.id}`}>Edit</Link>
+            <Link href={`${basePath}/${agent.id}`}>Edit</Link>
           </Button>
         </div>
       </CardBody>

@@ -16,8 +16,8 @@ export * from "./company-permissions";
 // Subscription Plans
 export * from "./subscriptions";
 
-// AI Agents
-export * from "./agents";
+// AI Chatbots (renamed from agents)
+export * from "./chatbots";
 
 // Knowledge Base
 export * from "./knowledge";

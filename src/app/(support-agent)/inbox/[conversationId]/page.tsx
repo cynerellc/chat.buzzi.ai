@@ -48,6 +48,7 @@ import {
   ScrollShadow,
 } from "@/components/ui";
 import type { DropdownMenuItemData } from "@/components/ui";
+import { useSetPageTitle } from "@/contexts/page-context";
 import {
   CannedResponsesPicker,
   EmojiPicker,
@@ -159,6 +160,7 @@ interface ConversationData {
 }
 
 export default function LiveChatPage() {
+  useSetPageTitle("Live Chat");
   const params = useParams();
   const router = useRouter();
   const conversationId = params.conversationId as string;
