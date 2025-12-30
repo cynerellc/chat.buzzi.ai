@@ -4,20 +4,22 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { KnowledgeNewPage } from "@/components/shared/knowledge";
-import { useSetPageTitle } from "@/contexts/page-context";
+
+import { useCompanyContext } from "../../company-context";
 
 function KnowledgeNewPageContent() {
-  useSetPageTitle("New Knowledge Source");
   const searchParams = useSearchParams();
+  const { companyId } = useCompanyContext();
+
   const isFaqMode = searchParams.get("type") === "faq";
   const editFaqId = searchParams.get("edit");
   const categoryFromUrl = searchParams.get("category");
 
   return (
     <KnowledgeNewPage
-      baseApiUrl="/api/company/knowledge"
-      uploadApiUrl="/api/company/knowledge/upload"
-      backUrl="/knowledge"
+      baseApiUrl={`/api/master-admin/companies/${companyId}/knowledge`}
+      uploadApiUrl={`/api/master-admin/companies/${companyId}/knowledge/upload`}
+      backUrl={`/admin/companies/${companyId}/knowledge`}
       isFaqMode={isFaqMode}
       editFaqId={editFaqId}
       categoryFromUrl={categoryFromUrl}
@@ -25,7 +27,7 @@ function KnowledgeNewPageContent() {
   );
 }
 
-export default function KnowledgeNewPageWrapper() {
+export default function MasterAdminKnowledgeNewPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-64">Loading...</div>}>
       <KnowledgeNewPageContent />

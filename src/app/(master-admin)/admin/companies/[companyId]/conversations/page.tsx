@@ -1,30 +1,26 @@
 "use client";
 
-import { MessageSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-import { Card } from "@/components/ui";
+import { ConversationsPage } from "@/components/shared/conversations";
 
 import { useCompanyContext } from "../company-context";
 
-export default function CompanyConversationsPage() {
-  const { company } = useCompanyContext();
+export default function MasterAdminConversationsPage() {
+  const router = useRouter();
+  const { companyId, company } = useCompanyContext();
+
+  const handleConversationClick = (conversationId: string) => {
+    router.push(`/admin/companies/${companyId}/conversations/${conversationId}`);
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Conversations</h2>
-        <p className="text-sm text-muted-foreground">
-          View conversations for {company?.name}
-        </p>
-      </div>
-
-      <Card className="p-12 text-center">
-        <MessageSquare size={48} className="mx-auto mb-4 text-muted-foreground/50" />
-        <h3 className="font-semibold mb-2">No Conversations</h3>
-        <p className="text-muted-foreground">
-          This company doesn&apos;t have any conversations yet.
-        </p>
-      </Card>
-    </div>
+    <ConversationsPage
+      title="Conversations"
+      subtitle={`View conversations for ${company?.name || "company"}`}
+      baseApiUrl={`/api/master-admin/companies/${companyId}/conversations`}
+      agentsApiUrl={`/api/master-admin/companies/${companyId}/agents`}
+      onConversationClick={handleConversationClick}
+    />
   );
 }

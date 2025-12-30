@@ -1,11 +1,18 @@
 "use client";
 
-import { CompanyUsers } from "@/components/master-admin/companies";
+import { TeamManagementPage } from "@/components/shared/team";
 
 import { useCompanyContext } from "../company-context";
 
 export default function CompanyTeamPage() {
-  const { companyId } = useCompanyContext();
+  const { companyId, company } = useCompanyContext();
 
-  return <CompanyUsers companyId={companyId} />;
+  return (
+    <TeamManagementPage
+      title="Team Management"
+      subtitle={`Manage team members for ${company?.name || "company"}`}
+      baseApiUrl={`/api/master-admin/companies/${companyId}/team`}
+      showCurrentUserBadge={false}
+    />
+  );
 }
