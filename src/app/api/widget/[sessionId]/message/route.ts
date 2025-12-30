@@ -7,10 +7,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { conversations, messages } from "@/lib/db/schema/conversations";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getAgentRunner } from "@/lib/ai";
-import { getSSEManager, getConversationChannel } from "@/lib/realtime";
-import type { SendMessageRequest, SendMessageResponse } from "@/lib/widget/types";
+import type { SendMessageRequest } from "@/lib/widget/types";
 
 interface RouteParams {
   sessionId: string;
@@ -85,14 +84,15 @@ export async function POST(
       })
       .where(eq(conversations.id, conversationId));
 
-    // 6. Process with AI agent (async - don't wait)
-    processMessageAsync(conversationId, content, attachments);
+    // 6. Process with AI agent and get response
+    const aiResponse = await processMessage(conversationId, content);
 
-    // 7. Return response
-    const response: SendMessageResponse = {
+    // 7. Return response with AI message
+    const response = {
       messageId: userMessage.id,
       conversationId,
       timestamp: userMessage.createdAt.toISOString(),
+      assistantMessage: aiResponse,
     };
 
     // Set CORS headers
@@ -160,20 +160,17 @@ async function validateSession(sessionId: string): Promise<string | null> {
   return null;
 }
 
-async function processMessageAsync(
+interface AssistantMessageResponse {
+  messageId: string;
+  content: string;
+  sourceChunkIds: string[];
+}
+
+async function processMessage(
   conversationId: string,
-  content: string,
-  _attachments?: SendMessageRequest["attachments"]
-): Promise<void> {
+  content: string
+): Promise<AssistantMessageResponse | null> {
   try {
-    const sseManager = getSSEManager();
-    const channel = getConversationChannel(conversationId);
-
-    // Publish thinking event
-    sseManager.publish(channel, "thinking", {
-      step: "Processing your message...",
-    });
-
     // Run AI agent
     const runner = getAgentRunner();
     const response = await runner.sendMessage({
@@ -185,7 +182,9 @@ async function processMessageAsync(
       // Extract metadata
       const metadata = response.metadata ?? {};
       const tokenCount = metadata.tokensUsed?.totalTokens;
-      const processingTimeMs = metadata.processingTimeMs;
+      const processingTimeMs = metadata.processingTimeMs
+        ? Math.round(metadata.processingTimeMs)
+        : undefined;
       const sourceIds = metadata.sources?.map((s) => s.id) ?? [];
 
       // Save assistant message
@@ -223,21 +222,16 @@ async function processMessageAsync(
           .where(eq(conversations.id, conversationId));
       }
 
-      // Publish complete event
-      sseManager.publish(channel, "complete", {
-        messageId: assistantMessage?.id,
+      return {
+        messageId: assistantMessage?.id ?? "",
         content: response.content,
         sourceChunkIds: sourceIds,
-      });
+      };
     }
+
+    return null;
   } catch (error) {
     console.error("Error processing message:", error);
-
-    // Publish error event
-    const sseManager = getSSEManager();
-    const channel = getConversationChannel(conversationId);
-    sseManager.publish(channel, "error", {
-      message: "Failed to process your message. Please try again.",
-    });
+    throw error;
   }
 }

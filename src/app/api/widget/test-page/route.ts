@@ -344,15 +344,36 @@ export async function GET(request: NextRequest) {
       var config = {
         agentId: "${safeChatbotId}",
         companyId: "${safeCompanyId}",
-        baseUrl: "${safeBaseUrl}"
+        baseUrl: "${safeBaseUrl}",
+        primaryColor: "#6437F3",
+        launcherIcon: "chat"
       };
 
       var container = document.getElementById("buzzi-chat-widget");
       var isOpen = false;
       var chatWindow = null;
+      var launcher = null;
+
+      // Fetch widget config from API
+      fetch(config.baseUrl + "/api/widget/config?agentId=" + config.agentId + "&companyId=" + config.companyId)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.config) {
+            config.primaryColor = data.config.primaryColor || config.primaryColor;
+            config.launcherIcon = data.config.launcherIcon || config.launcherIcon;
+            // Update launcher with new config
+            if (launcher) {
+              launcher.style.background = config.primaryColor;
+              if (!isOpen) {
+                launcher.replaceChildren(createLauncherIcon());
+              }
+            }
+          }
+        })
+        .catch(function() {});
 
       // Create SVG elements safely (no innerHTML with user content)
-      function createChatIcon() {
+      function createLauncherIcon() {
         var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.setAttribute("width", "28");
         svg.setAttribute("height", "28");
@@ -363,9 +384,45 @@ export async function GET(request: NextRequest) {
         svg.setAttribute("stroke-linecap", "round");
         svg.setAttribute("stroke-linejoin", "round");
 
-        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z");
-        svg.appendChild(path);
+        if (config.launcherIcon === "message") {
+          // Message bubble with lines icon
+          var path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path1.setAttribute("d", "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z");
+          svg.appendChild(path1);
+          var line1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line1.setAttribute("x1", "8"); line1.setAttribute("y1", "9");
+          line1.setAttribute("x2", "16"); line1.setAttribute("y2", "9");
+          svg.appendChild(line1);
+          var line2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line2.setAttribute("x1", "8"); line2.setAttribute("y1", "13");
+          line2.setAttribute("x2", "14"); line2.setAttribute("y2", "13");
+          svg.appendChild(line2);
+        } else if (config.launcherIcon === "help") {
+          // Question mark / help icon
+          var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          circle.setAttribute("cx", "12"); circle.setAttribute("cy", "12"); circle.setAttribute("r", "10");
+          svg.appendChild(circle);
+          var path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path1.setAttribute("d", "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3");
+          svg.appendChild(path1);
+          var line1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line1.setAttribute("x1", "12"); line1.setAttribute("y1", "17");
+          line1.setAttribute("x2", "12.01"); line1.setAttribute("y2", "17");
+          svg.appendChild(line1);
+        } else if (config.launcherIcon === "support") {
+          // Headphones / support icon
+          var path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path1.setAttribute("d", "M3 18v-6a9 9 0 0 1 18 0v6");
+          svg.appendChild(path1);
+          var path2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path2.setAttribute("d", "M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z");
+          svg.appendChild(path2);
+        } else {
+          // Default: chat bubble icon
+          var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z");
+          svg.appendChild(path);
+        }
 
         return svg;
       }
@@ -399,7 +456,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Create launcher button
-      var launcher = document.createElement("button");
+      launcher = document.createElement("button");
       launcher.id = "buzzi-launcher";
       launcher.setAttribute("aria-label", "Open chat");
       launcher.style.cssText = [
@@ -407,7 +464,7 @@ export async function GET(request: NextRequest) {
         "height: 60px",
         "border-radius: 50%",
         "border: none",
-        "background: #6437F3",
+        "background: " + config.primaryColor,
         "cursor: pointer",
         "display: flex",
         "align-items: center",
@@ -417,7 +474,7 @@ export async function GET(request: NextRequest) {
         "transition: transform 0.2s ease, box-shadow 0.2s ease"
       ].join("; ");
 
-      launcher.appendChild(createChatIcon());
+      launcher.appendChild(createLauncherIcon());
 
       launcher.addEventListener("mouseenter", function() {
         launcher.style.transform = "scale(1.05)";
@@ -436,7 +493,7 @@ export async function GET(request: NextRequest) {
             chatWindow.style.opacity = "0";
             chatWindow.style.transform = "translateY(20px) scale(0.95)";
           }
-          launcher.replaceChildren(createChatIcon());
+          launcher.replaceChildren(createLauncherIcon());
         } else {
           // Open
           if (!chatWindow) {
@@ -463,9 +520,7 @@ export async function GET(request: NextRequest) {
 
             var params = new URLSearchParams({
               agentId: config.agentId,
-              companyId: config.companyId,
-              theme: "auto",
-              primaryColor: "#6437F3"
+              companyId: config.companyId
             });
             iframe.src = config.baseUrl + "/embed-widget?" + params.toString();
 

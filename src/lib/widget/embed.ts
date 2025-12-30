@@ -3,9 +3,19 @@
  *
  * This is the entry point for the embeddable chat widget.
  * It loads the widget iframe and exposes the global ChatWidget API.
+ *
+ * OPTIMIZATION: The widget now loads config from pre-generated JSON before
+ * showing the launcher to prevent flash of default colors/icons.
  */
 
-import type { WidgetConfig, ChatWidgetAPI, WidgetSession, WidgetEventType, WidgetEventCallback } from "./types";
+import type {
+  WidgetConfig,
+  ChatWidgetAPI,
+  WidgetSession,
+  WidgetEventType,
+  WidgetEventCallback,
+  WidgetConfigJson,
+} from "./types";
 
 declare global {
   interface Window {
@@ -15,11 +25,213 @@ declare global {
 }
 
 // ============================================================================
+// Config Cache
+// ============================================================================
+
+const CONFIG_CACHE_KEY = "buzzi_widget_config_";
+const CONFIG_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface CachedConfig {
+  config: WidgetConfigJson;
+  timestamp: number;
+}
+
+function getCachedConfig(chatbotId: string): WidgetConfigJson | null {
+  try {
+    const cached = localStorage.getItem(CONFIG_CACHE_KEY + chatbotId);
+    if (!cached) return null;
+
+    const { config, timestamp } = JSON.parse(cached) as CachedConfig;
+    if (Date.now() - timestamp > CONFIG_CACHE_DURATION) {
+      localStorage.removeItem(CONFIG_CACHE_KEY + chatbotId);
+      return null;
+    }
+    return config;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedConfig(chatbotId: string, config: WidgetConfigJson): void {
+  try {
+    const cached: CachedConfig = { config, timestamp: Date.now() };
+    localStorage.setItem(CONFIG_CACHE_KEY + chatbotId, JSON.stringify(cached));
+  } catch {
+    // localStorage might be full or disabled
+  }
+}
+
+// ============================================================================
+// Safe SVG Creation Helpers
+// ============================================================================
+
+function createSvgElement(
+  tag: string,
+  attrs: Record<string, string>
+): SVGElement {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    el.setAttribute(key, value);
+  }
+  return el;
+}
+
+function createChatIcon(): SVGElement {
+  const svg = createSvgElement("svg", {
+    width: "28",
+    height: "28",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "white",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+  const path = createSvgElement("path", {
+    d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
+  });
+  svg.appendChild(path);
+  return svg;
+}
+
+function createMessageIcon(): SVGElement {
+  const svg = createSvgElement("svg", {
+    width: "28",
+    height: "28",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "white",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+  const path = createSvgElement("path", {
+    d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
+  });
+  const line1 = createSvgElement("line", {
+    x1: "8",
+    y1: "9",
+    x2: "16",
+    y2: "9",
+  });
+  const line2 = createSvgElement("line", {
+    x1: "8",
+    y1: "13",
+    x2: "14",
+    y2: "13",
+  });
+  svg.appendChild(path);
+  svg.appendChild(line1);
+  svg.appendChild(line2);
+  return svg;
+}
+
+function createHelpIcon(): SVGElement {
+  const svg = createSvgElement("svg", {
+    width: "28",
+    height: "28",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "white",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+  const circle = createSvgElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "10",
+  });
+  const path = createSvgElement("path", {
+    d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3",
+  });
+  const line = createSvgElement("line", {
+    x1: "12",
+    y1: "17",
+    x2: "12.01",
+    y2: "17",
+  });
+  svg.appendChild(circle);
+  svg.appendChild(path);
+  svg.appendChild(line);
+  return svg;
+}
+
+function createSparkleIcon(): SVGElement {
+  const svg = createSvgElement("svg", {
+    width: "28",
+    height: "28",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "white",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+  const path1 = createSvgElement("path", {
+    d: "M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z",
+  });
+  const path2 = createSvgElement("path", {
+    d: "M5 19l.5 1.5L7 21l-1.5.5L5 23l-.5-1.5L3 21l1.5-.5L5 19z",
+  });
+  const path3 = createSvgElement("path", {
+    d: "M19 12l.5 1.5L21 14l-1.5.5L19 16l-.5-1.5L17 14l1.5-.5L19 12z",
+  });
+  svg.appendChild(path1);
+  svg.appendChild(path2);
+  svg.appendChild(path3);
+  return svg;
+}
+
+function createCloseIcon(): SVGElement {
+  const svg = createSvgElement("svg", {
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "white",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+  const line1 = createSvgElement("line", {
+    x1: "18",
+    y1: "6",
+    x2: "6",
+    y2: "18",
+  });
+  const line2 = createSvgElement("line", {
+    x1: "6",
+    y1: "6",
+    x2: "18",
+    y2: "18",
+  });
+  svg.appendChild(line1);
+  svg.appendChild(line2);
+  return svg;
+}
+
+function getLauncherIconElement(iconType: string): SVGElement {
+  switch (iconType) {
+    case "message":
+      return createMessageIcon();
+    case "help":
+      return createHelpIcon();
+    case "sparkle":
+      return createSparkleIcon();
+    case "chat":
+    default:
+      return createChatIcon();
+  }
+}
+
+// ============================================================================
 // Widget Class
 // ============================================================================
 
 class BuzziChatWidget implements ChatWidgetAPI {
   private config: WidgetConfig;
+  private loadedConfig: WidgetConfigJson | null = null;
   private container: HTMLDivElement | null = null;
   private iframe: HTMLIFrameElement | null = null;
   private session: WidgetSession | null = null;
@@ -27,6 +239,7 @@ class BuzziChatWidget implements ChatWidgetAPI {
   private isWidgetMinimized = false;
   private eventListeners: Map<WidgetEventType, Set<WidgetEventCallback>> = new Map();
   private baseUrl: string;
+  private isReady = false;
 
   constructor(config: WidgetConfig) {
     this.config = this.validateConfig(config);
@@ -45,7 +258,7 @@ class BuzziChatWidget implements ChatWidgetAPI {
     return {
       theme: "light",
       position: "bottom-right",
-      primaryColor: "#007bff",
+      primaryColor: "#6437F3",
       autoOpen: false,
       autoOpenDelay: 5000,
       showBranding: true,
@@ -60,8 +273,6 @@ class BuzziChatWidget implements ChatWidgetAPI {
   }
 
   private getBaseUrl(): string {
-    // In production, this would be the CDN URL
-    // For development, use the current origin or a configured URL
     const scriptEl = document.querySelector('script[src*="chat.min.js"]');
     if (scriptEl) {
       const src = scriptEl.getAttribute("src") ?? "";
@@ -76,18 +287,21 @@ class BuzziChatWidget implements ChatWidgetAPI {
   }
 
   private async init(): Promise<void> {
+    // Load config from JSON first (with caching)
+    await this.loadConfig();
+
     // Create container
     this.container = document.createElement("div");
     this.container.id = "buzzi-chat-widget";
     this.container.style.cssText = `
       position: fixed;
       bottom: 0;
-      ${this.config.position === "bottom-left" ? "left: 0" : "right: 0"};
-      z-index: 999999;
+      ${this.getPosition() === "bottom-left" ? "left: 0" : "right: 0"};
+      z-index: ${this.getZIndex()};
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     `;
 
-    // Create launcher button
+    // Create launcher button with loaded config
     const launcher = this.createLauncher();
     this.container.appendChild(launcher);
 
@@ -103,15 +317,111 @@ class BuzziChatWidget implements ChatWidgetAPI {
       });
     }
 
+    // Mark as ready
+    this.isReady = true;
+
     // Auto-open if configured
-    if (this.config.autoOpen) {
+    if (this.getBehavior().autoOpen) {
       setTimeout(() => {
         this.open();
-      }, this.config.autoOpenDelay ?? 5000);
+      }, (this.getBehavior().autoOpenDelay ?? 5) * 1000);
     }
 
     // Expose global API
     window.ChatWidget = this;
+  }
+
+  private async loadConfig(): Promise<void> {
+    const { agentId, companyId } = this.config;
+
+    // Check cache first
+    const cached = getCachedConfig(agentId);
+    if (cached) {
+      this.loadedConfig = cached;
+      return;
+    }
+
+    try {
+      // Get config URL from API
+      const urlResponse = await fetch(
+        `${this.baseUrl}/api/widget/config-url?chatbotId=${agentId}&companyId=${companyId}`
+      );
+
+      if (!urlResponse.ok) {
+        console.warn("Failed to get widget config URL, using defaults");
+        return;
+      }
+
+      const { configUrl } = await urlResponse.json();
+
+      if (!configUrl) {
+        console.warn("No config URL available, using defaults");
+        return;
+      }
+
+      // Fetch the JSON config directly from storage
+      const configResponse = await fetch(configUrl);
+      if (!configResponse.ok) {
+        console.warn("Failed to fetch widget config JSON, using defaults");
+        return;
+      }
+
+      const config = await configResponse.json();
+      this.loadedConfig = config;
+
+      // Cache for future loads
+      setCachedConfig(agentId, config);
+    } catch (error) {
+      console.warn("Error loading widget config:", error);
+      // Continue with defaults
+    }
+  }
+
+  // Helper methods to get config values (prefer loaded config over initial)
+  private getAppearance() {
+    return this.loadedConfig?.appearance ?? {
+      primaryColor: this.config.primaryColor ?? "#6437F3",
+      position: this.config.position ?? "bottom-right",
+      borderRadius: this.config.borderRadius ?? 16,
+      buttonSize: 60,
+      launcherIcon: "chat",
+      zIndex: 9999,
+    };
+  }
+
+  private getBehavior() {
+    return this.loadedConfig?.behavior ?? {
+      autoOpen: this.config.autoOpen ?? false,
+      autoOpenDelay: this.config.autoOpenDelay ?? 5,
+      showTypingIndicator: this.config.enableTypingIndicator ?? true,
+      persistConversation: true,
+      playSoundOnMessage: true,
+      hideLauncherOnMobile: false,
+    };
+  }
+
+  private getPosition(): string {
+    return this.loadedConfig?.appearance?.position ?? this.config.position ?? "bottom-right";
+  }
+
+  private getZIndex(): number {
+    return this.loadedConfig?.appearance?.zIndex ?? 999999;
+  }
+
+  private getPrimaryColor(): string {
+    return this.loadedConfig?.appearance?.primaryColor ?? this.config.primaryColor ?? "#6437F3";
+  }
+
+  private getButtonSize(): number {
+    return this.loadedConfig?.appearance?.buttonSize ?? 60;
+  }
+
+  private getLauncherIcon(): string {
+    return this.loadedConfig?.appearance?.launcherIcon ?? "chat";
+  }
+
+  private getBorderRadius(): number {
+    return this.loadedConfig?.appearance?.borderRadius ?? this.config.borderRadius ?? 16;
   }
 
   private createLauncher(): HTMLButtonElement {
@@ -121,12 +431,15 @@ class BuzziChatWidget implements ChatWidgetAPI {
     launcher.setAttribute("aria-haspopup", "dialog");
     launcher.setAttribute("aria-expanded", "false");
 
+    const buttonSize = this.getButtonSize();
+    const primaryColor = this.getPrimaryColor();
+
     launcher.style.cssText = `
-      width: 60px;
-      height: 60px;
+      width: ${buttonSize}px;
+      height: ${buttonSize}px;
       border-radius: 50%;
       border: none;
-      background: ${this.config.primaryColor};
+      background: ${primaryColor};
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -136,11 +449,8 @@ class BuzziChatWidget implements ChatWidgetAPI {
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     `;
 
-    launcher.innerHTML = `
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-      </svg>
-    `;
+    // Set icon based on config using safe DOM methods
+    launcher.appendChild(getLauncherIconElement(this.getLauncherIcon()));
 
     launcher.addEventListener("mouseenter", () => {
       launcher.style.transform = "scale(1.05)";
@@ -159,20 +469,37 @@ class BuzziChatWidget implements ChatWidgetAPI {
     return launcher;
   }
 
-  private createChatWindow(): HTMLDivElement {
-    const window = document.createElement("div");
-    window.id = "buzzi-chat-window";
-    window.setAttribute("role", "dialog");
-    window.setAttribute("aria-label", "Chat window");
+  private updateLauncherIcon(launcher: HTMLButtonElement, isOpen: boolean): void {
+    // Clear existing children
+    while (launcher.firstChild) {
+      launcher.removeChild(launcher.firstChild);
+    }
 
-    window.style.cssText = `
+    // Add appropriate icon
+    if (isOpen) {
+      launcher.appendChild(createCloseIcon());
+    } else {
+      launcher.appendChild(getLauncherIconElement(this.getLauncherIcon()));
+    }
+  }
+
+  private createChatWindow(): HTMLDivElement {
+    const chatWindow = document.createElement("div");
+    chatWindow.id = "buzzi-chat-window";
+    chatWindow.setAttribute("role", "dialog");
+    chatWindow.setAttribute("aria-label", "Chat window");
+
+    const position = this.getPosition();
+    const borderRadius = this.getBorderRadius();
+
+    chatWindow.style.cssText = `
       position: absolute;
       bottom: 90px;
-      ${this.config.position === "bottom-left" ? "left: 20px" : "right: 20px"};
+      ${position === "bottom-left" ? "left: 20px" : "right: 20px"};
       width: 380px;
       height: 600px;
       max-height: calc(100vh - 120px);
-      border-radius: ${this.config.borderRadius ?? 16}px;
+      border-radius: ${Math.min(borderRadius, 24)}px;
       overflow: hidden;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
       opacity: 0;
@@ -193,8 +520,8 @@ class BuzziChatWidget implements ChatWidgetAPI {
     const params = new URLSearchParams({
       agentId: this.config.agentId,
       companyId: this.config.companyId,
-      theme: this.config.theme ?? "light",
-      primaryColor: this.config.primaryColor ?? "#007bff",
+      theme: this.loadedConfig?.appearance?.theme ?? this.config.theme ?? "light",
+      primaryColor: this.getPrimaryColor(),
     });
 
     if (this.config.customer) {
@@ -206,8 +533,8 @@ class BuzziChatWidget implements ChatWidgetAPI {
     // Setup iframe communication
     globalThis.addEventListener("message", this.handleIframeMessage.bind(this));
 
-    window.appendChild(this.iframe);
-    return window;
+    chatWindow.appendChild(this.iframe);
+    return chatWindow;
   }
 
   private handleIframeMessage(event: MessageEvent): void {
@@ -262,17 +589,17 @@ class BuzziChatWidget implements ChatWidgetAPI {
   open(): void {
     if (!this.container) return;
 
-    let window = this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null;
-    if (!window) {
-      window = this.createChatWindow();
-      this.container.appendChild(window);
+    let chatWindow = this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null;
+    if (!chatWindow) {
+      chatWindow = this.createChatWindow();
+      this.container.appendChild(chatWindow);
     }
 
     // Show window with animation
     requestAnimationFrame(() => {
-      if (window) {
-        window.style.opacity = "1";
-        window.style.transform = "translateY(0) scale(1)";
+      if (chatWindow) {
+        chatWindow.style.opacity = "1";
+        chatWindow.style.transform = "translateY(0) scale(1)";
       }
     });
 
@@ -280,12 +607,7 @@ class BuzziChatWidget implements ChatWidgetAPI {
     const launcher = this.container.querySelector("#buzzi-launcher") as HTMLButtonElement | null;
     if (launcher) {
       launcher.setAttribute("aria-expanded", "true");
-      launcher.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      `;
+      this.updateLauncherIcon(launcher, true);
     }
 
     this.isWidgetOpen = true;
@@ -297,21 +619,17 @@ class BuzziChatWidget implements ChatWidgetAPI {
   close(): void {
     if (!this.container) return;
 
-    const window = this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null;
-    if (window) {
-      window.style.opacity = "0";
-      window.style.transform = "translateY(20px) scale(0.95)";
+    const chatWindow = this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null;
+    if (chatWindow) {
+      chatWindow.style.opacity = "0";
+      chatWindow.style.transform = "translateY(20px) scale(0.95)";
     }
 
-    // Update launcher
+    // Update launcher with correct icon
     const launcher = this.container.querySelector("#buzzi-launcher") as HTMLButtonElement | null;
     if (launcher) {
       launcher.setAttribute("aria-expanded", "false");
-      launcher.innerHTML = `
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-      `;
+      this.updateLauncherIcon(launcher, false);
     }
 
     this.isWidgetOpen = false;
@@ -343,7 +661,7 @@ class BuzziChatWidget implements ChatWidgetAPI {
     delete window.ChatWidget;
   }
 
-  async sendMessage(content: string, _attachments?: File[]): Promise<void> {
+  async sendMessage(content: string): Promise<void> {
     this.postToWidget("sendMessage", { content });
     this.emit("message:sent", { content });
   }
@@ -402,6 +720,26 @@ class BuzziChatWidget implements ChatWidgetAPI {
   getSession(): WidgetSession | null {
     return this.session;
   }
+
+  /**
+   * Force refresh the config from server
+   */
+  async refreshConfig(): Promise<void> {
+    // Clear cache
+    localStorage.removeItem(CONFIG_CACHE_KEY + this.config.agentId);
+
+    // Reload
+    await this.loadConfig();
+
+    // Update launcher if visible
+    if (this.container && !this.isWidgetOpen) {
+      const launcher = this.container.querySelector("#buzzi-launcher") as HTMLButtonElement | null;
+      if (launcher) {
+        launcher.style.background = this.getPrimaryColor();
+        this.updateLauncherIcon(launcher, false);
+      }
+    }
+  }
 }
 
 // ============================================================================
@@ -420,7 +758,9 @@ if (document.readyState === "loading") {
 } else {
   // Use requestIdleCallback for non-blocking initialization
   if ("requestIdleCallback" in window) {
-    (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(initWidget);
+    (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(
+      initWidget
+    );
   } else {
     setTimeout(initWidget, 0);
   }

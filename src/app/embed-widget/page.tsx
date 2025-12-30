@@ -8,12 +8,22 @@
  */
 
 import { useEffect, useState, useRef, useCallback, FormEvent } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 
 // ============================================================================
 // Types
 // ============================================================================
+
+interface AgentInfo {
+  id: string;
+  name: string;
+  designation?: string;
+  avatarUrl?: string;
+  type?: string;
+}
 
 interface WidgetConfig {
   agentId: string;
@@ -30,12 +40,33 @@ interface WidgetConfig {
   enableEmoji?: boolean;
   enableVoice?: boolean;
   enableTypingIndicator?: boolean;
+  enableMarkdown?: boolean;
+  launcherIcon?: string;
+  isMultiAgent?: boolean;
+  agentsList?: AgentInfo[];
   customer?: {
     id?: string;
     name?: string;
     email?: string;
     metadata?: Record<string, unknown>;
   };
+  // Stream Display Options
+  showAgentSwitchNotification?: boolean;
+  showThinking?: boolean;
+  showToolCalls?: boolean;
+  showInstantUpdates?: boolean;
+  // Multi-agent Display Options
+  showAgentListOnTop?: boolean;
+  agentListMinCards?: number;
+}
+
+interface ThinkingState {
+  text?: string;
+  toolCalls?: {
+    name: string;
+    status: "pending" | "running" | "completed" | "error";
+    args?: Record<string, unknown>;
+  }[];
 }
 
 interface Message {
@@ -46,6 +77,9 @@ interface Message {
   status?: "sending" | "sent" | "error";
   isNotification?: boolean;
   targetAgentName?: string;
+  agentId?: string;
+  agentName?: string;
+  agentAvatarUrl?: string;
 }
 
 interface Session {
@@ -64,14 +98,17 @@ export default function WidgetPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [thinkingText, setThinkingText] = useState<string | null>(null);
+  const [thinkingState, setThinkingState] = useState<ThinkingState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const sendMessageRef = useRef<(content: string) => void>(() => {});
+  const agentsListRef = useRef<HTMLDivElement>(null);
 
   // Voice recording for push-to-talk
   const handleVoiceTranscript = useCallback((text: string) => {
@@ -126,6 +163,22 @@ export default function WidgetPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Scroll to active agent in horizontal list
+  useEffect(() => {
+    if (activeAgentId && agentsListRef.current && config?.isMultiAgent) {
+      const activeElement = agentsListRef.current.querySelector(
+        `[data-agent-id="${activeAgentId}"]`
+      );
+      if (activeElement) {
+        activeElement.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+      }
+    }
+  }, [activeAgentId, config?.isMultiAgent]);
+
   // Setup parent window communication
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -144,7 +197,7 @@ export default function WidgetPage() {
           setMessages([]);
           break;
         case "setCustomer":
-          setConfig((prev) => prev ? { ...prev, customer: data } : null);
+          setConfig((prev) => (prev ? { ...prev, customer: data } : null));
           break;
       }
     };
@@ -187,22 +240,97 @@ export default function WidgetPage() {
     initialConfig: WidgetConfig
   ) => {
     try {
-      const response = await fetch(
-        `/api/widget/config?agentId=${agentId}&companyId=${companyId}`
-      );
+      // First, try to get config URL for pre-generated JSON
+      let configData: WidgetConfig | null = null;
 
-      if (response.ok) {
-        const data = await response.json();
-        setConfig({ ...initialConfig, ...data.config });
+      try {
+        const configUrlResponse = await fetch(
+          `/api/widget/config-url?chatbotId=${agentId}&companyId=${companyId}`
+        );
+
+        if (configUrlResponse.ok) {
+          const { configUrl } = await configUrlResponse.json();
+
+          if (configUrl) {
+            // Fetch the pre-generated JSON config from Supabase storage
+            const jsonResponse = await fetch(configUrl);
+
+            if (jsonResponse.ok) {
+              const jsonConfig = await jsonResponse.json();
+
+              // Transform WidgetConfigJson to internal WidgetConfig format
+              configData = {
+                agentId,
+                companyId,
+                theme: jsonConfig.appearance?.theme || "light",
+                primaryColor: jsonConfig.appearance?.primaryColor || "#007bff",
+                title: jsonConfig.branding?.title,
+                subtitle: jsonConfig.branding?.subtitle,
+                avatarUrl: jsonConfig.branding?.avatarUrl,
+                welcomeMessage: jsonConfig.branding?.welcomeMessage,
+                showBranding: jsonConfig.branding?.showBranding ?? true,
+                enableFileUpload: jsonConfig.features?.enableFileUpload ?? false,
+                enableEmoji: jsonConfig.features?.enableEmoji ?? true,
+                enableVoice: jsonConfig.features?.enableVoiceMessages ?? false,
+                enableTypingIndicator: jsonConfig.behavior?.showTypingIndicator ?? true,
+                launcherIcon: jsonConfig.appearance?.launcherIcon,
+                isMultiAgent: jsonConfig.chatbot?.type === "multi_agent",
+                agentsList: jsonConfig.agents?.map((agent: { id: string; name: string; designation?: string; avatarUrl?: string; type?: string }) => ({
+                  id: agent.id,
+                  name: agent.name,
+                  designation: agent.designation,
+                  avatarUrl: agent.avatarUrl,
+                  type: agent.type,
+                })),
+                // Stream Display Options
+                showAgentSwitchNotification: jsonConfig.streamDisplay?.showAgentSwitchNotification ?? true,
+                showThinking: jsonConfig.streamDisplay?.showThinking ?? false,
+                showToolCalls: jsonConfig.streamDisplay?.showToolCalls ?? false,
+                showInstantUpdates: jsonConfig.streamDisplay?.showInstantUpdates ?? true,
+                // Multi-agent Display Options
+                showAgentListOnTop: jsonConfig.multiAgent?.showAgentListOnTop ?? true,
+                agentListMinCards: jsonConfig.multiAgent?.agentListMinCards ?? 3,
+              };
+            }
+          }
+        }
+      } catch {
+        // JSON config fetch failed, will fallback to API
+      }
+
+      // Fallback to original API if JSON config failed
+      if (!configData) {
+        const response = await fetch(
+          `/api/widget/config?agentId=${agentId}&companyId=${companyId}`
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          configData = { ...initialConfig, ...data.config };
+        }
+      }
+
+      if (configData) {
+        const mergedConfig = { ...initialConfig, ...configData };
+        setConfig(mergedConfig);
+
+        // Set first agent as active for multi-agent
+        if (mergedConfig.isMultiAgent && mergedConfig.agentsList?.length) {
+          setActiveAgentId(mergedConfig.agentsList[0]?.id ?? null);
+        }
 
         // Add welcome message if configured
-        if (data.config?.welcomeMessage) {
+        if (mergedConfig.welcomeMessage) {
+          const firstAgent = mergedConfig.agentsList?.[0];
           setMessages([
             {
               id: "welcome",
               role: "assistant",
-              content: data.config.welcomeMessage,
+              content: mergedConfig.welcomeMessage,
               timestamp: new Date(),
+              agentId: firstAgent?.id,
+              agentName: firstAgent?.name,
+              agentAvatarUrl: firstAgent?.avatarUrl,
             },
           ]);
         }
@@ -257,15 +385,50 @@ export default function WidgetPage() {
 
     eventSource.addEventListener("thinking", (event) => {
       setIsTyping(true);
-      // Parse thinking text if available
+      // Only show thinking text if showThinking is enabled
+      if (config?.showThinking !== false) {
+        try {
+          const data = JSON.parse(event.data);
+          setThinkingState((prev) => ({
+            ...prev,
+            text: data.content || prev?.text,
+          }));
+        } catch {
+          // No thinking text
+        }
+      }
+    });
+
+    eventSource.addEventListener("tool_call", (event) => {
+      // Only show tool calls if both showThinking and showToolCalls are enabled
+      if (config?.showThinking !== false && config?.showToolCalls !== false) {
+        try {
+          const data = JSON.parse(event.data);
+          setThinkingState((prev) => ({
+            ...prev,
+            toolCalls: [
+              ...(prev?.toolCalls || []).filter((t) => t.name !== data.name),
+              {
+                name: data.name,
+                status: data.status || "running",
+                args: data.args,
+              },
+            ],
+          }));
+        } catch {
+          // Ignore
+        }
+      }
+    });
+
+    eventSource.addEventListener("agent", (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.content) {
-          setThinkingText(data.content);
+        if (data.agentId) {
+          setActiveAgentId(data.agentId);
         }
       } catch {
-        // No thinking text, just show indicator
-        setThinkingText(null);
+        // Ignore
       }
     });
 
@@ -273,18 +436,25 @@ export default function WidgetPage() {
       try {
         const data = JSON.parse(event.data);
         if (data.message) {
-          // Add notification message to chat
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `notification-${Date.now()}`,
-              role: "system",
-              content: data.message,
-              timestamp: new Date(),
-              isNotification: true,
-              targetAgentName: data.targetAgentName,
-            },
-          ]);
+          // Only add notification message if showAgentSwitchNotification is enabled
+          if (config?.showAgentSwitchNotification !== false) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `notification-${Date.now()}`,
+                role: "system",
+                content: data.message,
+                timestamp: new Date(),
+                isNotification: true,
+                targetAgentName: data.targetAgentName,
+              },
+            ]);
+          }
+
+          // Update active agent if transfer (always do this regardless of notification setting)
+          if (data.targetAgentId) {
+            setActiveAgentId(data.targetAgentId);
+          }
         }
       } catch {
         // Ignore parsing errors
@@ -293,12 +463,21 @@ export default function WidgetPage() {
 
     eventSource.addEventListener("delta", (event) => {
       const data = JSON.parse(event.data);
-      // Clear thinking text when we start receiving content
-      setThinkingText(null);
+      // Clear thinking state when we start receiving content
+      setThinkingState(null);
+
+      // If showInstantUpdates is disabled, just keep typing indicator and wait for complete message
+      if (config?.showInstantUpdates === false) {
+        return;
+      }
+
       // Handle streaming delta updates
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
-        if (lastMessage?.role === "assistant" && lastMessage.status === "sending") {
+        if (
+          lastMessage?.role === "assistant" &&
+          lastMessage.status === "sending"
+        ) {
           return [
             ...prev.slice(0, -1),
             {
@@ -307,18 +486,44 @@ export default function WidgetPage() {
             },
           ];
         }
-        return prev;
+        // Create new streaming message if none exists
+        const newMsgId = `stream-${Date.now()}`;
+        setStreamingMessageId(newMsgId);
+        const activeAgent = config?.agentsList?.find(
+          (a) => a.id === activeAgentId
+        );
+        return [
+          ...prev,
+          {
+            id: newMsgId,
+            role: "assistant",
+            content: data.content,
+            timestamp: new Date(),
+            status: "sending",
+            agentId: activeAgentId || undefined,
+            agentName: activeAgent?.name,
+            agentAvatarUrl: activeAgent?.avatarUrl,
+          },
+        ];
       });
     });
 
     eventSource.addEventListener("complete", (event) => {
       const data = JSON.parse(event.data);
       setIsTyping(false);
-      setThinkingText(null);
+      setThinkingState(null);
+      setStreamingMessageId(null);
+
+      const activeAgent = config?.agentsList?.find(
+        (a) => a.id === (data.agentId || activeAgentId)
+      );
 
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
-        if (lastMessage?.role === "assistant" && lastMessage.status === "sending") {
+        if (
+          lastMessage?.role === "assistant" &&
+          lastMessage.status === "sending"
+        ) {
           return [
             ...prev.slice(0, -1),
             {
@@ -327,6 +532,9 @@ export default function WidgetPage() {
               content: data.content,
               timestamp: new Date(),
               status: "sent",
+              agentId: data.agentId || activeAgentId || undefined,
+              agentName: data.agentName || activeAgent?.name,
+              agentAvatarUrl: data.agentAvatarUrl || activeAgent?.avatarUrl,
             },
           ];
         }
@@ -339,9 +547,17 @@ export default function WidgetPage() {
             content: data.content,
             timestamp: new Date(),
             status: "sent",
+            agentId: data.agentId || activeAgentId || undefined,
+            agentName: data.agentName || activeAgent?.name,
+            agentAvatarUrl: data.agentAvatarUrl || activeAgent?.avatarUrl,
           },
         ];
       });
+
+      // Update active agent if provided
+      if (data.agentId) {
+        setActiveAgentId(data.agentId);
+      }
 
       notifyParent("widget:message", {
         role: "assistant",
@@ -375,6 +591,7 @@ export default function WidgetPage() {
       if (!content.trim() || !session) return;
 
       const messageId = `msg-${Date.now()}`;
+      const responseId = `response-${Date.now()}`;
 
       // Add user message
       const userMessage: Message = {
@@ -387,29 +604,43 @@ export default function WidgetPage() {
 
       setMessages((prev) => [...prev, userMessage]);
       setInputValue("");
+      setIsTyping(true);
+      setThinkingState(null);
 
-      // Add placeholder for assistant response
+      // Add placeholder for streaming response
+      const activeAgent = config?.agentsList?.find(
+        (a) => a.id === activeAgentId
+      );
       setMessages((prev) => [
         ...prev,
         {
-          id: `response-${Date.now()}`,
+          id: responseId,
           role: "assistant",
           content: "",
           timestamp: new Date(),
           status: "sending",
+          agentId: activeAgentId || undefined,
+          agentName: activeAgent?.name,
+          agentAvatarUrl: activeAgent?.avatarUrl,
         },
       ]);
+      setStreamingMessageId(responseId);
 
       try {
-        const response = await fetch(`/api/widget/${session.sessionId}/message`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: content.trim() }),
-        });
+        const response = await fetch(
+          `/api/widget/${session.sessionId}/message`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: content.trim() }),
+          }
+        );
 
         if (!response.ok) {
           throw new Error("Failed to send message");
         }
+
+        const data = await response.json();
 
         // Update user message status
         setMessages((prev) =>
@@ -417,6 +648,45 @@ export default function WidgetPage() {
             msg.id === messageId ? { ...msg, status: "sent" } : msg
           )
         );
+
+        // Update streaming message with final response if not already updated by SSE
+        if (data.assistantMessage) {
+          setMessages((prev) => {
+            // Find the streaming placeholder
+            const streamingIdx = prev.findIndex((m) => m.id === responseId);
+            if (streamingIdx === -1) {
+              // Already replaced by SSE
+              return prev;
+            }
+            const streamingMsg = prev[streamingIdx];
+            // Guard against undefined (shouldn't happen but satisfies TypeScript)
+            if (!streamingMsg) {
+              return prev;
+            }
+            // Only update if still empty (SSE didn't update it)
+            if (!streamingMsg.content || streamingMsg.status === "sending") {
+              return [
+                ...prev.slice(0, streamingIdx),
+                {
+                  ...streamingMsg,
+                  id: data.assistantMessage.messageId || responseId,
+                  content: data.assistantMessage.content,
+                  status: "sent" as const,
+                },
+                ...prev.slice(streamingIdx + 1),
+              ];
+            }
+            return prev;
+          });
+
+          notifyParent("widget:message", {
+            role: "assistant",
+            content: data.assistantMessage.content,
+          });
+        }
+
+        setIsTyping(false);
+        setStreamingMessageId(null);
       } catch {
         // Mark as error
         setMessages((prev) =>
@@ -424,10 +694,14 @@ export default function WidgetPage() {
             msg.id === messageId ? { ...msg, status: "error" } : msg
           )
         );
+        // Remove streaming placeholder
+        setMessages((prev) => prev.filter((m) => m.id !== responseId));
         setError("Failed to send message");
+        setIsTyping(false);
+        setStreamingMessageId(null);
       }
     },
-    [session]
+    [session, config?.agentsList, activeAgentId]
   );
 
   // Keep sendMessageRef in sync for voice recording callback
@@ -465,6 +739,11 @@ export default function WidgetPage() {
     }
   };
 
+  const getAgentInfo = (agentId?: string): AgentInfo | undefined => {
+    if (!config?.agentsList || !agentId) return undefined;
+    return config.agentsList.find((a) => a.id === agentId);
+  };
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -480,7 +759,10 @@ export default function WidgetPage() {
   if (!config) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
+          style={{ borderColor: `#007bff transparent transparent transparent` }}
+        />
       </div>
     );
   }
@@ -523,7 +805,14 @@ export default function WidgetPage() {
             className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
             aria-label="Minimize"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M19 12H5" />
             </svg>
           </button>
@@ -532,12 +821,107 @@ export default function WidgetPage() {
             className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
             aria-label="Close"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
       </header>
+
+      {/* Multi-agent horizontal agents list */}
+      {config.isMultiAgent && config.showAgentListOnTop !== false && config.agentsList && config.agentsList.length > 0 && (
+        <div
+          ref={agentsListRef}
+          className={cn(
+            "flex gap-3 px-4 py-3 overflow-x-auto border-b",
+            isDark ? "bg-zinc-800/50 border-zinc-700" : "bg-gray-50 border-gray-200",
+            // Hide scrollbar
+            "scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          )}
+        >
+          {config.agentsList.map((agent) => (
+            <div
+              key={agent.id}
+              data-agent-id={agent.id}
+              className={cn(
+                "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all shrink-0",
+                activeAgentId !== agent.id && (isDark ? "bg-zinc-700/50" : "bg-white shadow-sm")
+              )}
+              style={
+                activeAgentId === agent.id
+                  ? {
+                      outline: `2px solid ${config.primaryColor}`,
+                      outlineOffset: "2px",
+                      backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "white",
+                    }
+                  : undefined
+              }
+            >
+              <div className="relative">
+                {agent.avatarUrl ? (
+                  <img
+                    src={agent.avatarUrl}
+                    alt={agent.name}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium text-sm"
+                    style={{ backgroundColor: config.primaryColor }}
+                  >
+                    {agent.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {activeAgentId === agent.id && (
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2"
+                    style={{
+                      backgroundColor: "#22c55e",
+                      borderColor: isDark ? "#18181b" : "#f9fafb",
+                    }}
+                  />
+                )}
+              </div>
+              <div className="text-center min-w-0">
+                <p
+                  className={cn(
+                    "text-xs font-medium truncate max-w-[80px]",
+                    activeAgentId === agent.id
+                      ? ""
+                      : isDark
+                      ? "text-zinc-300"
+                      : "text-gray-700"
+                  )}
+                  style={
+                    activeAgentId === agent.id
+                      ? { color: config.primaryColor }
+                      : undefined
+                  }
+                >
+                  {agent.name}
+                </p>
+                {agent.designation && (
+                  <p
+                    className={cn(
+                      "text-[10px] truncate max-w-[80px]",
+                      isDark ? "text-zinc-500" : "text-gray-500"
+                    )}
+                  >
+                    {agent.designation}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Messages */}
       <div
@@ -550,14 +934,13 @@ export default function WidgetPage() {
           // Render notification messages differently
           if (message.isNotification) {
             return (
-              <div
-                key={message.id}
-                className="flex justify-center my-3"
-              >
+              <div key={message.id} className="flex justify-center my-3">
                 <div
                   className={cn(
                     "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm",
-                    isDark ? "bg-zinc-800/80 text-zinc-300" : "bg-gray-100 text-gray-600"
+                    isDark
+                      ? "bg-zinc-800/80 text-zinc-300"
+                      : "bg-gray-100 text-gray-600"
                   )}
                 >
                   <svg
@@ -571,7 +954,10 @@ export default function WidgetPage() {
                     strokeLinejoin="round"
                     className="shrink-0"
                   >
-                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
                   <span>{message.content}</span>
                 </div>
@@ -579,92 +965,260 @@ export default function WidgetPage() {
             );
           }
 
+          const isUser = message.role === "user";
+          const showAgentInfo =
+            !isUser && config.isMultiAgent && message.agentName;
+
           return (
             <div
               key={message.id}
-              className={cn(
-                "flex",
-                message.role === "user" ? "justify-end" : "justify-start"
-              )}
+              className={cn("flex", isUser ? "justify-end" : "justify-start")}
             >
-              <div
-                className={cn(
-                  "max-w-[85%] rounded-2xl px-4 py-2.5",
-                  message.role === "user"
-                    ? "rounded-br-sm text-white"
-                    : cn(
-                        "rounded-bl-sm",
-                        isDark ? "bg-zinc-800" : "bg-white shadow-sm"
-                      ),
-                  message.status === "sending" && "opacity-70"
+              <div className={cn("max-w-[85%]", !isUser && "flex gap-2")}>
+                {/* Agent avatar for assistant messages */}
+                {!isUser && showAgentInfo && (
+                  <div className="shrink-0 pt-1">
+                    {message.agentAvatarUrl ? (
+                      <img
+                        src={message.agentAvatarUrl}
+                        alt={message.agentName}
+                        className="h-7 w-7 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="h-7 w-7 rounded-full flex items-center justify-center text-white font-medium text-xs"
+                        style={{ backgroundColor: config.primaryColor }}
+                      >
+                        {message.agentName?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
                 )}
-                style={
-                  message.role === "user"
-                    ? { backgroundColor: config.primaryColor }
-                    : undefined
-                }
-              >
-                {message.content || (
-                  <span className="inline-flex gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
-                  </span>
-                )}
+                <div>
+                  {/* Agent name above bubble */}
+                  {!isUser && showAgentInfo && (
+                    <p
+                      className={cn(
+                        "text-xs mb-1 ml-1",
+                        isDark ? "text-zinc-400" : "text-gray-500"
+                      )}
+                    >
+                      {message.agentName}
+                    </p>
+                  )}
+                  <div
+                    className={cn(
+                      "rounded-2xl px-4 py-2.5",
+                      isUser
+                        ? "rounded-br-sm text-white"
+                        : cn(
+                            "rounded-bl-sm",
+                            isDark ? "bg-zinc-800" : "bg-white shadow-sm"
+                          ),
+                      message.status === "sending" && "opacity-70"
+                    )}
+                    style={
+                      isUser ? { backgroundColor: config.primaryColor } : undefined
+                    }
+                  >
+                    {message.content ? (
+                      config.enableMarkdown !== false ? (
+                        <div
+                          className={cn(
+                            "prose prose-sm max-w-none",
+                            isDark ? "prose-invert" : "",
+                            isUser && "prose-invert",
+                            "[&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_pre]:my-1 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs",
+                            isUser
+                              ? "[&_code]:bg-white/20"
+                              : isDark
+                              ? "[&_code]:bg-zinc-700"
+                              : "[&_code]:bg-gray-100"
+                          )}
+                        >
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      )
+                    ) : message.status === "sending" ? (
+                      <span className="inline-flex gap-1">
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
           );
         })}
 
-        {isTyping && messages[messages.length - 1]?.role !== "assistant" && (
+        {/* Thinking indicator */}
+        {isTyping && !streamingMessageId && (
           <div className="flex justify-start">
-            <div
-              className={cn(
-                "rounded-2xl rounded-bl-sm px-4 py-2.5",
-                isDark ? "bg-zinc-800" : "bg-white shadow-sm"
+            <div className={cn("max-w-[85%]", config.isMultiAgent && "flex gap-2")}>
+              {/* Agent avatar */}
+              {config.isMultiAgent && activeAgentId && (
+                <div className="shrink-0 pt-1">
+                  {(() => {
+                    const agent = getAgentInfo(activeAgentId);
+                    return agent?.avatarUrl ? (
+                      <img
+                        src={agent.avatarUrl}
+                        alt={agent.name}
+                        className="h-7 w-7 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="h-7 w-7 rounded-full flex items-center justify-center text-white font-medium text-xs"
+                        style={{ backgroundColor: config.primaryColor }}
+                      >
+                        {agent?.name?.charAt(0).toUpperCase() || "?"}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
-            >
-              {thinkingText ? (
-                <div className="space-y-1.5">
-                  <div
+              <div>
+                {/* Agent name */}
+                {config.isMultiAgent && activeAgentId && (
+                  <p
                     className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium",
+                      "text-xs mb-1 ml-1",
                       isDark ? "text-zinc-400" : "text-gray-500"
                     )}
                   >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="animate-pulse"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 16v-4" />
-                      <path d="M12 8h.01" />
-                    </svg>
-                    <span>Thinking...</span>
-                  </div>
-                  <p
-                    className={cn(
-                      "text-sm italic",
-                      isDark ? "text-zinc-300" : "text-gray-600"
-                    )}
-                  >
-                    {thinkingText}
+                    {getAgentInfo(activeAgentId)?.name}
                   </p>
+                )}
+                <div
+                  className={cn(
+                    "rounded-2xl rounded-bl-sm px-4 py-2.5",
+                    isDark ? "bg-zinc-800" : "bg-white shadow-sm"
+                  )}
+                >
+                  {thinkingState?.text || thinkingState?.toolCalls?.length ? (
+                    <div className="space-y-2">
+                      {/* Thinking text */}
+                      {thinkingState.text && (
+                        <div className="space-y-1">
+                          <div
+                            className={cn(
+                              "flex items-center gap-1.5 text-xs font-medium",
+                              isDark ? "text-zinc-400" : "text-gray-500"
+                            )}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="animate-pulse"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M12 16v-4" />
+                              <path d="M12 8h.01" />
+                            </svg>
+                            <span>Thinking...</span>
+                          </div>
+                          <p
+                            className={cn(
+                              "text-sm italic",
+                              isDark ? "text-zinc-300" : "text-gray-600"
+                            )}
+                          >
+                            {thinkingState.text}
+                          </p>
+                        </div>
+                      )}
+                      {/* Tool calls */}
+                      {thinkingState.toolCalls &&
+                        thinkingState.toolCalls.length > 0 && (
+                          <div className="space-y-1.5">
+                            {thinkingState.toolCalls.map((tool, idx) => (
+                              <div
+                                key={`${tool.name}-${idx}`}
+                                className={cn(
+                                  "flex items-center gap-2 text-xs px-2 py-1.5 rounded",
+                                  isDark ? "bg-zinc-700/50" : "bg-gray-100"
+                                )}
+                              >
+                                {tool.status === "running" ? (
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    className="animate-spin"
+                                  >
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                  </svg>
+                                ) : tool.status === "completed" ? (
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#22c55e"
+                                    strokeWidth="2"
+                                  >
+                                    <path d="M20 6L9 17l-5-5" />
+                                  </svg>
+                                ) : tool.status === "error" ? (
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#ef4444"
+                                    strokeWidth="2"
+                                  >
+                                    <path d="M18 6L6 18M6 6l12 12" />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                  >
+                                    <circle cx="12" cy="12" r="10" />
+                                  </svg>
+                                )}
+                                <span
+                                  className={cn(
+                                    "font-mono",
+                                    isDark ? "text-zinc-300" : "text-gray-700"
+                                  )}
+                                >
+                                  {tool.name}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                    </div>
+                  ) : (
+                    <span className="inline-flex gap-1">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <span className="inline-flex gap-1">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-current" />
-                </span>
-              )}
+              </div>
             </div>
           </div>
         )}
@@ -709,9 +1263,7 @@ export default function WidgetPage() {
                     <line x1="12" x2="12" y1="19" y2="22" />
                   </svg>
                 </div>
-                <span
-                  className="absolute -top-1 -right-1 flex h-3 w-3"
-                >
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
                   <span
                     className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
                     style={{ backgroundColor: "#ef4444" }}
@@ -725,17 +1277,33 @@ export default function WidgetPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-medium">Recording...</span>
-                  <span className={cn("text-xs", isDark ? "text-zinc-400" : "text-gray-500")}>
-                    {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
+                  <span
+                    className={cn(
+                      "text-xs",
+                      isDark ? "text-zinc-400" : "text-gray-500"
+                    )}
+                  >
+                    {Math.floor(recordingDuration / 60)}:
+                    {(recordingDuration % 60).toString().padStart(2, "0")}
                   </span>
                 </div>
                 {voiceTranscript && (
-                  <p className={cn("text-sm truncate", isDark ? "text-zinc-300" : "text-gray-600")}>
+                  <p
+                    className={cn(
+                      "text-sm truncate",
+                      isDark ? "text-zinc-300" : "text-gray-600"
+                    )}
+                  >
                     {voiceTranscript}
                   </p>
                 )}
                 {!voiceTranscript && (
-                  <p className={cn("text-sm italic", isDark ? "text-zinc-500" : "text-gray-400")}>
+                  <p
+                    className={cn(
+                      "text-sm italic",
+                      isDark ? "text-zinc-500" : "text-gray-400"
+                    )}
+                  >
                     Speak now...
                   </p>
                 )}
@@ -745,16 +1313,30 @@ export default function WidgetPage() {
                 onClick={cancelRecording}
                 className={cn(
                   "rounded-full p-2 transition-colors",
-                  isDark ? "hover:bg-zinc-700 text-zinc-400" : "hover:bg-gray-200 text-gray-500"
+                  isDark
+                    ? "hover:bg-zinc-700 text-zinc-400"
+                    : "hover:bg-gray-200 text-gray-500"
                 )}
                 aria-label="Cancel recording"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <p className={cn("text-xs mt-2 text-center", isDark ? "text-zinc-500" : "text-gray-400")}>
+            <p
+              className={cn(
+                "text-xs mt-2 text-center",
+                isDark ? "text-zinc-500" : "text-gray-400"
+              )}
+            >
               Release to send • Click X to cancel
             </p>
           </div>
@@ -784,7 +1366,9 @@ export default function WidgetPage() {
                   ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
                   : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
               )}
-              style={isRecording ? { backgroundColor: config.primaryColor } : undefined}
+              style={
+                isRecording ? { backgroundColor: config.primaryColor } : undefined
+              }
               aria-label="Hold to record voice message"
             >
               <svg
@@ -833,7 +1417,14 @@ export default function WidgetPage() {
             }
             aria-label="Send message"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M22 2L11 13" />
               <path d="M22 2L15 22L11 13L2 9L22 2Z" />
             </svg>

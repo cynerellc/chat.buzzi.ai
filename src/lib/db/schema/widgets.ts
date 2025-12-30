@@ -74,6 +74,16 @@ export const widgetConfigs = chatappSchema.table(
       fields: [],
     }).notNull(),
 
+    // Stream Display Options
+    showAgentSwitchNotification: boolean("show_agent_switch_notification").default(true).notNull(),
+    showThinking: boolean("show_thinking").default(false).notNull(),
+    showToolCalls: boolean("show_tool_calls").default(false).notNull(),
+    showInstantUpdates: boolean("show_instant_updates").default(true).notNull(),
+
+    // Multi-agent Display Options
+    showAgentListOnTop: boolean("show_agent_list_on_top").default(true).notNull(),
+    agentListMinCards: varchar("agent_list_min_cards", { length: 10 }).default("3").notNull(),
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

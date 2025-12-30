@@ -83,7 +83,11 @@ export async function POST(request: NextRequest) {
     // 5. Find or create end user
     const endUser = await findOrCreateEndUser(companyId, customer, userAgent);
 
-    // 6. Create conversation
+    // 6. Generate session token
+    const sessionId = generateSessionToken();
+    const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+
+    // 7. Create conversation with session ID
     const [conversation] = await db
       .insert(conversations)
       .values({
@@ -94,6 +98,7 @@ export async function POST(request: NextRequest) {
         status: "active",
         pageUrl,
         referrer,
+        sessionId, // Store session ID in conversation
         lastMessageAt: new Date(),
       })
       .returning();
@@ -102,13 +107,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create conversation");
     }
 
-    // 7. Generate session token
-    const sessionId = generateSessionToken();
-    const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-
-    // 8. Store session (in a real app, you'd use Redis or a sessions table)
-    // For now, we'll encode session data in a JWT-like token
-    // This is a simplified implementation - in production, use proper session management
+    // 8. Return session info (session is stored in conversation record)
 
     const response: CreateSessionResponse = {
       sessionId,

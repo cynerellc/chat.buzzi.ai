@@ -4,6 +4,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { widgetConfigs, chatbots, companies } from "@/lib/db/schema";
+import { generateWidgetConfigJson } from "@/lib/widget/config-generator";
 
 interface RouteContext {
   params: Promise<{ companyId: string; chatbotId: string }>;
@@ -60,6 +61,14 @@ export interface WidgetConfigResponse {
       required: boolean;
     }>;
   };
+  // Stream Display Options
+  showAgentSwitchNotification: boolean;
+  showThinking: boolean;
+  showToolCalls: boolean;
+  showInstantUpdates: boolean;
+  // Multi-agent Display Options
+  showAgentListOnTop: boolean;
+  agentListMinCards: string;
   // Embed info
   embedCode: string;
   createdAt: string;
@@ -182,6 +191,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
       hideLauncherOnMobile: config.hideLauncherOnMobile,
       // Pre-chat Form
       preChatForm: config.preChatForm as WidgetConfigResponse["preChatForm"],
+      // Stream Display Options
+      showAgentSwitchNotification: config.showAgentSwitchNotification,
+      showThinking: config.showThinking,
+      showToolCalls: config.showToolCalls,
+      showInstantUpdates: config.showInstantUpdates,
+      // Multi-agent Display Options
+      showAgentListOnTop: config.showAgentListOnTop,
+      agentListMinCards: config.agentListMinCards,
       // Embed info
       embedCode: generateEmbedCode(company?.slug ?? "unknown", chatbotId),
       createdAt: config.createdAt.toISOString(),
@@ -247,6 +264,14 @@ interface UpdateWidgetConfigRequest {
       required: boolean;
     }>;
   };
+  // Stream Display Options
+  showAgentSwitchNotification?: boolean;
+  showThinking?: boolean;
+  showToolCalls?: boolean;
+  showInstantUpdates?: boolean;
+  // Multi-agent Display Options
+  showAgentListOnTop?: boolean;
+  agentListMinCards?: string;
 }
 
 /**
@@ -355,6 +380,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Pre-chat Form
     if (body.preChatForm !== undefined) updateData.preChatForm = body.preChatForm;
 
+    // Stream Display Options
+    if (body.showAgentSwitchNotification !== undefined) updateData.showAgentSwitchNotification = body.showAgentSwitchNotification;
+    if (body.showThinking !== undefined) updateData.showThinking = body.showThinking;
+    if (body.showToolCalls !== undefined) updateData.showToolCalls = body.showToolCalls;
+    if (body.showInstantUpdates !== undefined) updateData.showInstantUpdates = body.showInstantUpdates;
+
+    // Multi-agent Display Options
+    if (body.showAgentListOnTop !== undefined) updateData.showAgentListOnTop = body.showAgentListOnTop;
+    if (body.agentListMinCards !== undefined) updateData.agentListMinCards = body.agentListMinCards;
+
     const [updatedConfig] = await db
       .update(widgetConfigs)
       .set(updateData)
@@ -363,6 +398,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     if (!updatedConfig) {
       return NextResponse.json({ error: "Failed to update widget configuration" }, { status: 500 });
+    }
+
+    // Regenerate widget config JSON in Supabase Storage
+    const regenerateResult = await generateWidgetConfigJson(chatbotId);
+    if (!regenerateResult.success) {
+      console.error("Failed to regenerate widget config JSON:", regenerateResult.error);
+      // Continue anyway - the database update succeeded
     }
 
     const response: WidgetConfigResponse = {
@@ -401,6 +443,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       launcherText: updatedConfig.launcherText,
       hideLauncherOnMobile: updatedConfig.hideLauncherOnMobile,
       preChatForm: updatedConfig.preChatForm as WidgetConfigResponse["preChatForm"],
+      // Stream Display Options
+      showAgentSwitchNotification: updatedConfig.showAgentSwitchNotification,
+      showThinking: updatedConfig.showThinking,
+      showToolCalls: updatedConfig.showToolCalls,
+      showInstantUpdates: updatedConfig.showInstantUpdates,
+      // Multi-agent Display Options
+      showAgentListOnTop: updatedConfig.showAgentListOnTop,
+      agentListMinCards: updatedConfig.agentListMinCards,
       embedCode: generateEmbedCode(company?.slug ?? "unknown", chatbotId),
       createdAt: updatedConfig.createdAt.toISOString(),
       updatedAt: updatedConfig.updatedAt.toISOString(),

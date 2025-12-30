@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
         agentsList: agents.agentsList,
         behavior: agents.behavior,
         status: agents.status,
+        packageType: agents.packageType,
       })
       .from(agents)
       .where(
@@ -93,32 +94,68 @@ export async function GET(request: NextRequest) {
     }
 
     const agent = agentResult[0];
-    const agentsListData = (agent.agentsList as { avatar_url?: string }[] | null) || [];
+    const agentsListData = (agent.agentsList as {
+      agent_identifier: string;
+      name: string;
+      designation?: string;
+      avatar_url?: string;
+      agent_type?: string;
+    }[] | null) || [];
     const avatarUrl = agentsListData[0]?.avatar_url || null;
-    const behavior = (agent.behavior as { greeting?: string; widgetConfig?: Record<string, unknown> }) ?? {};
-    const storedConfig = behavior.widgetConfig ?? {};
+    const behavior = (agent.behavior as { greeting?: string }) ?? {};
+    const isMultiAgent = agent.packageType === "multi_agent";
 
     // Fetch widget config for this chatbot
     const widgetConfigResult = await db
-      .select({
-        enableVoiceMessages: widgetConfigs.enableVoiceMessages,
-      })
+      .select()
       .from(widgetConfigs)
       .where(eq(widgetConfigs.chatbotId, agentId))
       .limit(1);
 
     const widgetConfig = widgetConfigResult[0];
 
-    // Merge default config with stored config
+    // Merge default config with widget config from database
     const config = {
       ...DEFAULT_CONFIG,
-      ...storedConfig,
-      // Always use agent-specific values
-      title: agent.name,
-      avatarUrl,
-      welcomeMessage: behavior.greeting ?? DEFAULT_CONFIG.title,
-      // Include voice feature flag from widget config
-      enableVoice: widgetConfig?.enableVoiceMessages ?? false,
+      // Apply widget config customizations if they exist
+      ...(widgetConfig && {
+        theme: widgetConfig.theme,
+        position: widgetConfig.position,
+        primaryColor: widgetConfig.primaryColor,
+        borderRadius: parseInt(widgetConfig.borderRadius) || DEFAULT_CONFIG.borderRadius,
+        title: widgetConfig.title,
+        subtitle: widgetConfig.subtitle || undefined,
+        placeholderText: DEFAULT_CONFIG.placeholderText,
+        welcomeMessage: widgetConfig.welcomeMessage,
+        avatarUrl: widgetConfig.avatarUrl || avatarUrl,
+        logoUrl: widgetConfig.logoUrl || undefined,
+        showBranding: widgetConfig.showBranding,
+        autoOpen: widgetConfig.autoOpen,
+        autoOpenDelay: parseInt(widgetConfig.autoOpenDelay) * 1000 || DEFAULT_CONFIG.autoOpenDelay,
+        soundEnabled: widgetConfig.playSoundOnMessage,
+        enableVoice: widgetConfig.enableVoiceMessages,
+        enableFileUpload: widgetConfig.enableFileUpload,
+        enableEmoji: widgetConfig.enableEmoji,
+        enableTypingIndicator: widgetConfig.showTypingIndicator,
+        launcherIcon: widgetConfig.launcherIcon,
+        launcherText: widgetConfig.launcherText || undefined,
+        customCss: widgetConfig.customCss || undefined,
+      }),
+      // If no widget config exists, use defaults with agent name as title
+      ...(!widgetConfig && {
+        title: agent.name,
+        avatarUrl,
+        welcomeMessage: behavior.greeting || DEFAULT_CONFIG.title,
+      }),
+      // Multi-agent configuration
+      isMultiAgent,
+      agentsList: isMultiAgent ? agentsListData.map(a => ({
+        id: a.agent_identifier,
+        name: a.name,
+        designation: a.designation,
+        avatarUrl: a.avatar_url,
+        type: a.agent_type,
+      })) : undefined,
     };
 
     // Set CORS headers

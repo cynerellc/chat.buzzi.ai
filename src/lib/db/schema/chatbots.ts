@@ -31,6 +31,13 @@ export interface PackageVariableDefinition {
   placeholder?: string; // Input placeholder
 }
 
+// Type definition for chatbot settings (widget config, etc.)
+export interface ChatbotSettings {
+  widgetConfigUrl?: string; // Signed URL to pre-generated JSON config (10-year expiry)
+  widgetConfigPath?: string; // Storage path for regeneration
+  widgetConfigGeneratedAt?: string; // ISO timestamp of last generation
+}
+
 // Type definition for agent list items (stored as JSONB array)
 export interface AgentListItem {
   agent_identifier: string; // Unique identifier within the package
@@ -181,6 +188,9 @@ export const chatbots = chatappSchema.table(
     // Package Variable Values (key-value pairs)
     // Record<variableName, value> - values for variables defined in the package
     variableValues: jsonb("variable_values").$type<Record<string, string>>().default({}).notNull(),
+
+    // Settings (widget config URL, etc.)
+    settings: jsonb("settings").$type<ChatbotSettings>().default({}).notNull(),
 
     // Analytics
     totalConversations: integer("total_conversations").default(0).notNull(),

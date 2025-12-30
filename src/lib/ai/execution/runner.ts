@@ -387,7 +387,9 @@ export class AgentRunnerService {
       type: "text",
       content: response.content,
       tokenCount: response.metadata?.tokensUsed?.totalTokens,
-      processingTimeMs: response.metadata?.processingTimeMs,
+      processingTimeMs: response.metadata?.processingTimeMs
+        ? Math.round(response.metadata.processingTimeMs)
+        : undefined,
       sourceChunkIds: response.metadata?.sources?.map((s) => s.id) || [],
       toolCalls: response.metadata?.toolsUsed || [],
     });

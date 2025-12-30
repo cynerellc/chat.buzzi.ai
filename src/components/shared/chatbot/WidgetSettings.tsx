@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Palette,
   ImageIcon,
@@ -16,8 +16,10 @@ import {
   Sparkles,
   Save,
   ExternalLink,
+  Upload,
+  X,
 } from "lucide-react";
-import { Switch, Slider, Textarea, addToast } from "@/components/ui";
+import { Switch, Slider, Textarea, addToast, Modal, ModalContent, ModalHeader, ModalBody } from "@/components/ui";
 
 import {
   Button,
@@ -31,6 +33,7 @@ import {
   type TabItem,
 } from "@/components/ui";
 import useSWR from "swr";
+import { ImageCropper, type CropData } from "@/components/shared/image-cropper";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Light" },
@@ -71,7 +74,6 @@ interface WidgetConfig {
   welcomeMessage: string;
   offlineMessage: string | null;
   logoUrl: string | null;
-  avatarUrl: string | null;
   companyName: string | null;
   autoOpen: boolean;
   autoOpenDelay: string;
@@ -92,6 +94,13 @@ interface WidgetConfig {
   launcherIcon: string;
   launcherText: string | null;
   hideLauncherOnMobile: boolean;
+  // Stream Display Options
+  showAgentSwitchNotification: boolean;
+  showThinking: boolean;
+  showToolCalls: boolean;
+  showInstantUpdates: boolean;
+  // Multi-agent Display Options
+  showAgentListOnTop: boolean;
   embedCode: string;
 }
 
@@ -106,15 +115,22 @@ interface WidgetSettingsProps {
   chatbotName?: string;
   companyId: string;
   apiUrl: string;
+  isMultiAgent?: boolean;
 }
 
-export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: WidgetSettingsProps) {
+export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMultiAgent = false }: WidgetSettingsProps) {
   const { data, isLoading, mutate } = useSWR<{ config: WidgetConfig }>(apiUrl, fetcher);
 
   const config = data?.config;
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Logo upload state
+  const [showCropperModal, setShowCropperModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     theme: "light",
@@ -128,7 +144,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
     welcomeMessage: "Hi there! How can we help you today?",
     offlineMessage: "We're currently offline. Leave a message and we'll get back to you.",
     logoUrl: "",
-    avatarUrl: "",
     companyName: "",
     autoOpen: false,
     autoOpenDelay: "5",
@@ -149,6 +164,13 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
     launcherIcon: "chat",
     launcherText: "",
     hideLauncherOnMobile: false,
+    // Stream Display Options
+    showAgentSwitchNotification: true,
+    showThinking: false,
+    showToolCalls: false,
+    showInstantUpdates: true,
+    // Multi-agent Display Options
+    showAgentListOnTop: true,
   });
 
   useEffect(() => {
@@ -165,7 +187,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
         welcomeMessage: config.welcomeMessage,
         offlineMessage: config.offlineMessage || "",
         logoUrl: config.logoUrl || "",
-        avatarUrl: config.avatarUrl || "",
         companyName: config.companyName || "",
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
@@ -186,6 +207,13 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
         launcherIcon: config.launcherIcon,
         launcherText: config.launcherText || "",
         hideLauncherOnMobile: config.hideLauncherOnMobile,
+        // Stream Display Options
+        showAgentSwitchNotification: config.showAgentSwitchNotification ?? true,
+        showThinking: config.showThinking ?? false,
+        showToolCalls: config.showToolCalls ?? false,
+        showInstantUpdates: config.showInstantUpdates ?? true,
+        // Multi-agent Display Options
+        showAgentListOnTop: config.showAgentListOnTop ?? true,
       });
     }
   }, [config]);
@@ -206,7 +234,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
           subtitle: formData.subtitle || null,
           offlineMessage: formData.offlineMessage || null,
           logoUrl: formData.logoUrl || null,
-          avatarUrl: formData.avatarUrl || null,
           companyName: formData.companyName || null,
           customCss: formData.customCss || null,
           launcherText: formData.launcherText || null,
@@ -236,10 +263,127 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
 
   const openTestWidget = () => {
     if (companyId && chatbotId) {
-      const testUrl = `/api/widget/test-page?chatbotId=${chatbotId}&companyId=${companyId}`;
+      const testUrl = `/preview/widget?chatbotId=${chatbotId}&companyId=${companyId}`;
       window.open(testUrl, "_blank");
     }
   };
+
+  // Logo upload handlers
+  const handleLogoFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      addToast({ title: "Invalid file type. Use JPEG, PNG, GIF, or WebP", color: "danger" });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      addToast({ title: "File too large. Maximum size is 5MB", color: "danger" });
+      return;
+    }
+
+    // Create data URL for cropper
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedImage(reader.result as string);
+      setShowCropperModal(true);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so same file can be selected again
+    event.target.value = "";
+  }, []);
+
+  const handleCropComplete = useCallback(async (cropData: CropData) => {
+    if (!selectedImage) return;
+
+    setIsUploadingLogo(true);
+    try {
+      // Create a canvas to crop the image
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Failed to get canvas context");
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = selectedImage;
+      });
+
+      // Set canvas size to crop size
+      canvas.width = cropData.width;
+      canvas.height = cropData.height;
+
+      // Draw cropped portion
+      ctx.drawImage(
+        img,
+        cropData.x,
+        cropData.y,
+        cropData.width,
+        cropData.height,
+        0,
+        0,
+        cropData.width,
+        cropData.height
+      );
+
+      // Convert to blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("Failed to create blob"));
+          },
+          "image/png",
+          0.9
+        );
+      });
+
+      // Upload to server
+      const formData = new FormData();
+      formData.append("file", blob, "logo.png");
+
+      const response = await fetch("/api/company/logo", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to upload logo");
+      }
+
+      const result = await response.json();
+
+      // Update the logo URL in form data
+      updateField("logoUrl", result.logoUrl);
+      addToast({ title: "Logo uploaded successfully", color: "success" });
+      setShowCropperModal(false);
+      setSelectedImage(null);
+    } catch (error) {
+      console.error("Logo upload error:", error);
+      addToast({ title: error instanceof Error ? error.message : "Failed to upload logo", color: "danger" });
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  }, [selectedImage, updateField]);
+
+  const handleCropCancel = useCallback(() => {
+    setShowCropperModal(false);
+    setSelectedImage(null);
+  }, []);
+
+  const handleRemoveLogo = useCallback(() => {
+    updateField("logoUrl", "");
+    setHasChanges(true);
+  }, [updateField]);
 
   if (isLoading) {
     return (
@@ -384,21 +528,56 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
             description="Message shown when no agents are available"
           />
 
-          <Input
-            label="Logo URL"
-            placeholder="https://..."
-            value={formData.logoUrl}
-            onValueChange={(v) => updateField("logoUrl", v)}
-            description="Company logo shown in widget header"
-          />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Company Logo</label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Logo shown in widget header (recommended: square, at least 100x100px)
+            </p>
 
-          <Input
-            label="Avatar URL"
-            placeholder="https://..."
-            value={formData.avatarUrl}
-            onValueChange={(v) => updateField("avatarUrl", v)}
-            description="Default avatar for AI responses"
-          />
+            {formData.logoUrl ? (
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-16 h-16 rounded-lg border border-divider bg-cover bg-center bg-no-repeat"
+                  style={{ backgroundImage: `url(${formData.logoUrl})` }}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onPress={() => logoInputRef.current?.click()}
+                    startContent={<Upload size={14} />}
+                  >
+                    Change
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onPress={handleRemoveLogo}
+                    startContent={<X size={14} />}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => logoInputRef.current?.click()}
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-divider rounded-lg cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+              >
+                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                <span className="text-sm text-muted-foreground">Click to upload logo</span>
+                <span className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF, WebP (max 5MB)</span>
+              </div>
+            )}
+
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              onChange={handleLogoFileSelect}
+              className="hidden"
+            />
+          </div>
         </div>
       ),
     },
@@ -588,6 +767,92 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
               </div>
             </div>
           </div>
+
+          <div className="border-t border-divider pt-6">
+            <h3 className="font-semibold mb-4">Stream Display Options</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Control what information is shown to users while the AI is generating responses.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show instant updates</span>
+                  <p className="text-sm text-muted-foreground">
+                    Update response in real-time as it streams
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showInstantUpdates}
+                  onValueChange={(v) => updateField("showInstantUpdates", v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show thinking process</span>
+                  <p className="text-sm text-muted-foreground">
+                    Display what the AI is thinking about while generating
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showThinking}
+                  onValueChange={(v) => updateField("showThinking", v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show tool calls</span>
+                  <p className="text-sm text-muted-foreground">
+                    Display when AI uses tools like search or calculations
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showToolCalls}
+                  onValueChange={(v) => updateField("showToolCalls", v)}
+                  isDisabled={!formData.showThinking}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show agent transfer notifications</span>
+                  <p className="text-sm text-muted-foreground">
+                    Notify when conversation is transferred to another agent
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showAgentSwitchNotification}
+                  onValueChange={(v) => updateField("showAgentSwitchNotification", v)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {isMultiAgent && (
+            <div className="border-t border-divider pt-6">
+              <h3 className="font-semibold mb-4">Multi-Agent Display</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure how multiple agents are displayed in the widget.
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                  <div>
+                    <span className="font-medium">Show agent list at top</span>
+                    <p className="text-sm text-muted-foreground">
+                      Display horizontal list of available agents at the top of the widget
+                    </p>
+                  </div>
+                  <Switch
+                    isSelected={formData.showAgentListOnTop}
+                    onValueChange={(v) => updateField("showAgentListOnTop", v)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ),
     },
@@ -708,10 +973,10 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
                   >
                     <div className="p-3 text-white" style={{ backgroundColor: formData.primaryColor }}>
                       <div className="flex items-center gap-2">
-                        {formData.avatarUrl ? (
+                        {formData.logoUrl ? (
                           <div
                             className="w-8 h-8 rounded-full bg-white/20 bg-cover bg-center"
-                            style={{ backgroundImage: `url(${formData.avatarUrl})` }}
+                            style={{ backgroundImage: `url(${formData.logoUrl})` }}
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -842,6 +1107,36 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl }: Wi
           </Card>
         </div>
       </div>
+
+      {/* Logo Cropper Modal */}
+      <Modal isOpen={showCropperModal} onClose={handleCropCancel} size="lg">
+        <ModalContent>
+          <ModalHeader>
+            <h3 className="text-lg font-semibold">Crop Logo</h3>
+          </ModalHeader>
+          <ModalBody className="pb-6">
+            {selectedImage && (
+              <div className="relative">
+                {isUploadingLogo && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Uploading...</span>
+                    </div>
+                  </div>
+                )}
+                <ImageCropper
+                  image={selectedImage}
+                  onCropComplete={handleCropComplete}
+                  onCancel={handleCropCancel}
+                  aspectRatio={1}
+                  cropShape="round"
+                />
+              </div>
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

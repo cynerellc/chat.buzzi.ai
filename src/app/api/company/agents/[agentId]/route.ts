@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { agents, agentPackages, agentVersions, type PackageVariableDefinition, type AgentListItem } from "@/lib/db/schema";
+import { generateWidgetConfigJson } from "@/lib/widget/config-generator";
 
 interface RouteParams {
   params: Promise<{ agentId: string }>;
@@ -235,6 +236,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .set(updateData)
       .where(eq(agents.id, agentId))
       .returning();
+
+    // Regenerate widget config JSON if name or agentsList changed
+    const shouldRegenerateWidgetConfig =
+      body.name !== undefined || hasAgentConfigChanges;
+
+    if (shouldRegenerateWidgetConfig) {
+      const regenerateResult = await generateWidgetConfigJson(agentId);
+      if (!regenerateResult.success) {
+        console.error("Failed to regenerate widget config JSON:", regenerateResult.error);
+        // Continue anyway - the database update succeeded
+      }
+    }
 
     return NextResponse.json({ agent: updatedAgent });
   } catch (error) {

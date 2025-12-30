@@ -1,13 +1,200 @@
 /**
- * Chat Widget Types
+ * Widget Configuration JSON Types
  *
- * Type definitions for the embeddable chat widget.
+ * These types define the structure of the pre-generated widget config JSON
+ * stored in Supabase Storage for fast widget initialization.
  */
 
+// Pre-chat form field definition
+export interface PreChatFormField {
+  name: string;
+  label: string;
+  type: "text" | "email" | "phone" | "select" | "textarea";
+  required: boolean;
+  options?: string[]; // For select type
+  placeholder?: string;
+}
+
+// Agent info for multi-agent widgets
+export interface WidgetAgentInfo {
+  id: string; // agent_identifier
+  name: string;
+  designation?: string;
+  avatarUrl?: string;
+  type: "worker" | "supervisor";
+}
+
+/**
+ * Main widget configuration JSON structure
+ * This is the format stored in Supabase Storage
+ */
+export interface WidgetConfigJson {
+  // Metadata
+  version: string; // "1.0.0" for compatibility
+  generatedAt: string; // ISO timestamp
+
+  // Chatbot info
+  chatbot: {
+    id: string;
+    name: string;
+    type: "single_agent" | "multi_agent";
+    companyId: string;
+  };
+
+  // Agent list (for multi-agent, includes all agents; for single-agent, just one)
+  agents: WidgetAgentInfo[];
+
+  // Appearance settings
+  appearance: {
+    theme: "light" | "dark" | "auto";
+    position: "bottom-right" | "bottom-left";
+    primaryColor: string;
+    accentColor: string;
+    borderRadius: number;
+    buttonSize: number;
+    launcherIcon: string;
+    launcherText?: string;
+    zIndex: number;
+  };
+
+  // Branding settings
+  branding: {
+    title: string;
+    subtitle?: string;
+    welcomeMessage: string;
+    offlineMessage?: string;
+    logoUrl?: string;
+    avatarUrl?: string;
+    companyName?: string;
+    showBranding: boolean;
+  };
+
+  // Behavior settings
+  behavior: {
+    autoOpen: boolean;
+    autoOpenDelay: number;
+    playSoundOnMessage: boolean;
+    showTypingIndicator: boolean;
+    persistConversation: boolean;
+    hideLauncherOnMobile: boolean;
+  };
+
+  // Feature flags
+  features: {
+    enableFileUpload: boolean;
+    enableVoiceMessages: boolean;
+    enableEmoji: boolean;
+    enableFeedback: boolean;
+    requireEmail: boolean;
+    requireName: boolean;
+  };
+
+  // Stream display options (new)
+  streamDisplay: {
+    showAgentSwitchNotification: boolean;
+    showThinking: boolean;
+    showToolCalls: boolean;
+    showInstantUpdates: boolean;
+  };
+
+  // Multi-agent display options (optional, only for multi-agent chatbots)
+  multiAgent?: {
+    showAgentListOnTop: boolean;
+    agentListMinCards: number;
+  };
+
+  // Pre-chat form configuration
+  preChatForm: {
+    enabled: boolean;
+    fields: PreChatFormField[];
+  };
+
+  // Custom CSS (optional)
+  customCss?: string;
+
+  // Security settings
+  security: {
+    allowedDomains: string[];
+    blockedDomains: string[];
+  };
+}
+
+// Default values for widget config
+export const WIDGET_CONFIG_DEFAULTS = {
+  version: "1.0.0",
+  appearance: {
+    theme: "light" as const,
+    position: "bottom-right" as const,
+    primaryColor: "#6437F3",
+    accentColor: "#2b3dd8",
+    borderRadius: 16,
+    buttonSize: 60,
+    launcherIcon: "chat",
+    zIndex: 9999,
+  },
+  branding: {
+    title: "Chat with us",
+    welcomeMessage: "Hi there! How can we help you today?",
+    showBranding: true,
+  },
+  behavior: {
+    autoOpen: false,
+    autoOpenDelay: 5,
+    playSoundOnMessage: true,
+    showTypingIndicator: true,
+    persistConversation: true,
+    hideLauncherOnMobile: false,
+  },
+  features: {
+    enableFileUpload: false,
+    enableVoiceMessages: false,
+    enableEmoji: true,
+    enableFeedback: true,
+    requireEmail: false,
+    requireName: false,
+  },
+  streamDisplay: {
+    showAgentSwitchNotification: true,
+    showThinking: false,
+    showToolCalls: false,
+    showInstantUpdates: true,
+  },
+  multiAgent: {
+    showAgentListOnTop: true,
+    agentListMinCards: 3,
+  },
+  preChatForm: {
+    enabled: false,
+    fields: [],
+  },
+  security: {
+    allowedDomains: [],
+    blockedDomains: [],
+  },
+};
+
+// Request/Response types for API endpoints
+export interface WidgetConfigUrlResponse {
+  configUrl: string;
+  chatbotId: string;
+  generatedAt: string;
+}
+
+export interface GenerateWidgetConfigResult {
+  success: boolean;
+  configUrl?: string;
+  storagePath?: string;
+  error?: string;
+}
+
 // ============================================================================
-// Widget Configuration
+// Widget Embed Script Types (for embed.ts and widget iframe communication)
 // ============================================================================
 
+/**
+ * Widget configuration for the embed script
+ * This is what developers pass to initialize the widget
+ */
 export interface WidgetConfig {
   // Required
   agentId: string;
@@ -18,165 +205,90 @@ export interface WidgetConfig {
   position?: "bottom-right" | "bottom-left";
   primaryColor?: string;
   borderRadius?: number;
-  width?: number;
-  height?: number;
-
-  // Branding
-  title?: string;
-  subtitle?: string;
-  avatarUrl?: string;
-  welcomeMessage?: string;
-  placeholderText?: string;
-  showBranding?: boolean;
 
   // Behavior
   autoOpen?: boolean;
   autoOpenDelay?: number;
-  openOnLoad?: boolean;
+  showBranding?: boolean;
   closeOnEscape?: boolean;
-  soundEnabled?: boolean;
 
   // Features
-  enableVoice?: boolean;
   enableFileUpload?: boolean;
   enableEmoji?: boolean;
+  enableVoice?: boolean;
   enableMarkdown?: boolean;
   enableTypingIndicator?: boolean;
 
-  // Localization
-  locale?: string;
-  strings?: Partial<WidgetStrings>;
-
-  // Customer context (optional)
-  customer?: CustomerInfo;
+  // Customer info (optional)
+  customer?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    avatarUrl?: string;
+    metadata?: Record<string, unknown>;
+  };
 
   // Callbacks
   onOpen?: () => void;
   onClose?: () => void;
-  onMessage?: (message: WidgetMessage) => void;
+  onMessage?: (message: unknown) => void;
   onError?: (error: Error) => void;
+
+  // Custom strings
+  strings?: {
+    openChat?: string;
+    closeChat?: string;
+    placeholder?: string;
+  };
 }
 
-export interface CustomerInfo {
-  id?: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  avatarUrl?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface WidgetStrings {
-  inputPlaceholder: string;
-  sendButton: string;
-  welcomeMessage: string;
-  typingIndicator: string;
-  connectionError: string;
-  reconnecting: string;
-  sendError: string;
-  offlineMessage: string;
-  poweredBy: string;
-  close: string;
-  minimize: string;
-  openChat: string;
-  fileUpload: string;
-  voiceInput: string;
-  emoji: string;
-}
-
-// ============================================================================
-// Session & Messages
-// ============================================================================
-
+/**
+ * Widget session info
+ */
 export interface WidgetSession {
   sessionId: string;
   conversationId: string;
   endUserId: string;
-  agentId: string;
-  companyId: string;
-  createdAt: Date;
-  expiresAt?: Date;
+  expiresAt: string;
 }
 
-export interface WidgetMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: Date;
-  status?: "sending" | "sent" | "error";
-  attachments?: MessageAttachment[];
-  metadata?: Record<string, unknown>;
-}
-
-export interface MessageAttachment {
-  id: string;
-  type: "image" | "document" | "audio" | "video";
-  name: string;
-  url?: string;
-  size?: number;
-  mimeType?: string;
-  analysis?: {
-    description?: string;
-    extractedText?: string;
-    summary?: string;
-  };
-}
-
-// ============================================================================
-// Widget Events
-// ============================================================================
-
+/**
+ * Widget event types
+ */
 export type WidgetEventType =
   | "open"
   | "close"
   | "minimize"
+  | "session:start"
   | "message:sent"
   | "message:received"
-  | "message:error"
-  | "typing:start"
-  | "typing:stop"
-  | "session:start"
-  | "session:end"
-  | "handover:started"
-  | "handover:ended"
-  | "connection:online"
-  | "connection:offline"
-  | "connection:reconnecting"
   | "error";
 
-export interface WidgetEvent<T = unknown> {
+/**
+ * Widget event callback
+ */
+export type WidgetEventCallback<T = unknown> = (event: {
   type: WidgetEventType;
   data: T;
   timestamp: Date;
-}
+}) => void;
 
-export type WidgetEventCallback<T = unknown> = (event: WidgetEvent<T>) => void;
-
-// ============================================================================
-// Widget API (Public Interface)
-// ============================================================================
-
+/**
+ * Chat widget public API
+ */
 export interface ChatWidgetAPI {
-  // Lifecycle
   open(): void;
   close(): void;
   toggle(): void;
   minimize(): void;
   destroy(): void;
-
-  // Messaging
   sendMessage(content: string, attachments?: File[]): Promise<void>;
   clearHistory(): void;
-
-  // Customer context
-  setCustomer(customer: CustomerInfo): void;
+  setCustomer(customer: WidgetConfig["customer"]): void;
   setMetadata(key: string, value: unknown): void;
-
-  // Events
   on<T = unknown>(event: WidgetEventType, callback: WidgetEventCallback<T>): void;
   off<T = unknown>(event: WidgetEventType, callback: WidgetEventCallback<T>): void;
-
-  // State
   isOpen(): boolean;
   isMinimized(): boolean;
   getConversationId(): string | null;
@@ -184,34 +296,31 @@ export interface ChatWidgetAPI {
 }
 
 // ============================================================================
-// Widget State
+// Widget API Request/Response Types
 // ============================================================================
 
-export interface WidgetState {
-  isOpen: boolean;
-  isMinimized: boolean;
-  isConnected: boolean;
-  isReconnecting: boolean;
-  isTyping: boolean;
-  session: WidgetSession | null;
-  messages: WidgetMessage[];
-  pendingMessage: string | null;
-  error: string | null;
-}
-
-// ============================================================================
-// Server Types
-// ============================================================================
-
+/**
+ * Create session request
+ */
 export interface CreateSessionRequest {
   agentId: string;
   companyId: string;
-  customer?: CustomerInfo;
+  customer?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    avatarUrl?: string;
+    metadata?: Record<string, unknown>;
+  };
   pageUrl?: string;
   referrer?: string;
   userAgent?: string;
 }
 
+/**
+ * Create session response
+ */
 export interface CreateSessionResponse {
   sessionId: string;
   conversationId: string;
@@ -219,62 +328,15 @@ export interface CreateSessionResponse {
   expiresAt: string;
 }
 
+/**
+ * Send message request
+ */
 export interface SendMessageRequest {
   content: string;
-  attachments?: {
-    id: string;
-    type: string;
+  attachments?: Array<{
     name: string;
+    type: string;
     url: string;
-  }[];
-}
-
-export interface SendMessageResponse {
-  messageId: string;
-  conversationId: string;
-  timestamp: string;
-}
-
-// ============================================================================
-// Widget Configuration (Server-side stored)
-// ============================================================================
-
-export interface StoredWidgetConfig {
-  id: string;
-  companyId: string;
-  agentId: string;
-
-  // Appearance
-  theme: "light" | "dark" | "auto";
-  position: "bottom-right" | "bottom-left";
-  primaryColor: string;
-  borderRadius: number;
-
-  // Branding
-  title: string;
-  subtitle?: string;
-  avatarUrl?: string;
-  welcomeMessage?: string;
-  placeholderText: string;
-  showBranding: boolean;
-
-  // Behavior
-  autoOpen: boolean;
-  autoOpenDelay: number;
-  closeOnEscape: boolean;
-  soundEnabled: boolean;
-
-  // Features
-  enableVoice: boolean;
-  enableFileUpload: boolean;
-  enableEmoji: boolean;
-  enableMarkdown: boolean;
-  enableTypingIndicator: boolean;
-
-  // Security
-  allowedDomains: string[];
-
-  // Timestamps
-  createdAt: Date;
-  updatedAt: Date;
+    size: number;
+  }>;
 }
