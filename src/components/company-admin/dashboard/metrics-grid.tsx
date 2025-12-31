@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { MessageSquare, Bot, UserCheck, Clock } from "lucide-react";
 
 import { StatCard } from "@/components/shared";
@@ -11,25 +12,17 @@ interface MetricsGridProps {
   isLoading?: boolean;
 }
 
-export function MetricsGrid({ stats, isLoading }: MetricsGridProps) {
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-28 rounded-xl" />
-        ))}
-      </div>
-    );
-  }
+// M9: Move pure function outside component to avoid recreation
+const getInvertedTrend = (change: number): "up" | "down" | "neutral" => {
+  if (change > 0) return "down"; // Increasing is bad
+  if (change < 0) return "up"; // Decreasing is good
+  return "neutral";
+};
 
-  // For escalations and response time, lower is better, so invert the trend
-  const getInvertedTrend = (change: number): "up" | "down" | "neutral" => {
-    if (change > 0) return "down"; // Increasing is bad
-    if (change < 0) return "up"; // Decreasing is good
-    return "neutral";
-  };
-
-  const metrics = [
+// H7: Wrap with React.memo since it receives props from parent
+export const MetricsGrid = memo(function MetricsGrid({ stats, isLoading }: MetricsGridProps) {
+  // M7: Memoize metrics array - must be called before any early returns
+  const metrics = useMemo(() => [
     {
       title: "Active Conversations",
       value: stats?.activeConversations ?? 0,
@@ -60,7 +53,17 @@ export function MetricsGrid({ stats, isLoading }: MetricsGridProps) {
       trend: getInvertedTrend(stats?.avgResponseTimeChange ?? 0),
       formatValue: (v: number) => `${v.toFixed(1)}m`,
     },
-  ];
+  ], [stats]);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -76,4 +79,4 @@ export function MetricsGrid({ stats, isLoading }: MetricsGridProps) {
       ))}
     </div>
   );
-}
+});

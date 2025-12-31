@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Inbox,
@@ -152,14 +152,14 @@ export default function SupportAgentInbox() {
     fetchConversations(selectedFilter, searchQuery);
   }, [fetchConversations, selectedFilter, searchQuery]);
 
-  // Refresh handler
-  const handleRefresh = () => {
+  // H8: Wrap handlers with useCallback to prevent recreation on every render
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchConversations(selectedFilter, searchQuery);
-  };
+  }, [fetchConversations, selectedFilter, searchQuery]);
 
   // Star/unstar conversation
-  const toggleStar = async (conversationId: string, isStarred: boolean) => {
+  const toggleStar = useCallback(async (conversationId: string, isStarred: boolean) => {
     try {
       await fetch(`/api/support-agent/conversations/${conversationId}`, {
         method: "PATCH",
@@ -176,10 +176,10 @@ export default function SupportAgentInbox() {
     } catch (err) {
       console.error("Failed to toggle star:", err);
     }
-  };
+  }, []);
 
   // Take conversation
-  const takeConversation = async (conversationId: string) => {
+  const takeConversation = useCallback(async (conversationId: string) => {
     try {
       await fetch(`/api/support-agent/conversations/${conversationId}`, {
         method: "PATCH",
@@ -192,12 +192,12 @@ export default function SupportAgentInbox() {
     } catch (err) {
       console.error("Failed to take conversation:", err);
     }
-  };
+  }, [fetchConversations, selectedFilter, searchQuery]);
 
   // Open conversation
-  const openConversation = (conversationId: string) => {
+  const openConversation = useCallback((conversationId: string) => {
     router.push(`/inbox/${conversationId}`);
-  };
+  }, [router]);
 
   // Get status badge
   const getStatusBadge = (conversation: Conversation) => {
@@ -224,8 +224,8 @@ export default function SupportAgentInbox() {
     }
   };
 
-  // Quick stats data
-  const statsData = [
+  // M7: Memoize stats data to prevent recreation on every render
+  const statsData = useMemo(() => [
     {
       title: "My Conversations",
       value: stats.myConversations.toString(),
@@ -244,7 +244,7 @@ export default function SupportAgentInbox() {
       icon: CheckCircle2,
       change: 0,
     },
-  ];
+  ], [stats]);
 
   return (
     <div className="space-y-6">

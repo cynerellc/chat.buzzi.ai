@@ -3,9 +3,26 @@ import Link from "next/link";
 
 import { Button, Card, CardBody } from "@/components/ui";
 
+// M1: Force static generation for marketing page
+export const dynamic = "force-static";
+export const revalidate = 86400; // Revalidate daily for copyright year
+
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border">
+        <div className="container mx-auto flex items-center justify-between px-4 py-4">
+          <span className="text-xl font-bold">Chat.buzzi.ai</span>
+          <Link
+            href="/login"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Login
+          </Link>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10" />

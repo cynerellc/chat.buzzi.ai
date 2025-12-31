@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 
 import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
+import { withRateLimit } from "@/lib/redis/rate-limit";
 
 const forgotPasswordSchema = z.object({
   email: z.email(),
@@ -12,6 +13,10 @@ const forgotPasswordSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Rate limiting: 10 password reset requests per minute per IP
+    const rateLimitResult = await withRateLimit(request, "auth");
+    if (rateLimitResult) return rateLimitResult;
+
     const body = await request.json();
     const { email } = forgotPasswordSchema.parse(body);
 

@@ -71,7 +71,10 @@ export async function GET() {
       })),
     }));
 
-    return NextResponse.json({ packages: transformedPackages });
+    // L1: Add cache headers - agent packages rarely change
+    const response = NextResponse.json({ packages: transformedPackages });
+    response.headers.set("Cache-Control", "private, max-age=300, stale-while-revalidate=600");
+    return response;
   } catch (error) {
     console.error("Error fetching agent packages:", error);
     return NextResponse.json(

@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 
 import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
+import { withRateLimit } from "@/lib/redis/rate-limit";
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1),
@@ -13,6 +14,10 @@ const resetPasswordSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Rate limiting: 10 password reset attempts per minute per IP
+    const rateLimitResult = await withRateLimit(request, "auth");
+    if (rateLimitResult) return rateLimitResult;
+
     const body = await request.json();
     const { token, password } = resetPasswordSchema.parse(body);
 

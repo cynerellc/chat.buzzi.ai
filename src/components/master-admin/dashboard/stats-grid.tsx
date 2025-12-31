@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Building2, Users, MessageSquare, DollarSign } from "lucide-react";
 
 import { StatCard } from "@/components/shared";
@@ -28,7 +29,8 @@ function formatNumber(value: number): string {
 export function StatsGrid() {
   const { stats, isLoading } = useDashboardStats();
 
-  const statCards = [
+  // M7: Memoize statCards array to prevent recreation on every render
+  const statCards = useMemo(() => [
     {
       title: "Total Companies",
       value: stats ? formatNumber(stats.totalCompanies) : "0",
@@ -61,7 +63,7 @@ export function StatsGrid() {
       iconColor: "text-warning",
       iconBgColor: "bg-warning/10",
     },
-  ];
+  ], [stats]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

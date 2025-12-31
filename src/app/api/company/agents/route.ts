@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
@@ -53,71 +53,62 @@ export async function GET(request: NextRequest) {
       .where(and(...conditions))
       .orderBy(desc(agents.createdAt));
 
-    // Get weekly stats for each agent
+    // H5: Batch query for weekly stats using GROUP BY instead of N+1 queries
+    // This reduces 3N queries to 1 query regardless of the number of agents
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
 
-    const agentList: AgentListItem[] = await Promise.all(
-      companyAgents.map(async (agent) => {
-        // Weekly conversations
-        const [weeklyResult] = await db
-          .select({ count: count() })
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.chatbotId, agent.id),
-              gte(conversations.createdAt, weekAgo)
-            )
-          );
+    const agentIds = companyAgents.map((a) => a.id);
+    const statsMap = new Map<string, { weekly: number; aiResolved: number; totalResolved: number }>();
 
-        // AI resolved this week
-        const [aiResolvedResult] = await db
-          .select({ count: count() })
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.chatbotId, agent.id),
-              eq(conversations.resolutionType, "ai"),
-              gte(conversations.resolvedAt, weekAgo)
-            )
-          );
+    if (agentIds.length > 0) {
+      const batchedStats = await db
+        .select({
+          chatbotId: conversations.chatbotId,
+          // Weekly conversations (created in last 7 days)
+          weekly: sql<number>`COUNT(*) FILTER (WHERE ${conversations.createdAt} >= ${weekAgo})`,
+          // AI resolved this week
+          aiResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} = 'ai' AND ${conversations.resolvedAt} >= ${weekAgo})`,
+          // Total resolved this week
+          totalResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} IS NOT NULL AND ${conversations.resolvedAt} >= ${weekAgo})`,
+        })
+        .from(conversations)
+        .where(inArray(conversations.chatbotId, agentIds))
+        .groupBy(conversations.chatbotId);
 
-        // Total resolved this week
-        const [totalResolvedResult] = await db
-          .select({ count: count() })
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.chatbotId, agent.id),
-              sql`${conversations.resolutionType} IS NOT NULL`,
-              gte(conversations.resolvedAt, weekAgo)
-            )
-          );
+      batchedStats.forEach((stat) => {
+        statsMap.set(stat.chatbotId, {
+          weekly: Number(stat.weekly) || 0,
+          aiResolved: Number(stat.aiResolved) || 0,
+          totalResolved: Number(stat.totalResolved) || 0,
+        });
+      });
+    }
 
-        const totalResolved = totalResolvedResult?.count ?? 0;
-        const aiResolved = aiResolvedResult?.count ?? 0;
-        const aiResolutionRate =
-          totalResolved > 0 ? Math.round((aiResolved / totalResolved) * 100) : 0;
+    // Map results using O(1) lookups
+    const agentList: AgentListItem[] = companyAgents.map((agent) => {
+      const stats = statsMap.get(agent.id) || { weekly: 0, aiResolved: 0, totalResolved: 0 };
+      const aiResolutionRate =
+        stats.totalResolved > 0 ? Math.round((stats.aiResolved / stats.totalResolved) * 100) : 0;
 
-        // Get avatar from first agent in agents_list
-        const agentsList = (agent.agentsList as AgentListItemSchema[]) || [];
-        const primaryAgent = agentsList[0];
+      // Get avatar from first agent in agents_list
+      const agentsList = (agent.agentsList as AgentListItemSchema[]) || [];
+      const primaryAgent = agentsList[0];
 
-        return {
-          id: agent.id,
-          name: agent.name,
-          description: agent.description,
-          avatarUrl: primaryAgent?.avatar_url ?? null,
-          type: agent.type,
-          status: agent.status,
-          totalConversations: agent.totalConversations,
-          weeklyConversations: weeklyResult?.count ?? 0,
-          aiResolutionRate,
-          createdAt: agent.createdAt.toISOString(),
-          updatedAt: agent.updatedAt.toISOString(),
-        };
-      })
-    );
+      return {
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
+        avatarUrl: primaryAgent?.avatar_url ?? null,
+        type: agent.type,
+        status: agent.status,
+        totalConversations: agent.totalConversations,
+        weeklyConversations: stats.weekly,
+        aiResolutionRate,
+        createdAt: agent.createdAt.toISOString(),
+        updatedAt: agent.updatedAt.toISOString(),
+      };
+    });
 
     return NextResponse.json({ agents: agentList });
   } catch (error) {

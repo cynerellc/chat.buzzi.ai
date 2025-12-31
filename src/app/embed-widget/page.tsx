@@ -30,9 +30,11 @@ interface WidgetConfig {
   companyId: string;
   theme: "light" | "dark" | "auto";
   primaryColor: string;
+  accentColor?: string;
   title?: string;
   subtitle?: string;
   avatarUrl?: string;
+  logoUrl?: string;
   welcomeMessage?: string;
   placeholderText?: string;
   showBranding?: boolean;
@@ -58,6 +60,9 @@ interface WidgetConfig {
   // Multi-agent Display Options
   showAgentListOnTop?: boolean;
   agentListMinCards?: number;
+  agentListingType?: "minimal" | "compact" | "standard" | "detailed";
+  // Custom CSS
+  customCss?: string;
 }
 
 interface ThinkingState {
@@ -103,6 +108,8 @@ export default function WidgetPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -122,6 +129,7 @@ export default function WidgetPage() {
     isSupported: isVoiceSupported,
     transcript: voiceTranscript,
     duration: recordingDuration,
+    audioData,
     startRecording,
     stopRecording,
     cancelRecording,
@@ -178,6 +186,20 @@ export default function WidgetPage() {
       }
     }
   }, [activeAgentId, config?.isMultiAgent]);
+
+  // Inject custom CSS if provided
+  useEffect(() => {
+    if (!config?.customCss) return;
+
+    const style = document.createElement("style");
+    style.setAttribute("data-widget-custom-css", "true");
+    style.textContent = config.customCss;
+    document.head.appendChild(style);
+
+    return () => {
+      style.remove();
+    };
+  }, [config?.customCss]);
 
   // Setup parent window communication
   useEffect(() => {
@@ -267,6 +289,7 @@ export default function WidgetPage() {
                 title: jsonConfig.branding?.title,
                 subtitle: jsonConfig.branding?.subtitle,
                 avatarUrl: jsonConfig.branding?.avatarUrl,
+                logoUrl: jsonConfig.branding?.logoUrl,
                 welcomeMessage: jsonConfig.branding?.welcomeMessage,
                 showBranding: jsonConfig.branding?.showBranding ?? true,
                 enableFileUpload: jsonConfig.features?.enableFileUpload ?? false,
@@ -290,6 +313,9 @@ export default function WidgetPage() {
                 // Multi-agent Display Options
                 showAgentListOnTop: jsonConfig.multiAgent?.showAgentListOnTop ?? true,
                 agentListMinCards: jsonConfig.multiAgent?.agentListMinCards ?? 3,
+                agentListingType: jsonConfig.multiAgent?.agentListingType ?? "detailed",
+                // Custom CSS
+                customCss: jsonConfig.customCss,
               };
             }
           }
@@ -605,6 +631,7 @@ export default function WidgetPage() {
       setMessages((prev) => [...prev, userMessage]);
       setInputValue("");
       setIsTyping(true);
+      setIsSending(true);
       setThinkingState(null);
 
       // Add placeholder for streaming response
@@ -686,6 +713,7 @@ export default function WidgetPage() {
         }
 
         setIsTyping(false);
+        setIsSending(false);
         setStreamingMessageId(null);
       } catch {
         // Mark as error
@@ -698,6 +726,7 @@ export default function WidgetPage() {
         setMessages((prev) => prev.filter((m) => m.id !== responseId));
         setError("Failed to send message");
         setIsTyping(false);
+        setIsSending(false);
         setStreamingMessageId(null);
       }
     },
@@ -783,13 +812,20 @@ export default function WidgetPage() {
         style={{ backgroundColor: config.primaryColor }}
       >
         <div className="flex items-center gap-3">
-          {config.avatarUrl && (
+          {/* Logo or Avatar */}
+          {config.logoUrl ? (
+            <img
+              src={config.logoUrl}
+              alt="Logo"
+              className="h-10 w-10 rounded-full object-cover"
+            />
+          ) : config.avatarUrl ? (
             <img
               src={config.avatarUrl}
               alt=""
               className="h-10 w-10 rounded-full object-cover"
             />
-          )}
+          ) : null}
           <div>
             <h1 className="font-semibold text-white">
               {config.title || "Chat Support"}
@@ -799,129 +835,139 @@ export default function WidgetPage() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleMinimize}
-            className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
-            aria-label="Minimize"
+        <button
+          onClick={handleMinimize}
+          className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
+          aria-label="Close"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M19 12H5" />
-            </svg>
-          </button>
-          <button
-            onClick={handleClose}
-            className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
-            aria-label="Close"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
       </header>
 
       {/* Multi-agent horizontal agents list */}
-      {config.isMultiAgent && config.showAgentListOnTop !== false && config.agentsList && config.agentsList.length > 0 && (
-        <div
-          ref={agentsListRef}
-          className={cn(
-            "flex gap-3 px-4 py-3 overflow-x-auto border-b",
-            isDark ? "bg-zinc-800/50 border-zinc-700" : "bg-gray-50 border-gray-200",
-            // Hide scrollbar
-            "scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-          )}
-        >
-          {config.agentsList.map((agent) => (
-            <div
-              key={agent.id}
-              data-agent-id={agent.id}
-              className={cn(
-                "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all shrink-0",
-                activeAgentId !== agent.id && (isDark ? "bg-zinc-700/50" : "bg-white shadow-sm")
-              )}
-              style={
-                activeAgentId === agent.id
-                  ? {
-                      outline: `2px solid ${config.primaryColor}`,
-                      outlineOffset: "2px",
-                      backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "white",
-                    }
-                  : undefined
+      {config.isMultiAgent && config.showAgentListOnTop !== false && config.agentsList && config.agentsList.length > 0 && (() => {
+        const listingType = config.agentListingType || "detailed";
+        const showAvatar = listingType === "standard" || listingType === "detailed";
+        const showDesignation = listingType === "compact" || listingType === "detailed";
+
+        return (
+          <>
+            {/* Opacity pulse animation styles */}
+            <style>{`
+              @keyframes widget-opacity-pulse {
+                0%, 100% {
+                  opacity: 1;
+                }
+                50% {
+                  opacity: 0.6;
+                }
               }
+            `}</style>
+            <div
+              ref={agentsListRef}
+              className={cn(
+                "flex gap-px overflow-x-auto border-b",
+                isDark ? "bg-zinc-800/50 border-zinc-700" : "bg-gray-50 border-gray-200",
+                // Hide scrollbar
+                "scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+              )}
             >
-              <div className="relative">
-                {agent.avatarUrl ? (
-                  <img
-                    src={agent.avatarUrl}
-                    alt={agent.name}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                ) : (
+              {config.agentsList.map((agent) => {
+                const isActive = activeAgentId === agent.id;
+
+                return (
                   <div
-                    className="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium text-sm"
-                    style={{ backgroundColor: config.primaryColor }}
-                  >
-                    {agent.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                {activeAgentId === agent.id && (
-                  <span
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2"
-                    style={{
-                      backgroundColor: "#22c55e",
-                      borderColor: isDark ? "#18181b" : "#f9fafb",
-                    }}
-                  />
-                )}
-              </div>
-              <div className="text-center min-w-0">
-                <p
-                  className={cn(
-                    "text-xs font-medium truncate max-w-[80px]",
-                    activeAgentId === agent.id
-                      ? ""
-                      : isDark
-                      ? "text-zinc-300"
-                      : "text-gray-700"
-                  )}
-                  style={
-                    activeAgentId === agent.id
-                      ? { color: config.primaryColor }
-                      : undefined
-                  }
-                >
-                  {agent.name}
-                </p>
-                {agent.designation && (
-                  <p
+                    key={agent.id}
+                    data-agent-id={agent.id}
                     className={cn(
-                      "text-[10px] truncate max-w-[80px]",
-                      isDark ? "text-zinc-500" : "text-gray-500"
+                      "flex items-center gap-2 px-3 py-2 transition-all shrink-0",
+                      !showAvatar && "py-1.5", // Smaller padding when no avatar
+                      isActive
+                        ? "ring-1 ring-inset"
+                        : (isDark ? "bg-zinc-700/50" : "bg-white shadow-sm")
                     )}
+                    style={
+                      isActive
+                        ? {
+                            animation: "widget-opacity-pulse 2s ease-in-out infinite",
+                            backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "white",
+                            "--tw-ring-color": config.accentColor,
+                          } as React.CSSProperties
+                        : { opacity: 0.5 }
+                    }
                   >
-                    {agent.designation}
-                  </p>
-                )}
-              </div>
+                    {/* Avatar - only show for standard and detailed */}
+                    {showAvatar && (
+                      <div className="shrink-0">
+                        {agent.avatarUrl ? (
+                          <img
+                            src={agent.avatarUrl}
+                            alt={agent.name}
+                            className={cn(
+                              "h-6 w-6 rounded-full object-cover",
+                              isActive && "ring-2 ring-green-500"
+                            )}
+                          />
+                        ) : (
+                          <div
+                            className={cn(
+                              "h-6 w-6 rounded-full flex items-center justify-center text-white font-medium text-[10px]",
+                              isActive && "ring-2 ring-green-500"
+                            )}
+                            style={{ backgroundColor: config.accentColor || config.primaryColor }}
+                          >
+                            {agent.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Name and designation */}
+                    <div className={cn("min-w-0", !showAvatar && "text-center")}>
+                      <p
+                        className={cn(
+                          "text-xs font-medium truncate max-w-[80px]",
+                          isActive
+                            ? ""
+                            : isDark
+                            ? "text-zinc-300"
+                            : "text-gray-700"
+                        )}
+                        style={
+                          isActive
+                            ? { color: config.accentColor }
+                            : undefined
+                        }
+                      >
+                        {agent.name}
+                      </p>
+                      {/* Designation - only show for compact and detailed */}
+                      {showDesignation && agent.designation && (
+                        <p
+                          className={cn(
+                            "text-[10px] truncate max-w-[80px]",
+                            isDark ? "text-zinc-500" : "text-gray-500"
+                          )}
+                        >
+                          {agent.designation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      )}
+          </>
+        );
+      })()}
 
       {/* Messages */}
       <div
@@ -1234,85 +1280,47 @@ export default function WidgetPage() {
           isDark ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-white"
         )}
       >
-        {/* Recording Overlay */}
-        {isRecording && (
-          <div
-            className={cn(
-              "mb-3 rounded-xl p-4",
-              isDark ? "bg-zinc-800" : "bg-gray-100"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div
-                  className="h-10 w-10 rounded-full flex items-center justify-center animate-pulse"
-                  style={{ backgroundColor: `${config.primaryColor}20` }}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={config.primaryColor}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" x2="12" y1="19" y2="22" />
-                  </svg>
+        <div
+          className={cn(
+            "flex items-end gap-2 rounded-2xl px-4 py-2 transition-all",
+            isDark ? "bg-zinc-800" : "bg-gray-100",
+            isFocused && "ring-2"
+          )}
+          style={isFocused ? { "--tw-ring-color": config.primaryColor } as React.CSSProperties : undefined}
+        >
+          {/* Recording waveform - replaces textarea when recording */}
+          {isRecording ? (
+            <>
+              {/* Audio waveform visualization */}
+              <div className="flex-1 flex items-center gap-2 py-1">
+                <div className="flex items-center justify-center gap-0.5 h-6 flex-1">
+                  {(audioData.length > 0 ? audioData.slice(0, 24) : Array(24).fill(0)).map((value, i) => (
+                    <div
+                      key={i}
+                      className="w-1 rounded-full transition-all duration-75"
+                      style={{
+                        height: `${Math.max(4, (value / 255) * 20)}px`,
+                        backgroundColor: config.primaryColor,
+                      }}
+                    />
+                  ))}
                 </div>
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                  <span
-                    className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                    style={{ backgroundColor: "#ef4444" }}
-                  />
-                  <span
-                    className="relative inline-flex rounded-full h-3 w-3"
-                    style={{ backgroundColor: "#ef4444" }}
-                  />
+                <span
+                  className={cn(
+                    "text-xs font-medium shrink-0",
+                    isDark ? "text-zinc-400" : "text-gray-500"
+                  )}
+                >
+                  {Math.floor(recordingDuration / 60)}:
+                  {(recordingDuration % 60).toString().padStart(2, "0")}
                 </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium">Recording...</span>
-                  <span
-                    className={cn(
-                      "text-xs",
-                      isDark ? "text-zinc-400" : "text-gray-500"
-                    )}
-                  >
-                    {Math.floor(recordingDuration / 60)}:
-                    {(recordingDuration % 60).toString().padStart(2, "0")}
-                  </span>
-                </div>
-                {voiceTranscript && (
-                  <p
-                    className={cn(
-                      "text-sm truncate",
-                      isDark ? "text-zinc-300" : "text-gray-600"
-                    )}
-                  >
-                    {voiceTranscript}
-                  </p>
-                )}
-                {!voiceTranscript && (
-                  <p
-                    className={cn(
-                      "text-sm italic",
-                      isDark ? "text-zinc-500" : "text-gray-400"
-                    )}
-                  >
-                    Speak now...
-                  </p>
-                )}
-              </div>
+              {/* Cancel button */}
               <button
                 type="button"
                 onClick={cancelRecording}
                 className={cn(
-                  "rounded-full p-2 transition-colors",
+                  "rounded-full p-2 transition-colors shrink-0",
                   isDark
                     ? "hover:bg-zinc-700 text-zinc-400"
                     : "hover:bg-gray-200 text-gray-500"
@@ -1320,8 +1328,8 @@ export default function WidgetPage() {
                 aria-label="Cancel recording"
               >
                 <svg
-                  width="18"
-                  height="18"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1330,105 +1338,85 @@ export default function WidgetPage() {
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
-            </div>
-            <p
-              className={cn(
-                "text-xs mt-2 text-center",
-                isDark ? "text-zinc-500" : "text-gray-400"
-              )}
-            >
-              Release to send • Click X to cancel
-            </p>
-          </div>
-        )}
-
-        <div
-          className={cn(
-            "flex items-end gap-2 rounded-2xl px-4 py-2",
-            isDark ? "bg-zinc-800" : "bg-gray-100",
-            isRecording && "opacity-50 pointer-events-none"
+            </>
+          ) : (
+            <>
+              {/* Text input */}
+              <textarea
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder={config.placeholderText || "Type a message..."}
+                rows={1}
+                className={cn(
+                  "max-h-[4.5rem] flex-1 resize-none bg-transparent py-1 outline-none",
+                  isDark ? "placeholder:text-zinc-500" : "placeholder:text-gray-400"
+                )}
+              />
+              {/* Processing spinner / Voice button / Send button */}
+              {isSending ? (
+                <div className="rounded-full p-2 shrink-0">
+                  <div
+                    className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent"
+                    style={{ borderColor: `${config.primaryColor} transparent transparent transparent` }}
+                  />
+                </div>
+              ) : inputValue.trim() ? (
+                <button
+                  type="submit"
+                  className="rounded-full p-2 transition-colors text-white shrink-0"
+                  style={{ backgroundColor: config.primaryColor }}
+                  aria-label="Send message"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M22 2L11 13" />
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                  </svg>
+                </button>
+              ) : config.enableVoice && isVoiceSupported ? (
+                <button
+                  type="button"
+                  onMouseDown={startRecording}
+                  onMouseUp={stopRecording}
+                  onMouseLeave={stopRecording}
+                  onTouchStart={startRecording}
+                  onTouchEnd={stopRecording}
+                  className={cn(
+                    "rounded-full p-2 transition-colors shrink-0",
+                    isDark
+                      ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
+                      : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+                  )}
+                  aria-label="Hold to record voice message"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </button>
+              ) : null}
+            </>
           )}
-        >
-          {/* Push-to-talk microphone button */}
-          {config.enableVoice && isVoiceSupported && (
-            <button
-              type="button"
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onMouseLeave={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
-              className={cn(
-                "rounded-full p-2 transition-colors shrink-0",
-                isRecording
-                  ? "text-white"
-                  : isDark
-                  ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
-                  : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
-              )}
-              style={
-                isRecording ? { backgroundColor: config.primaryColor } : undefined
-              }
-              aria-label="Hold to record voice message"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
-            </button>
-          )}
-          <textarea
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={config.placeholderText || "Type a message..."}
-            rows={1}
-            className={cn(
-              "max-h-32 flex-1 resize-none bg-transparent py-1 outline-none",
-              isDark ? "placeholder:text-zinc-500" : "placeholder:text-gray-400"
-            )}
-          />
-          <button
-            type="submit"
-            disabled={!inputValue.trim()}
-            className={cn(
-              "rounded-full p-2 transition-colors",
-              inputValue.trim()
-                ? "text-white"
-                : isDark
-                ? "text-zinc-600"
-                : "text-gray-400"
-            )}
-            style={
-              inputValue.trim()
-                ? { backgroundColor: config.primaryColor }
-                : undefined
-            }
-            aria-label="Send message"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M22 2L11 13" />
-              <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-            </svg>
-          </button>
         </div>
       </form>
 

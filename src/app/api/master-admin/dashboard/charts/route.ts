@@ -86,37 +86,40 @@ export async function GET(request: Request) {
         .from(subscriptionPlans)
         .where(eq(subscriptionPlans.isActive, true));
 
-      // Get count per plan
-      const distribution: PlanDistributionItem[] = [];
-
-      for (const plan of plans) {
-        const [countResult] = await db
+      // H3: Get all plan counts in parallel plus trial count
+      const [planCounts, [trialCount]] = await Promise.all([
+        // Get all plan subscription counts in parallel
+        Promise.all(
+          plans.map(async (plan) => {
+            const [countResult] = await db
+              .select({ count: count() })
+              .from(companySubscriptions)
+              .where(
+                and(
+                  eq(companySubscriptions.planId, plan.id),
+                  eq(companySubscriptions.status, "active")
+                )
+              );
+            return {
+              name: plan.name,
+              value: countResult?.count ?? 0,
+              color: planColors[plan.slug.toLowerCase()] ?? "#6366F1",
+            };
+          })
+        ),
+        // Get trial companies count
+        db
           .select({ count: count() })
-          .from(companySubscriptions)
+          .from(companies)
           .where(
             and(
-              eq(companySubscriptions.planId, plan.id),
-              eq(companySubscriptions.status, "active")
+              sql`${companies.deletedAt} IS NULL`,
+              eq(companies.status, "trial")
             )
-          );
+          ),
+      ]);
 
-        distribution.push({
-          name: plan.name,
-          value: countResult?.count ?? 0,
-          color: planColors[plan.slug.toLowerCase()] ?? "#6366F1",
-        });
-      }
-
-      // Add trial companies (those without active subscription)
-      const [trialCount] = await db
-        .select({ count: count() })
-        .from(companies)
-        .where(
-          and(
-            sql`${companies.deletedAt} IS NULL`,
-            eq(companies.status, "trial")
-          )
-        );
+      const distribution: PlanDistributionItem[] = [...planCounts];
 
       if (trialCount && trialCount.count > 0) {
         distribution.push({

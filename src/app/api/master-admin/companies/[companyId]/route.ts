@@ -100,86 +100,93 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    // Get admin user (first company_admin for this company)
-    const [admin] = await db
-      .select({
-        id: users.id,
-        name: users.name,
-        email: users.email,
-      })
-      .from(users)
-      .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
-      .where(
-        and(
-          eq(companyPermissions.companyId, companyId),
-          eq(companyPermissions.role, "chatapp.company_admin"),
-          sql`${users.deletedAt} IS NULL`
+    // H1: Parallelize all independent queries after company validation
+    const [
+      [admin],
+      [usersCount],
+      [agentsCount],
+      [conversationsCount],
+      [messagesCount],
+      [subscription],
+    ] = await Promise.all([
+      // Get admin user (first company_admin for this company)
+      db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        })
+        .from(users)
+        .innerJoin(companyPermissions, eq(users.id, companyPermissions.userId))
+        .where(
+          and(
+            eq(companyPermissions.companyId, companyId),
+            eq(companyPermissions.role, "chatapp.company_admin"),
+            sql`${users.deletedAt} IS NULL`
+          )
         )
-      )
-      .limit(1);
+        .limit(1),
 
-    // Get stats
-    const [usersCount] = await db
-      .select({ count: count() })
-      .from(companyPermissions)
-      .innerJoin(users, eq(companyPermissions.userId, users.id))
-      .where(
-        and(
-          eq(companyPermissions.companyId, companyId),
-          sql`${users.deletedAt} IS NULL`
-        )
-      );
+      // Get users count
+      db
+        .select({ count: count() })
+        .from(companyPermissions)
+        .innerJoin(users, eq(companyPermissions.userId, users.id))
+        .where(
+          and(
+            eq(companyPermissions.companyId, companyId),
+            sql`${users.deletedAt} IS NULL`
+          )
+        ),
 
-    const [agentsCount] = await db
-      .select({ count: count() })
-      .from(agents)
-      .where(
-        and(
-          eq(agents.companyId, companyId),
-          sql`${agents.deletedAt} IS NULL`
-        )
-      );
+      // Get agents count
+      db
+        .select({ count: count() })
+        .from(agents)
+        .where(
+          and(
+            eq(agents.companyId, companyId),
+            sql`${agents.deletedAt} IS NULL`
+          )
+        ),
 
-    const [conversationsCount] = await db
-      .select({ count: count() })
-      .from(conversations)
-      .where(eq(conversations.companyId, companyId));
+      // Get conversations count
+      db
+        .select({ count: count() })
+        .from(conversations)
+        .where(eq(conversations.companyId, companyId)),
 
-    // Get message count through conversations
-    const companyConversations = await db
-      .select({ id: conversations.id })
-      .from(conversations)
-      .where(eq(conversations.companyId, companyId));
-
-    let messagesTotal = 0;
-    if (companyConversations.length > 0) {
-      const conversationIds = companyConversations.map((c) => c.id);
-      const [messagesCount] = await db
+      // Get message count using subquery (single query instead of two-step)
+      db
         .select({ count: count() })
         .from(messages)
-        .where(inArray(messages.conversationId, conversationIds));
-      messagesTotal = messagesCount?.count ?? 0;
-    }
+        .where(
+          inArray(
+            messages.conversationId,
+            db.select({ id: conversations.id }).from(conversations).where(eq(conversations.companyId, companyId))
+          )
+        ),
 
-    // Get subscription
-    const [subscription] = await db
-      .select({
-        id: companySubscriptions.id,
-        planId: companySubscriptions.planId,
-        planName: subscriptionPlans.name,
-        status: companySubscriptions.status,
-        billingCycle: companySubscriptions.billingCycle,
-        currentPrice: companySubscriptions.currentPrice,
-        currentPeriodStart: companySubscriptions.currentPeriodStart,
-        currentPeriodEnd: companySubscriptions.currentPeriodEnd,
-      })
-      .from(companySubscriptions)
-      .innerJoin(
-        subscriptionPlans,
-        eq(companySubscriptions.planId, subscriptionPlans.id)
-      )
-      .where(eq(companySubscriptions.companyId, companyId))
-      .limit(1);
+      // Get subscription
+      db
+        .select({
+          id: companySubscriptions.id,
+          planId: companySubscriptions.planId,
+          planName: subscriptionPlans.name,
+          status: companySubscriptions.status,
+          billingCycle: companySubscriptions.billingCycle,
+          currentPrice: companySubscriptions.currentPrice,
+          currentPeriodStart: companySubscriptions.currentPeriodStart,
+          currentPeriodEnd: companySubscriptions.currentPeriodEnd,
+        })
+        .from(companySubscriptions)
+        .innerJoin(
+          subscriptionPlans,
+          eq(companySubscriptions.planId, subscriptionPlans.id)
+        )
+        .where(eq(companySubscriptions.companyId, companyId))
+        .limit(1),
+    ]);
 
     const response: CompanyDetails = {
       id: company.id,
@@ -202,7 +209,7 @@ export async function GET(request: Request, context: RouteContext) {
         users: usersCount?.count ?? 0,
         agents: agentsCount?.count ?? 0,
         conversations: conversationsCount?.count ?? 0,
-        messages: messagesTotal,
+        messages: messagesCount?.count ?? 0,
       },
       subscription: subscription
         ? {

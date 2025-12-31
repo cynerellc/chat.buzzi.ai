@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, count, eq, gte, sql } from "drizzle-orm";
+import { eq, gte, inArray, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
@@ -47,60 +47,50 @@ export async function GET() {
       };
     });
 
-    // Get conversation stats for each agent
-    const agentOverviews: AgentOverview[] = await Promise.all(
-      companyAgents.map(async (agent) => {
-        // Today's conversations
-        const [todayConversationsResult] = await db
-          .select({ count: count() })
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.chatbotId, agent.id),
-              gte(conversations.createdAt, today)
-            )
-          );
+    // C5: Fix N+1 - batch query for all agent stats using GROUP BY
+    const agentIds = companyAgents.map((a) => a.id);
+    let statsMap: Map<string, { todayConversations: number; aiResolved: number; totalResolved: number }> = new Map();
 
-        // AI resolved conversations today
-        const [aiResolvedResult] = await db
-          .select({ count: count() })
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.chatbotId, agent.id),
-              eq(conversations.resolutionType, "ai"),
-              gte(conversations.resolvedAt, today)
-            )
-          );
+    if (agentIds.length > 0) {
+      const batchedStats = await db
+        .select({
+          chatbotId: conversations.chatbotId,
+          todayConversations: sql<number>`COUNT(*) FILTER (WHERE ${conversations.createdAt} >= ${today})`,
+          aiResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} = 'ai' AND ${conversations.resolvedAt} >= ${today})`,
+          totalResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} IS NOT NULL AND ${conversations.resolvedAt} >= ${today})`,
+        })
+        .from(conversations)
+        .where(inArray(conversations.chatbotId, agentIds))
+        .groupBy(conversations.chatbotId);
 
-        // Total resolved today
-        const [totalResolvedResult] = await db
-          .select({ count: count() })
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.chatbotId, agent.id),
-              sql`${conversations.resolutionType} IS NOT NULL`,
-              gte(conversations.resolvedAt, today)
-            )
-          );
+      statsMap = new Map(
+        batchedStats.map((s) => [
+          s.chatbotId,
+          {
+            todayConversations: Number(s.todayConversations) || 0,
+            aiResolved: Number(s.aiResolved) || 0,
+            totalResolved: Number(s.totalResolved) || 0,
+          },
+        ])
+      );
+    }
 
-        const totalResolved = totalResolvedResult?.count ?? 0;
-        const aiResolved = aiResolvedResult?.count ?? 0;
-        const aiResolutionRate =
-          totalResolved > 0 ? Math.round((aiResolved / totalResolved) * 100) : 0;
+    // Build agent overviews using batched stats
+    const agentOverviews: AgentOverview[] = companyAgents.map((agent) => {
+      const stats = statsMap.get(agent.id) || { todayConversations: 0, aiResolved: 0, totalResolved: 0 };
+      const aiResolutionRate =
+        stats.totalResolved > 0 ? Math.round((stats.aiResolved / stats.totalResolved) * 100) : 0;
 
-        return {
-          id: agent.id,
-          name: agent.name,
-          avatarUrl: agent.avatarUrl,
-          status: agent.status as "active" | "paused" | "draft",
-          type: agent.type,
-          todayConversations: todayConversationsResult?.count ?? 0,
-          aiResolutionRate,
-        };
-      })
-    );
+      return {
+        id: agent.id,
+        name: agent.name,
+        avatarUrl: agent.avatarUrl,
+        status: agent.status as "active" | "paused" | "draft",
+        type: agent.type,
+        todayConversations: stats.todayConversations,
+        aiResolutionRate,
+      };
+    });
 
     return NextResponse.json({ agents: agentOverviews });
   } catch (error) {

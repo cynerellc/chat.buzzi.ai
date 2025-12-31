@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, type Key } from "react";
+import { useState, useMemo, useCallback, memo, type Key } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -53,7 +53,8 @@ const typeConfig: Record<string, { label: string; color: string }> = {
   custom: { label: "Custom", color: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
 };
 
-export function AgentCard({
+// H7: Wrap with React.memo to prevent unnecessary re-renders when parent updates
+export const AgentCard = memo(function AgentCard({
   agent,
   onDuplicate,
   onDelete,
@@ -84,7 +85,8 @@ export function AgentCard({
     return items;
   }, [agent.id, agent.status, basePath]);
 
-  const handleDropdownAction = (key: Key) => {
+  // H8: Wrap handler with useCallback to prevent unnecessary re-renders
+  const handleDropdownAction = useCallback((key: Key) => {
     switch (key) {
       case "duplicate":
         onDuplicate(agent.id);
@@ -99,7 +101,7 @@ export function AgentCard({
         setShowDeleteDialog(true);
         break;
     }
-  };
+  }, [agent.id, onDuplicate, onStatusChange]);
 
   return (
     <>
@@ -218,4 +220,4 @@ export function AgentCard({
       />
     </>
   );
-}
+});

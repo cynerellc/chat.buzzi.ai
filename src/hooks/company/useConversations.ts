@@ -1,9 +1,17 @@
+import { useEffect, useRef } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import type { ConversationListItem } from "@/app/api/company/conversations/route";
 import type { ConversationDetail } from "@/app/api/company/conversations/[conversationId]/route";
 import type { MessageItem } from "@/app/api/company/conversations/[conversationId]/messages/route";
+import {
+  isRealtimeConfigured,
+  subscribeToConversationMessages,
+  unsubscribe,
+  type MessagePayload,
+} from "@/lib/supabase/realtime";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -109,12 +117,89 @@ interface MessagesResponse {
   };
 }
 
-export function useConversationMessages(conversationId: string | null, page: number = 1) {
+/**
+ * Hook to fetch and subscribe to conversation messages
+ * Uses Supabase Realtime when available, falls back to polling otherwise
+ *
+ * @param conversationId - The conversation to fetch messages for
+ * @param page - Page number for pagination
+ * @param sessionId - Optional session ID for widget users (used for Realtime filtering)
+ */
+export function useConversationMessages(
+  conversationId: string | null,
+  page: number = 1,
+  sessionId?: string
+) {
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
   const { data, error, isLoading, mutate } = useSWR<MessagesResponse>(
     conversationId ? `/api/company/conversations/${conversationId}/messages?page=${page}` : null,
     fetcher,
-    { refreshInterval: 5000 } // Refresh every 5 seconds for real-time messages
+    {
+      // Use long polling interval when realtime is configured (as fallback only)
+      // Otherwise use 5 second polling
+      refreshInterval: isRealtimeConfigured() ? 60000 : 5000,
+      revalidateOnFocus: !isRealtimeConfigured(),
+    }
   );
+
+  // Set up Supabase Realtime subscription when available
+  useEffect(() => {
+    if (!conversationId || !isRealtimeConfigured()) {
+      return;
+    }
+
+    // Subscribe to real-time message updates
+    const channel = subscribeToConversationMessages(
+      conversationId,
+      sessionId ?? conversationId, // Use conversationId as fallback for session
+      (payload: MessagePayload) => {
+        if (payload.eventType === "INSERT") {
+          // Optimistically add new message
+          mutate(
+            (current) => {
+              if (!current) return current;
+              const newMessage: MessageItem = {
+                id: payload.new.id,
+                role: payload.new.role,
+                type: payload.new.type,
+                content: payload.new.content,
+                createdAt: payload.new.created_at,
+                tokenCount: payload.new.token_count ?? null,
+                attachments: [],
+                modelId: null,
+                processingTimeMs: null,
+                toolCalls: [],
+                toolResults: [],
+                sourceChunkIds: [],
+                isRead: false,
+                readAt: null,
+                user: null,
+              };
+              return {
+                ...current,
+                messages: [...current.messages, newMessage],
+              };
+            },
+            { revalidate: false }
+          );
+        } else if (payload.eventType === "UPDATE" || payload.eventType === "DELETE") {
+          // Revalidate on updates/deletes to get fresh data
+          mutate();
+        }
+      }
+    );
+
+    channelRef.current = channel;
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (channelRef.current) {
+        unsubscribe(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [conversationId, sessionId, mutate]);
 
   return {
     messages: data?.messages ?? [],

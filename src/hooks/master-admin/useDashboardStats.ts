@@ -18,7 +18,7 @@ export function useDashboardStats() {
     fetcher,
     {
       refreshInterval: 60000, // Refresh every 60 seconds
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // M8: Prevent extra fetches on tab focus
     }
   );
 

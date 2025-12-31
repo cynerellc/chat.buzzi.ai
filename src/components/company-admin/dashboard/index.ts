@@ -5,3 +5,4 @@ export { RecentConversations } from "./recent-conversations";
 export { QuickActions } from "./quick-actions";
 export { UsageOverview } from "./usage-overview";
 export { ActivityFeed } from "./activity-feed";
+export { PageTitleSetter } from "./page-title-setter";

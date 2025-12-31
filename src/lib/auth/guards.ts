@@ -4,6 +4,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { auth } from "./index";
 import { db } from "@/lib/db";
 import { companyPermissions, companies, type Company } from "@/lib/db/schema";
+import { getCachedCompanyPermission } from "@/lib/redis/permissions";
 import type { CompanyPermissionRole, UserRole } from "./role-utils";
 import { getActiveCompanyId, clearActiveCompany } from "./tenant";
 
@@ -60,20 +61,15 @@ export async function requireMasterAdmin() {
 
 /**
  * Get the user's permission for a specific company
+ * Uses Redis cache when available, falls back to database
  * Returns null if user has no permission
  */
 export async function getCompanyPermission(
   userId: string,
   companyId: string
 ): Promise<CompanyPermissionRole | null> {
-  const permission = await db.query.companyPermissions.findFirst({
-    where: and(
-      eq(companyPermissions.userId, userId),
-      eq(companyPermissions.companyId, companyId)
-    ),
-  });
-
-  return permission?.role as CompanyPermissionRole | null;
+  // Use cached version which handles cache miss gracefully
+  return getCachedCompanyPermission(userId, companyId);
 }
 
 /**

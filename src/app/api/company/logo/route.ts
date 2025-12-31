@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getSupabaseClient, STORAGE_BUCKET } from "@/lib/supabase/client";
+import { getSupabaseClient, getSignedStorageUrl, STORAGE_BUCKET } from "@/lib/supabase/client";
 
 /**
  * Get the storage path for company logo
@@ -68,11 +68,14 @@ export async function POST(request: NextRequest) {
     const storagePath = getLogoStoragePath(companyId, extension);
 
     // Delete old logo files first (different extensions might exist)
+    // M4: Parallelize deletion instead of sequential loop
     const oldExtensions = ["jpg", "png", "gif", "webp"];
-    for (const ext of oldExtensions) {
-      const oldPath = getLogoStoragePath(companyId, ext);
-      await supabase.storage.from(STORAGE_BUCKET).remove([oldPath]);
-    }
+    await Promise.all(
+      oldExtensions.map((ext) => {
+        const oldPath = getLogoStoragePath(companyId, ext);
+        return supabase.storage.from(STORAGE_BUCKET).remove([oldPath]);
+      })
+    );
 
     // Upload new logo
     const { data, error } = await supabase.storage
@@ -90,15 +93,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(storagePath);
+    // Get signed URL (for private bucket)
+    const signedUrl = await getSignedStorageUrl(storagePath);
+    if (!signedUrl) {
+      return NextResponse.json(
+        { error: "Failed to generate signed URL for logo" },
+        { status: 500 }
+      );
+    }
 
+    // L2: Only return logoUrl, remove redundant path field
     return NextResponse.json({
       success: true,
-      logoUrl: urlData.publicUrl,
-      path: data.path,
+      logoUrl: signedUrl,
     });
   } catch (error) {
     console.error("Logo upload error:", error);

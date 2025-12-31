@@ -18,7 +18,7 @@ export function useRecentCompanies(limit: number = 5) {
     fetcher,
     {
       refreshInterval: 60000,
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // H12: Prevent duplicate fetches on tab focus
     }
   );
 

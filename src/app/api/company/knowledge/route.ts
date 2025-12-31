@@ -66,9 +66,23 @@ export async function GET(request: NextRequest) {
       .from(knowledgeSources)
       .where(and(...conditions));
 
-    // Get sources
+    // Get sources - M5: Only select fields needed for list response
+    // Excludes sourceConfig (can contain large text content) and metadata
     const sources = await db
-      .select()
+      .select({
+        id: knowledgeSources.id,
+        name: knowledgeSources.name,
+        description: knowledgeSources.description,
+        type: knowledgeSources.type,
+        status: knowledgeSources.status,
+        category: knowledgeSources.category,
+        chunkCount: knowledgeSources.chunkCount,
+        tokenCount: knowledgeSources.tokenCount,
+        processingError: knowledgeSources.processingError,
+        lastProcessedAt: knowledgeSources.lastProcessedAt,
+        createdAt: knowledgeSources.createdAt,
+        updatedAt: knowledgeSources.updatedAt,
+      })
       .from(knowledgeSources)
       .where(and(...conditions))
       .orderBy(desc(knowledgeSources.createdAt))

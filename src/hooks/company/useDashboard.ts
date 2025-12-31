@@ -73,7 +73,7 @@ export function useDashboardStats() {
     fetcher,
     {
       refreshInterval: 30000, // Refresh every 30 seconds
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // H12: Prevent duplicate fetches on tab focus
     }
   );
 
@@ -94,6 +94,7 @@ export function useAgentsOverview() {
     fetcher,
     {
       refreshInterval: 60000,
+      revalidateOnFocus: false, // H12: Prevent duplicate fetches on tab focus
     }
   );
 
@@ -113,6 +114,7 @@ export function useRecentConversations(limit: number = 5) {
     conversations: RecentConversation[];
   }>(`/api/company/dashboard/conversations?limit=${limit}`, fetcher, {
     refreshInterval: 15000, // Refresh every 15 seconds
+    revalidateOnFocus: false, // H12: Prevent duplicate fetches on tab focus
   });
 
   return {
@@ -131,6 +133,7 @@ export function useActivityFeed(limit: number = 10) {
     activities: ActivityItem[];
   }>(`/api/company/dashboard/activity?limit=${limit}`, fetcher, {
     refreshInterval: 60000,
+    revalidateOnFocus: false, // H12: Prevent duplicate fetches on tab focus
   });
 
   return {
@@ -150,6 +153,7 @@ export function useUsageOverview() {
     fetcher,
     {
       refreshInterval: 300000, // Refresh every 5 minutes
+      revalidateOnFocus: false, // H12: Prevent duplicate fetches on tab focus
     }
   );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -22,7 +22,8 @@ export default function ChatbotsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const { agents: chatbots, isLoading, mutate } = useAgents(statusFilter);
 
-  const handleDuplicate = async (chatbotId: string) => {
+  // H8: Wrap handlers with useCallback to prevent recreation on every render
+  const handleDuplicate = useCallback(async (chatbotId: string) => {
     try {
       const response = await fetch(`/api/company/agents/${chatbotId}/duplicate`, {
         method: "POST",
@@ -33,9 +34,9 @@ export default function ChatbotsPage() {
     } catch {
       addToast({ title: "Failed to duplicate chatbot", color: "danger" });
     }
-  };
+  }, [mutate]);
 
-  const handleDelete = async (chatbotId: string) => {
+  const handleDelete = useCallback(async (chatbotId: string) => {
     try {
       const response = await fetch(`/api/company/agents/${chatbotId}`, {
         method: "DELETE",
@@ -46,9 +47,9 @@ export default function ChatbotsPage() {
     } catch {
       addToast({ title: "Failed to delete chatbot", color: "danger" });
     }
-  };
+  }, [mutate]);
 
-  const handleStatusChange = async (
+  const handleStatusChange = useCallback(async (
     chatbotId: string,
     status: "active" | "paused"
   ) => {
@@ -67,7 +68,7 @@ export default function ChatbotsPage() {
     } catch {
       addToast({ title: "Failed to update chatbot status", color: "danger" });
     }
-  };
+  }, [mutate]);
 
   return (
     <div className="space-y-6 p-6">

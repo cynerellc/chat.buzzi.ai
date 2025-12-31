@@ -10,6 +10,7 @@ import { agents } from "@/lib/db/schema/chatbots";
 import { companies } from "@/lib/db/schema/companies";
 import { conversations, endUsers } from "@/lib/db/schema/conversations";
 import { eq, and } from "drizzle-orm";
+import { withRateLimit } from "@/lib/redis/rate-limit";
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
@@ -20,6 +21,10 @@ const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 60 session creations per minute per IP (uses widget limiter)
+    const rateLimitResult = await withRateLimit(request, "widget");
+    if (rateLimitResult) return rateLimitResult;
+
     const body = (await request.json()) as CreateSessionRequest;
     const { agentId, companyId, customer, pageUrl, referrer, userAgent } = body;
 

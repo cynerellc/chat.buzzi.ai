@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 
 import { db } from "@/lib/db";
 import { companies, companyPermissions, companySubscriptions, subscriptionPlans, users } from "@/lib/db/schema";
+import { withRateLimit } from "@/lib/redis/rate-limit";
 
 const registerSchema = z.object({
   companyName: z.string().min(2),
@@ -15,6 +16,10 @@ const registerSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Rate limiting: 10 registrations per minute per IP
+    const rateLimitResult = await withRateLimit(request, "auth");
+    if (rateLimitResult) return rateLimitResult;
+
     const body = await request.json();
     const { companyName, fullName, email, password } = registerSchema.parse(body);
 

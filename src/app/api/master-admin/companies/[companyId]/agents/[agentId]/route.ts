@@ -110,27 +110,25 @@ export async function GET(request: NextRequest, context: RouteContext) {
       temperature: primaryAgent?.default_temperature ?? 70,
     };
 
-    // Get conversation count
-    const [convCount] = await db
-      .select({ count: count() })
-      .from(conversations)
-      .where(eq(conversations.chatbotId, agentId));
+    // H2: Parallelize conversation and message counts
+    const [[convCount], [msgCount]] = await Promise.all([
+      // Get conversation count
+      db
+        .select({ count: count() })
+        .from(conversations)
+        .where(eq(conversations.chatbotId, agentId)),
 
-    // Get message count
-    const agentConversations = await db
-      .select({ id: conversations.id })
-      .from(conversations)
-      .where(eq(conversations.chatbotId, agentId));
-
-    let msgCount = 0;
-    if (agentConversations.length > 0) {
-      const conversationIds = agentConversations.map((c) => c.id);
-      const [messagesCount] = await db
+      // Get message count using subquery (single query instead of two-step)
+      db
         .select({ count: count() })
         .from(messages)
-        .where(inArray(messages.conversationId, conversationIds));
-      msgCount = messagesCount?.count ?? 0;
-    }
+        .where(
+          inArray(
+            messages.conversationId,
+            db.select({ id: conversations.id }).from(conversations).where(eq(conversations.chatbotId, agentId))
+          )
+        ),
+    ]);
 
     const response: AgentDetails = {
       id: agent.id,
@@ -145,7 +143,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       status: agent.status,
       escalationEnabled: agent.escalationEnabled,
       conversationCount: convCount?.count ?? 0,
-      messageCount: msgCount,
+      messageCount: msgCount?.count ?? 0,
       createdAt: agent.createdAt.toISOString(),
       updatedAt: agent.updatedAt.toISOString(),
       agentsList: (agentRow.agentsList as AgentListItem[]) ?? [],

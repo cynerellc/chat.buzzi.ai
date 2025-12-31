@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { conversations, messages } from "@/lib/db/schema/conversations";
 import { eq } from "drizzle-orm";
 import { getAgentRunner } from "@/lib/ai";
+import { withRateLimit } from "@/lib/redis/rate-limit";
 import type { SendMessageRequest } from "@/lib/widget/types";
 
 interface RouteParams {
@@ -21,6 +22,11 @@ export async function POST(
 ) {
   try {
     const { sessionId } = await params;
+
+    // Rate limiting: 60 requests per minute per session
+    const rateLimitResult = await withRateLimit(request, "widget", sessionId);
+    if (rateLimitResult) return rateLimitResult;
+
     const body = (await request.json()) as SendMessageRequest;
     const { content, attachments } = body;
 

@@ -29,7 +29,7 @@ export function useCompany(companyId: string | null): UseCompanyReturn {
     companyId ? `/api/master-admin/companies/${companyId}` : null,
     fetcher,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // H11: Prevent duplicate fetches on tab focus
     }
   );
 
@@ -56,7 +56,7 @@ export function useCompanyUsers(companyId: string | null): UseCompanyUsersReturn
     companyId ? `/api/master-admin/companies/${companyId}/users` : null,
     fetcher,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // H11: Prevent duplicate fetches on tab focus
     }
   );
 
@@ -85,7 +85,7 @@ export function useCompanySubscription(
     companyId ? `/api/master-admin/companies/${companyId}/subscription` : null,
     fetcher,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // H11: Prevent duplicate fetches on tab focus
     }
   );
 

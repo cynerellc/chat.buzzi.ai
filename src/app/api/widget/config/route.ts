@@ -158,12 +158,14 @@ export async function GET(request: NextRequest) {
       })) : undefined,
     };
 
-    // Set CORS headers
+    // Set CORS and cache headers
     const res = NextResponse.json({ config });
     if (origin) {
       res.headers.set("Access-Control-Allow-Origin", origin);
       res.headers.set("Access-Control-Allow-Credentials", "true");
     }
+    // L1: Add cache headers for CDN and browser caching
+    res.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
 
     return res;
   } catch (error) {

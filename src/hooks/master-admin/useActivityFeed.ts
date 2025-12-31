@@ -24,7 +24,7 @@ export function useActivityFeed(limit: number = 10, offset: number = 0) {
     fetcher,
     {
       refreshInterval: 30000, // Refresh every 30 seconds
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // M8: Prevent extra fetches on tab focus
     }
   );
 

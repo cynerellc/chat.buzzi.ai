@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, count, desc, eq, gte, lte } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
@@ -93,7 +93,8 @@ export async function GET(request: NextRequest) {
       .from(conversations)
       .where(and(...conditions));
 
-    // Get conversations with related data
+    // C1: Use JOINs instead of N+1 queries
+    // Single query with LEFT JOINs for conversations, end users, and agents
     const conversationList = await db
       .select({
         id: conversations.id,
@@ -105,97 +106,103 @@ export async function GET(request: NextRequest) {
         satisfactionRating: conversations.satisfactionRating,
         lastMessageAt: conversations.lastMessageAt,
         createdAt: conversations.createdAt,
-        endUserId: conversations.endUserId,
-        agentId: conversations.chatbotId,
         assignedUserId: conversations.assignedUserId,
+        // End user fields via JOIN
+        endUserId: endUsers.id,
+        endUserName: endUsers.name,
+        endUserEmail: endUsers.email,
+        endUserAvatarUrl: endUsers.avatarUrl,
+        // Agent fields via JOIN
+        agentId: agents.id,
+        agentName: agents.name,
       })
       .from(conversations)
+      .leftJoin(endUsers, eq(conversations.endUserId, endUsers.id))
+      .leftJoin(agents, eq(conversations.chatbotId, agents.id))
       .where(and(...conditions))
       .orderBy(desc(conversations.lastMessageAt), desc(conversations.createdAt))
       .limit(limit)
       .offset(offset);
 
-    // Fetch related data for each conversation
-    const enrichedConversationsRaw = await Promise.all(
-      conversationList.map(async (conv): Promise<ConversationListItem | null> => {
-        // Get end user
-        const [endUser] = await db
-          .select({
-            id: endUsers.id,
-            name: endUsers.name,
-            email: endUsers.email,
-            avatarUrl: endUsers.avatarUrl,
-          })
-          .from(endUsers)
-          .where(eq(endUsers.id, conv.endUserId))
-          .limit(1);
+    // Batch query for last messages using DISTINCT ON (PostgreSQL)
+    // This reduces N queries to 1 query regardless of page size
+    const conversationIds = conversationList.map((c) => c.id);
+    const lastMessagesMap = new Map<string, { content: string; role: string; createdAt: Date }>();
 
-        // Get agent
-        const [agent] = await db
-          .select({
-            id: agents.id,
-            name: agents.name,
-          })
-          .from(agents)
-          .where(eq(agents.id, conv.agentId))
-          .limit(1);
+    if (conversationIds.length > 0) {
+      const lastMessages = await db
+        .selectDistinctOn([messages.conversationId], {
+          conversationId: messages.conversationId,
+          content: messages.content,
+          role: messages.role,
+          createdAt: messages.createdAt,
+        })
+        .from(messages)
+        .where(inArray(messages.conversationId, conversationIds))
+        .orderBy(messages.conversationId, desc(messages.createdAt));
 
-        // Get last message
-        const [lastMessage] = await db
-          .select({
-            content: messages.content,
-            role: messages.role,
-            createdAt: messages.createdAt,
-          })
-          .from(messages)
-          .where(eq(messages.conversationId, conv.id))
-          .orderBy(desc(messages.createdAt))
-          .limit(1);
+      lastMessages.forEach((msg) => {
+        lastMessagesMap.set(msg.conversationId, {
+          content: msg.content,
+          role: msg.role,
+          createdAt: msg.createdAt,
+        });
+      });
+    }
 
-        // Filter by search if provided (search in end user name/email or conversation subject)
-        if (search) {
-          const searchLower = search.toLowerCase();
-          const matchesName = endUser?.name?.toLowerCase().includes(searchLower);
-          const matchesEmail = endUser?.email?.toLowerCase().includes(searchLower);
-          const matchesSubject = conv.subject?.toLowerCase().includes(searchLower);
-          const matchesMessage = lastMessage?.content?.toLowerCase().includes(searchLower);
+    // Map and filter results
+    const enrichedConversations: ConversationListItem[] = [];
+    for (const conv of conversationList) {
+      const lastMessage = lastMessagesMap.get(conv.id);
 
-          if (!matchesName && !matchesEmail && !matchesSubject && !matchesMessage) {
-            return null;
-          }
+      // Filter by search if provided
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const matchesName = conv.endUserName?.toLowerCase().includes(searchLower);
+        const matchesEmail = conv.endUserEmail?.toLowerCase().includes(searchLower);
+        const matchesSubject = conv.subject?.toLowerCase().includes(searchLower);
+        const matchesMessage = lastMessage?.content?.toLowerCase().includes(searchLower);
+
+        if (!matchesName && !matchesEmail && !matchesSubject && !matchesMessage) {
+          continue;
         }
+      }
 
-        return {
-          id: conv.id,
-          status: conv.status,
-          subject: conv.subject,
-          channel: conv.channel,
-          messageCount: conv.messageCount,
-          sentiment: conv.sentiment,
-          satisfactionRating: conv.satisfactionRating,
-          lastMessageAt: conv.lastMessageAt?.toISOString() ?? null,
-          createdAt: conv.createdAt.toISOString(),
-          endUser: endUser || { id: "", name: null, email: null, avatarUrl: null },
-          agent: agent || { id: "", name: "Unknown Agent" },
-          assignedUser: null as ConversationListItem["assignedUser"], // TODO: Fetch assigned user if needed
-          lastMessage: lastMessage
-            ? {
-                content:
-                  lastMessage.content.length > 100
-                    ? lastMessage.content.substring(0, 100) + "..."
-                    : lastMessage.content,
-                role: lastMessage.role,
-                createdAt: lastMessage.createdAt.toISOString(),
-              }
-            : null,
-        };
-      })
-    );
+      enrichedConversations.push({
+        id: conv.id,
+        status: conv.status,
+        subject: conv.subject,
+        channel: conv.channel,
+        messageCount: conv.messageCount,
+        sentiment: conv.sentiment,
+        satisfactionRating: conv.satisfactionRating,
+        lastMessageAt: conv.lastMessageAt?.toISOString() ?? null,
+        createdAt: conv.createdAt.toISOString(),
+        endUser: {
+          id: conv.endUserId ?? "",
+          name: conv.endUserName,
+          email: conv.endUserEmail,
+          avatarUrl: conv.endUserAvatarUrl,
+        },
+        agent: {
+          id: conv.agentId ?? "",
+          name: conv.agentName ?? "Unknown Agent",
+        },
+        assignedUser: null, // TODO: Fetch assigned user if needed
+        lastMessage: lastMessage
+          ? {
+              content:
+                lastMessage.content.length > 100
+                  ? lastMessage.content.substring(0, 100) + "..."
+                  : lastMessage.content,
+              role: lastMessage.role,
+              createdAt: lastMessage.createdAt.toISOString(),
+            }
+          : null,
+      });
+    }
 
-    // Filter out null results from search
-    const filteredConversations = enrichedConversationsRaw.filter(
-      (conv): conv is ConversationListItem => conv !== null
-    );
+    const filteredConversations = enrichedConversations;
 
     // Get status counts for filter badges
     const statusCounts = await db

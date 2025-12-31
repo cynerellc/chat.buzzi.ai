@@ -7,56 +7,41 @@ import { authConfig } from "@/lib/auth/auth.config";
 // Use base config for middleware (Edge runtime compatible)
 const { auth } = NextAuth(authConfig);
 
+// M6: Use Set for O(1) exact match lookup on public routes
 // Routes that don't require authentication
-const publicRoutes = [
+const publicRoutesExact = new Set([
   "/login",
   "/register",
   "/forgot-password",
   "/reset-password",
   "/accept-invitation",
+  "/widget-demo",
+  "/embed-widget",
+]);
+
+// Public route prefixes (still need startsWith check)
+const publicRoutePrefixes = [
   "/api/auth",
   "/api/widget",
   "/widget",
-  "/widget-demo",
-  "/embed-widget",
 ];
 
-// Routes that require master_admin role
-const masterAdminRoutes = ["/admin"];
-
-// Routes for regular authenticated users (company-level access checked in layouts/routes)
-const userRoutes = [
-  "/dashboard",
-  "/agents",
-  "/knowledge",
-  "/conversations",
-  "/team",
-  "/settings",
-  "/analytics",
-  "/billing",
-  "/integrations",
-  "/widget",
-  "/files",
-  "/inbox",
-  "/customers",
-  "/responses",
-  "/agent-settings",
-  "/companies",
-];
+// Routes that require master_admin role (prefix check)
+const masterAdminPrefixes = ["/admin"];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const session = req.auth;
 
-  // Check if route is public
-  const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  // M6: O(1) exact match check + O(prefixes) prefix check
+  const isPublicRoute =
+    publicRoutesExact.has(pathname) ||
+    publicRoutePrefixes.some((prefix) => pathname.startsWith(prefix));
 
   // Allow public routes
   if (isPublicRoute) {
     // If user is already logged in and trying to access auth pages, redirect
-    if (session?.user && ["/login", "/register"].includes(pathname)) {
+    if (session?.user && (pathname === "/login" || pathname === "/register")) {
       // For master admin, go directly to admin dashboard
       if (session.user.role === "chatapp.master_admin") {
         return NextResponse.redirect(new URL("/admin/dashboard", req.url));
@@ -81,8 +66,8 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Regular users cannot access master admin routes
-  if (masterAdminRoutes.some((route) => pathname.startsWith(route))) {
+  // Regular users cannot access master admin routes (O(prefixes) check)
+  if (masterAdminPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
@@ -91,24 +76,6 @@ export default auth((req) => {
   // Just allow the request to proceed
   return NextResponse.next();
 });
-
-function redirectToDashboard(req: NextRequest, role: string) {
-  let dashboardUrl: string;
-
-  switch (role) {
-    case "chatapp.master_admin":
-      dashboardUrl = "/admin/dashboard";
-      break;
-    case "chatapp.user":
-      // Regular users go to company selection
-      dashboardUrl = "/companies";
-      break;
-    default:
-      dashboardUrl = "/companies";
-  }
-
-  return NextResponse.redirect(new URL(dashboardUrl, req.url));
-}
 
 export const config = {
   matcher: [
