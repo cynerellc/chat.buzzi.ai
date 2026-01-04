@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const productCatalogTool = tool(
+const productCatalogToolBase = tool(
   async ({ productId, category, searchQuery }) => {
     // TODO: Implement actual product catalog integration
     if (productId) {
@@ -35,3 +35,8 @@ export const productCatalogTool = tool(
     }),
   }
 );
+
+export const productCatalogTool = Object.assign(productCatalogToolBase, {
+  toolExecutingMessage: "Searching product catalog...",
+  toolCompletedMessage: "Product information found",
+});

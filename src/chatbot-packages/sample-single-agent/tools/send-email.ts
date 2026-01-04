@@ -16,8 +16,8 @@ import type { AgentContext } from "@/lib/ai/types";
  * - EMAIL_PASSWORD (secured_variable): SMTP password
  * - EMAIL_FROM (variable): Default from address
  */
-export const createSendEmailTool = (context: AgentContext) =>
-  tool(
+export const createSendEmailTool = (context: AgentContext) => {
+  const toolBase = tool(
     async ({ to, subject, body }) => {
       // Access package variables for email configuration
       const host = context.variables.get("EMAIL_HOST");
@@ -78,3 +78,9 @@ export const createSendEmailTool = (context: AgentContext) =>
       }),
     }
   );
+
+  return Object.assign(toolBase, {
+    toolExecutingMessage: "Sending email...",
+    toolCompletedMessage: "Email sent successfully",
+  });
+};

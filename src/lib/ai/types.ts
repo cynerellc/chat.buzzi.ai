@@ -423,7 +423,11 @@ export interface NotificationEvent extends StreamEvent {
     message: string;
     targetAgentId?: string;
     targetAgentName?: string;
+    targetAgentDesignation?: string;
+    targetAgentAvatarUrl?: string;
     previousAgentId?: string | null;
+    previousAgentName?: string;
+    previousAgentAvatarUrl?: string;
     level?: "info" | "warning" | "success";
   };
 }

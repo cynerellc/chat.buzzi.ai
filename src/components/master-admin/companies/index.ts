@@ -8,3 +8,4 @@ export { CompanyOverview } from "./company-overview";
 export { CompanySubscription } from "./company-subscription";
 export { CompanyAgents } from "./company-agents";
 export { CompanyActivity } from "./company-activity";
+export { CompanyMenuBar } from "./company-menu-bar";

@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const webSearchTool = tool(
+const webSearchToolBase = tool(
   async ({ query }) => {
     // TODO: Implement actual web search integration
     // This could use Google Search API, Bing API, or custom search
@@ -15,3 +15,9 @@ export const webSearchTool = tool(
     }),
   }
 );
+
+// Add custom notification messages for UI display
+export const webSearchTool = Object.assign(webSearchToolBase, {
+  toolExecutingMessage: "Searching the web...",
+  toolCompletedMessage: "Search complete",
+});

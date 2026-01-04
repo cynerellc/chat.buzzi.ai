@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const knowledgeLookupTool = tool(
+const knowledgeLookupToolBase = tool(
   async ({ query, category }) => {
     // TODO: This will be replaced by the platform's RAG tool injection
     // The AdkExecutor provides RAG capabilities automatically
@@ -20,3 +20,9 @@ export const knowledgeLookupTool = tool(
     }),
   }
 );
+
+// Add custom notification messages for UI display
+export const knowledgeLookupTool = Object.assign(knowledgeLookupToolBase, {
+  toolExecutingMessage: "Searching knowledge base...",
+  toolCompletedMessage: "Found relevant information",
+});

@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const knowledgeBaseTool = tool(
+const knowledgeBaseToolBase = tool(
   async ({ query, docType }) => {
     // TODO: This will be replaced by the platform's RAG tool injection
     const docTypeLabel = docType || "all documentation";
@@ -22,3 +22,8 @@ export const knowledgeBaseTool = tool(
     }),
   }
 );
+
+export const knowledgeBaseTool = Object.assign(knowledgeBaseToolBase, {
+  toolExecutingMessage: "Searching knowledge base...",
+  toolCompletedMessage: "Documentation found",
+});

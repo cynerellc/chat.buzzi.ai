@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const paymentHistoryTool = tool(
+const paymentHistoryToolBase = tool(
   async ({ customerId, startDate, endDate }) => {
     // TODO: Implement actual payment system integration
     const dateRange = startDate && endDate
@@ -35,3 +35,8 @@ Payment Method on File: Visa ending in 4242`;
     }),
   }
 );
+
+export const paymentHistoryTool = Object.assign(paymentHistoryToolBase, {
+  toolExecutingMessage: "Retrieving payment history...",
+  toolCompletedMessage: "Payment history retrieved",
+});

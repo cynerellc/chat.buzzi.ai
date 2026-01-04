@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const orderLookupTool = tool(
+const orderLookupToolBase = tool(
   async ({ orderId, customerEmail }) => {
     // TODO: Implement actual order management system integration
     if (orderId) {
@@ -25,3 +25,8 @@ export const orderLookupTool = tool(
     }),
   }
 );
+
+export const orderLookupTool = Object.assign(orderLookupToolBase, {
+  toolExecutingMessage: "Looking up order details...",
+  toolCompletedMessage: "Order information found",
+});

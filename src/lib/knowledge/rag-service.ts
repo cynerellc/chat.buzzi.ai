@@ -380,7 +380,18 @@ ${topResults.map((r, i) => `[${i}] ${r.content.slice(0, 1000)}`).join("\n\n")}`,
         max_tokens: 200,
       });
 
-      const content = response.choices[0]?.message?.content ?? "[]";
+      let content = response.choices[0]?.message?.content ?? "[]";
+
+      // Strip markdown code blocks if present (e.g., ```json\n[...]\n```)
+      content = content.trim();
+      if (content.startsWith("```")) {
+        // Remove opening ```json or ``` and closing ```
+        content = content
+          .replace(/^```(?:json)?\s*\n?/, "")
+          .replace(/\n?```\s*$/, "")
+          .trim();
+      }
+
       const scores = JSON.parse(content) as number[];
 
       // Apply new scores using weighted blend

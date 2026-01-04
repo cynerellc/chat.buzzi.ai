@@ -26,9 +26,7 @@ const DEFAULT_CONFIG = {
   soundEnabled: false,
   enableVoice: false,
   enableFileUpload: true,
-  enableEmoji: true,
   enableMarkdown: true,
-  enableTypingIndicator: true,
 };
 
 export async function GET(request: NextRequest) {
@@ -100,6 +98,7 @@ export async function GET(request: NextRequest) {
       designation?: string;
       avatar_url?: string;
       agent_type?: string;
+      color?: string;
     }[] | null) || [];
     const avatarUrl = agentsListData[0]?.avatar_url || null;
     const behavior = (agent.behavior as { greeting?: string }) ?? {};
@@ -122,6 +121,10 @@ export async function GET(request: NextRequest) {
         theme: widgetConfig.theme,
         position: widgetConfig.position,
         primaryColor: widgetConfig.primaryColor,
+        accentColor: widgetConfig.accentColor,
+        userBubbleColor: widgetConfig.userBubbleColor || undefined,
+        overrideAgentColor: widgetConfig.overrideAgentColor,
+        agentBubbleColor: widgetConfig.agentBubbleColor || undefined,
         borderRadius: parseInt(widgetConfig.borderRadius) || DEFAULT_CONFIG.borderRadius,
         title: widgetConfig.title,
         subtitle: widgetConfig.subtitle || undefined,
@@ -135,11 +138,18 @@ export async function GET(request: NextRequest) {
         soundEnabled: widgetConfig.playSoundOnMessage,
         enableVoice: widgetConfig.enableVoiceMessages,
         enableFileUpload: widgetConfig.enableFileUpload,
-        enableEmoji: widgetConfig.enableEmoji,
-        enableTypingIndicator: widgetConfig.showTypingIndicator,
         launcherIcon: widgetConfig.launcherIcon,
         launcherText: widgetConfig.launcherText || undefined,
         customCss: widgetConfig.customCss || undefined,
+        // Stream Display Options
+        showAgentSwitchNotification: widgetConfig.showAgentSwitchNotification,
+        showThinking: widgetConfig.showThinking,
+        showToolCalls: widgetConfig.showToolCalls,
+        showInstantUpdates: widgetConfig.showInstantUpdates,
+        // Multi-agent Display Options
+        showAgentListOnTop: widgetConfig.showAgentListOnTop,
+        agentListMinCards: parseInt(widgetConfig.agentListMinCards) || 3,
+        agentListingType: widgetConfig.agentListingType,
       }),
       // If no widget config exists, use defaults with agent name as title
       ...(!widgetConfig && {
@@ -154,6 +164,7 @@ export async function GET(request: NextRequest) {
         name: a.name,
         designation: a.designation,
         avatarUrl: a.avatar_url,
+        color: a.color,
         type: a.agent_type,
       })) : undefined,
     };

@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const billingInfoTool = tool(
+const billingInfoToolBase = tool(
   async ({ customerId, action }) => {
     // TODO: Implement actual billing system integration
     switch (action) {
@@ -30,3 +30,8 @@ export const billingInfoTool = tool(
     }),
   }
 );
+
+export const billingInfoTool = Object.assign(billingInfoToolBase, {
+  toolExecutingMessage: "Looking up billing information...",
+  toolCompletedMessage: "Billing information retrieved",
+});

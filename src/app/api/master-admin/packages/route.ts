@@ -15,6 +15,8 @@ export interface PackageListItem {
   description: string | null;
   category: string | null;
   packageType: "single_agent" | "multi_agent";
+  chatbotType: "chat" | "call";
+  isCustomPackage: boolean;
   defaultBehavior: Record<string, unknown>;
   features: unknown[];
   isActive: boolean;
@@ -24,6 +26,7 @@ export interface PackageListItem {
   agentsListCount: number;
   variablesCount: number;
   securedVariablesCount: number;
+  bundlePath: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -138,12 +141,15 @@ export async function GET(request: NextRequest) {
       return {
         ...pkg,
         packageType: pkg.packageType as "single_agent" | "multi_agent",
+        chatbotType: pkg.chatbotType as "chat" | "call",
+        isCustomPackage: pkg.isCustomPackage,
         defaultBehavior: pkg.defaultBehavior as Record<string, unknown>,
         features: pkg.features as unknown[],
         agentsCount: agentCountMap.get(pkg.id) ?? 0,
         agentsListCount: agentsList.length,
         variablesCount,
         securedVariablesCount,
+        bundlePath: pkg.bundlePath,
         createdAt: pkg.createdAt.toISOString(),
         updatedAt: pkg.updatedAt.toISOString(),
       };
@@ -206,6 +212,8 @@ const createPackageSchema = z.object({
   description: z.string().optional(),
   category: z.string().max(100).optional(),
   packageType: z.enum(["single_agent", "multi_agent"]).default("single_agent"),
+  chatbotType: z.enum(["chat", "call"]).default("chat"),
+  isCustomPackage: z.boolean().default(false),
   // Default behavior shared across all agents in the package
   defaultBehavior: z.record(z.string(), z.unknown()).default({}),
   features: z.array(z.string()).default([]),
@@ -288,6 +296,8 @@ export async function POST(request: NextRequest) {
         description: validatedData.description ?? null,
         category: validatedData.category ?? null,
         packageType: validatedData.packageType,
+        chatbotType: validatedData.chatbotType,
+        isCustomPackage: validatedData.isCustomPackage,
         defaultBehavior: validatedData.defaultBehavior,
         features: validatedData.features,
         bundlePath: validatedData.bundlePath ?? null,

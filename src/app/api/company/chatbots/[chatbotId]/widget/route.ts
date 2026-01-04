@@ -18,39 +18,42 @@ export interface WidgetConfigResponse {
   position: string;
   primaryColor: string;
   accentColor: string;
+  userBubbleColor: string | null;
+  overrideAgentColor: boolean;
+  agentBubbleColor: string | null;
   borderRadius: string;
   buttonSize: string;
   // Branding
   title: string;
   subtitle: string | null;
   welcomeMessage: string;
-  offlineMessage: string | null;
   logoUrl: string | null;
   avatarUrl: string | null;
-  companyName: string | null;
   // Behavior
   autoOpen: boolean;
   autoOpenDelay: string;
   showBranding: boolean;
   playSoundOnMessage: boolean;
-  showTypingIndicator: boolean;
   persistConversation: boolean;
   // Features
   enableFileUpload: boolean;
   enableVoiceMessages: boolean;
-  enableEmoji: boolean;
   enableFeedback: boolean;
   requireEmail: boolean;
   requireName: boolean;
   // Advanced
   customCss: string | null;
   allowedDomains: string[];
-  blockedDomains: string[];
   zIndex: string;
   // Launcher
   launcherIcon: string;
   launcherText: string | null;
   hideLauncherOnMobile: boolean;
+  launcherIconBorderRadius: string;
+  launcherIconPulseGlow: boolean;
+  showLauncherText: boolean;
+  launcherTextBackgroundColor: string;
+  launcherTextColor: string;
   // Pre-chat Form
   preChatForm: {
     enabled: boolean;
@@ -69,6 +72,7 @@ export interface WidgetConfigResponse {
   // Multi-agent Display Options
   showAgentListOnTop: boolean;
   agentListMinCards: string;
+  agentListingType: string;
   // Embed info
   embedCode: string;
   createdAt: string;
@@ -130,7 +134,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .insert(widgetConfigs)
         .values({
           chatbotId: chatbotId,
-          companyName: company.name,
           title: `Chat with ${chatbot.name}`,
         })
         .returning();
@@ -149,39 +152,42 @@ export async function GET(request: NextRequest, context: RouteContext) {
       position: config.position,
       primaryColor: config.primaryColor,
       accentColor: config.accentColor,
+      userBubbleColor: config.userBubbleColor,
+      overrideAgentColor: config.overrideAgentColor,
+      agentBubbleColor: config.agentBubbleColor,
       borderRadius: config.borderRadius,
       buttonSize: config.buttonSize,
       // Branding
       title: config.title,
       subtitle: config.subtitle,
       welcomeMessage: config.welcomeMessage,
-      offlineMessage: config.offlineMessage,
       logoUrl: config.logoUrl,
       avatarUrl: config.avatarUrl,
-      companyName: config.companyName,
       // Behavior
       autoOpen: config.autoOpen,
       autoOpenDelay: config.autoOpenDelay,
       showBranding: config.showBranding,
       playSoundOnMessage: config.playSoundOnMessage,
-      showTypingIndicator: config.showTypingIndicator,
       persistConversation: config.persistConversation,
       // Features
       enableFileUpload: config.enableFileUpload,
       enableVoiceMessages: config.enableVoiceMessages,
-      enableEmoji: config.enableEmoji,
       enableFeedback: config.enableFeedback,
       requireEmail: config.requireEmail,
       requireName: config.requireName,
       // Advanced
       customCss: config.customCss,
       allowedDomains: (config.allowedDomains as string[]) || [],
-      blockedDomains: (config.blockedDomains as string[]) || [],
       zIndex: config.zIndex,
       // Launcher
       launcherIcon: config.launcherIcon,
       launcherText: config.launcherText,
       hideLauncherOnMobile: config.hideLauncherOnMobile,
+      launcherIconBorderRadius: config.launcherIconBorderRadius,
+      launcherIconPulseGlow: config.launcherIconPulseGlow,
+      showLauncherText: config.showLauncherText,
+      launcherTextBackgroundColor: config.launcherTextBackgroundColor,
+      launcherTextColor: config.launcherTextColor,
       // Pre-chat Form
       preChatForm: config.preChatForm as WidgetConfigResponse["preChatForm"],
       // Stream Display Options
@@ -192,6 +198,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // Multi-agent Display Options
       showAgentListOnTop: config.showAgentListOnTop,
       agentListMinCards: config.agentListMinCards,
+      agentListingType: config.agentListingType,
       // Embed info
       embedCode: generateEmbedCode(company.slug, chatbotId),
       createdAt: config.createdAt.toISOString(),
@@ -214,39 +221,42 @@ interface UpdateWidgetConfigRequest {
   position?: string;
   primaryColor?: string;
   accentColor?: string;
+  userBubbleColor?: string | null;
+  overrideAgentColor?: boolean;
+  agentBubbleColor?: string | null;
   borderRadius?: string;
   buttonSize?: string;
   // Branding
   title?: string;
   subtitle?: string | null;
   welcomeMessage?: string;
-  offlineMessage?: string | null;
   logoUrl?: string | null;
   avatarUrl?: string | null;
-  companyName?: string | null;
   // Behavior
   autoOpen?: boolean;
   autoOpenDelay?: string;
   showBranding?: boolean;
   playSoundOnMessage?: boolean;
-  showTypingIndicator?: boolean;
   persistConversation?: boolean;
   // Features
   enableFileUpload?: boolean;
   enableVoiceMessages?: boolean;
-  enableEmoji?: boolean;
   enableFeedback?: boolean;
   requireEmail?: boolean;
   requireName?: boolean;
   // Advanced
   customCss?: string | null;
   allowedDomains?: string[];
-  blockedDomains?: string[];
   zIndex?: string;
   // Launcher
   launcherIcon?: string;
   launcherText?: string | null;
   hideLauncherOnMobile?: boolean;
+  launcherIconBorderRadius?: string;
+  launcherIconPulseGlow?: boolean;
+  showLauncherText?: boolean;
+  launcherTextBackgroundColor?: string;
+  launcherTextColor?: string;
   // Pre-chat Form
   preChatForm?: {
     enabled: boolean;
@@ -265,6 +275,7 @@ interface UpdateWidgetConfigRequest {
   // Multi-agent Display Options
   showAgentListOnTop?: boolean;
   agentListMinCards?: string;
+  agentListingType?: string;
 }
 
 /**
@@ -308,7 +319,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         .insert(widgetConfigs)
         .values({
           chatbotId: chatbotId,
-          companyName: company.name,
           title: `Chat with ${chatbot.name}`,
         })
         .returning({ id: widgetConfigs.id });
@@ -324,6 +334,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.position !== undefined) updateData.position = body.position;
     if (body.primaryColor !== undefined) updateData.primaryColor = body.primaryColor;
     if (body.accentColor !== undefined) updateData.accentColor = body.accentColor;
+    if (body.userBubbleColor !== undefined) updateData.userBubbleColor = body.userBubbleColor;
+    if (body.overrideAgentColor !== undefined) updateData.overrideAgentColor = body.overrideAgentColor;
+    if (body.agentBubbleColor !== undefined) updateData.agentBubbleColor = body.agentBubbleColor;
     if (body.borderRadius !== undefined) updateData.borderRadius = body.borderRadius;
     if (body.buttonSize !== undefined) updateData.buttonSize = body.buttonSize;
 
@@ -331,23 +344,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.title !== undefined) updateData.title = body.title;
     if (body.subtitle !== undefined) updateData.subtitle = body.subtitle;
     if (body.welcomeMessage !== undefined) updateData.welcomeMessage = body.welcomeMessage;
-    if (body.offlineMessage !== undefined) updateData.offlineMessage = body.offlineMessage;
     if (body.logoUrl !== undefined) updateData.logoUrl = body.logoUrl;
     if (body.avatarUrl !== undefined) updateData.avatarUrl = body.avatarUrl;
-    if (body.companyName !== undefined) updateData.companyName = body.companyName;
 
     // Behavior
     if (body.autoOpen !== undefined) updateData.autoOpen = body.autoOpen;
     if (body.autoOpenDelay !== undefined) updateData.autoOpenDelay = body.autoOpenDelay;
     if (body.showBranding !== undefined) updateData.showBranding = body.showBranding;
     if (body.playSoundOnMessage !== undefined) updateData.playSoundOnMessage = body.playSoundOnMessage;
-    if (body.showTypingIndicator !== undefined) updateData.showTypingIndicator = body.showTypingIndicator;
     if (body.persistConversation !== undefined) updateData.persistConversation = body.persistConversation;
 
     // Features
     if (body.enableFileUpload !== undefined) updateData.enableFileUpload = body.enableFileUpload;
     if (body.enableVoiceMessages !== undefined) updateData.enableVoiceMessages = body.enableVoiceMessages;
-    if (body.enableEmoji !== undefined) updateData.enableEmoji = body.enableEmoji;
     if (body.enableFeedback !== undefined) updateData.enableFeedback = body.enableFeedback;
     if (body.requireEmail !== undefined) updateData.requireEmail = body.requireEmail;
     if (body.requireName !== undefined) updateData.requireName = body.requireName;
@@ -355,13 +364,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Advanced
     if (body.customCss !== undefined) updateData.customCss = body.customCss;
     if (body.allowedDomains !== undefined) updateData.allowedDomains = body.allowedDomains;
-    if (body.blockedDomains !== undefined) updateData.blockedDomains = body.blockedDomains;
     if (body.zIndex !== undefined) updateData.zIndex = body.zIndex;
 
     // Launcher
     if (body.launcherIcon !== undefined) updateData.launcherIcon = body.launcherIcon;
     if (body.launcherText !== undefined) updateData.launcherText = body.launcherText;
     if (body.hideLauncherOnMobile !== undefined) updateData.hideLauncherOnMobile = body.hideLauncherOnMobile;
+    if (body.launcherIconBorderRadius !== undefined) updateData.launcherIconBorderRadius = body.launcherIconBorderRadius;
+    if (body.launcherIconPulseGlow !== undefined) updateData.launcherIconPulseGlow = body.launcherIconPulseGlow;
+    if (body.showLauncherText !== undefined) updateData.showLauncherText = body.showLauncherText;
+    if (body.launcherTextBackgroundColor !== undefined) updateData.launcherTextBackgroundColor = body.launcherTextBackgroundColor;
+    if (body.launcherTextColor !== undefined) updateData.launcherTextColor = body.launcherTextColor;
 
     // Pre-chat Form
     if (body.preChatForm !== undefined) updateData.preChatForm = body.preChatForm;
@@ -375,6 +388,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Multi-agent Display Options
     if (body.showAgentListOnTop !== undefined) updateData.showAgentListOnTop = body.showAgentListOnTop;
     if (body.agentListMinCards !== undefined) updateData.agentListMinCards = body.agentListMinCards;
+    if (body.agentListingType !== undefined) updateData.agentListingType = body.agentListingType;
 
     const [updatedConfig] = await db
       .update(widgetConfigs)
@@ -386,7 +400,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Failed to update widget configuration" }, { status: 500 });
     }
 
-    // Regenerate widget config JSON in Supabase Storage
+    // Regenerate widget config JSON in R2 Storage
     const regenerateResult = await generateWidgetConfigJson(chatbotId);
     if (!regenerateResult.success) {
       console.error("Failed to regenerate widget config JSON:", regenerateResult.error);
@@ -400,34 +414,37 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       position: updatedConfig.position,
       primaryColor: updatedConfig.primaryColor,
       accentColor: updatedConfig.accentColor,
+      userBubbleColor: updatedConfig.userBubbleColor,
+      overrideAgentColor: updatedConfig.overrideAgentColor,
+      agentBubbleColor: updatedConfig.agentBubbleColor,
       borderRadius: updatedConfig.borderRadius,
       buttonSize: updatedConfig.buttonSize,
       title: updatedConfig.title,
       subtitle: updatedConfig.subtitle,
       welcomeMessage: updatedConfig.welcomeMessage,
-      offlineMessage: updatedConfig.offlineMessage,
       logoUrl: updatedConfig.logoUrl,
       avatarUrl: updatedConfig.avatarUrl,
-      companyName: updatedConfig.companyName,
       autoOpen: updatedConfig.autoOpen,
       autoOpenDelay: updatedConfig.autoOpenDelay,
       showBranding: updatedConfig.showBranding,
       playSoundOnMessage: updatedConfig.playSoundOnMessage,
-      showTypingIndicator: updatedConfig.showTypingIndicator,
       persistConversation: updatedConfig.persistConversation,
       enableFileUpload: updatedConfig.enableFileUpload,
       enableVoiceMessages: updatedConfig.enableVoiceMessages,
-      enableEmoji: updatedConfig.enableEmoji,
       enableFeedback: updatedConfig.enableFeedback,
       requireEmail: updatedConfig.requireEmail,
       requireName: updatedConfig.requireName,
       customCss: updatedConfig.customCss,
       allowedDomains: (updatedConfig.allowedDomains as string[]) || [],
-      blockedDomains: (updatedConfig.blockedDomains as string[]) || [],
       zIndex: updatedConfig.zIndex,
       launcherIcon: updatedConfig.launcherIcon,
       launcherText: updatedConfig.launcherText,
       hideLauncherOnMobile: updatedConfig.hideLauncherOnMobile,
+      launcherIconBorderRadius: updatedConfig.launcherIconBorderRadius,
+      launcherIconPulseGlow: updatedConfig.launcherIconPulseGlow,
+      showLauncherText: updatedConfig.showLauncherText,
+      launcherTextBackgroundColor: updatedConfig.launcherTextBackgroundColor,
+      launcherTextColor: updatedConfig.launcherTextColor,
       preChatForm: updatedConfig.preChatForm as WidgetConfigResponse["preChatForm"],
       // Stream Display Options
       showAgentSwitchNotification: updatedConfig.showAgentSwitchNotification,
@@ -437,6 +454,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       // Multi-agent Display Options
       showAgentListOnTop: updatedConfig.showAgentListOnTop,
       agentListMinCards: updatedConfig.agentListMinCards,
+      agentListingType: updatedConfig.agentListingType,
       embedCode: generateEmbedCode(company.slug, chatbotId),
       createdAt: updatedConfig.createdAt.toISOString(),
       updatedAt: updatedConfig.updatedAt.toISOString(),

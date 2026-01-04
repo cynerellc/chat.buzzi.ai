@@ -70,34 +70,202 @@ export interface SendMessageOptions {
 }
 
 // ============================================================================
-// Agent Cache
+// Agent Cache with Activity-Based Eviction
 // ============================================================================
 
-class ExecutorCache {
-  private cache: Map<string, { executor: AdkExecutor; timestamp: number }> = new Map();
-  private readonly ttlMs = 300000; // 5 minutes
+interface ExecutorCacheEntry {
+  executor: AdkExecutor;
+  lastActivity: number;  // Timestamp of last activity
+  chatbotId: string;     // For logging
+}
 
+interface ExecutorCacheConfig {
+  inactivityTTL: number;    // Time before evicting inactive executors (default: 3 hours)
+  cleanupInterval: number;  // How often to run cleanup (default: 15 minutes)
+  maxExecutors: number;     // Maximum number of cached executors (default: 100)
+}
+
+const DEFAULT_EXECUTOR_CACHE_CONFIG: ExecutorCacheConfig = {
+  inactivityTTL: 3 * 60 * 60 * 1000,    // 3 hours
+  cleanupInterval: 15 * 60 * 1000,       // 15 minutes
+  maxExecutors: 100,
+};
+
+class ExecutorCache {
+  private cache: Map<string, ExecutorCacheEntry> = new Map();
+  private config: ExecutorCacheConfig;
+  private cleanupTimer: NodeJS.Timeout | null = null;
+
+  constructor(config: Partial<ExecutorCacheConfig> = {}) {
+    this.config = { ...DEFAULT_EXECUTOR_CACHE_CONFIG, ...config };
+    this.startCleanupTimer();
+  }
+
+  /**
+   * Get an executor from cache, updating its activity timestamp
+   */
   get(chatbotId: string): AdkExecutor | undefined {
     const entry = this.cache.get(chatbotId);
     if (entry) {
-      if (Date.now() - entry.timestamp < this.ttlMs) {
-        return entry.executor;
+      const now = Date.now();
+      // Check if expired
+      if (now - entry.lastActivity > this.config.inactivityTTL) {
+        console.log(`[ExecutorCache] Executor ${chatbotId} expired after ${this.formatDuration(now - entry.lastActivity)} of inactivity`);
+        this.cache.delete(chatbotId);
+        return undefined;
       }
-      this.cache.delete(chatbotId);
+      // Update activity timestamp on access
+      entry.lastActivity = now;
+      return entry.executor;
     }
     return undefined;
   }
 
+  /**
+   * Store an executor in cache
+   */
   set(chatbotId: string, executor: AdkExecutor): void {
-    this.cache.set(chatbotId, { executor, timestamp: Date.now() });
+    // Check if we're at capacity
+    if (this.cache.size >= this.config.maxExecutors && !this.cache.has(chatbotId)) {
+      this.evictLeastRecentlyUsed();
+    }
+
+    this.cache.set(chatbotId, {
+      executor,
+      lastActivity: Date.now(),
+      chatbotId,
+    });
+
+    console.log(`[ExecutorCache] Cached executor for ${chatbotId}, total: ${this.cache.size}`);
   }
 
+  /**
+   * Record activity for an executor (call when processing messages)
+   */
+  touch(chatbotId: string): void {
+    const entry = this.cache.get(chatbotId);
+    if (entry) {
+      entry.lastActivity = Date.now();
+    }
+  }
+
+  /**
+   * Remove an executor from cache
+   */
   delete(chatbotId: string): void {
     this.cache.delete(chatbotId);
   }
 
+  /**
+   * Clear all cached executors
+   */
   clear(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Get cache size
+   */
+  size(): number {
+    return this.cache.size;
+  }
+
+  /**
+   * Start the background cleanup timer
+   */
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) return;
+
+    this.cleanupTimer = setInterval(() => {
+      this.cleanup();
+    }, this.config.cleanupInterval);
+
+    // Ensure timer doesn't prevent process exit
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
+    }
+  }
+
+  /**
+   * Stop the cleanup timer (for testing/shutdown)
+   */
+  stopCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+  }
+
+  /**
+   * Remove expired executors
+   */
+  private cleanup(): void {
+    const now = Date.now();
+    let evicted = 0;
+
+    for (const [chatbotId, entry] of this.cache.entries()) {
+      const inactiveFor = now - entry.lastActivity;
+      if (inactiveFor > this.config.inactivityTTL) {
+        this.cache.delete(chatbotId);
+        evicted++;
+        console.log(`[ExecutorCache] Evicted ${chatbotId} after ${this.formatDuration(inactiveFor)} of inactivity`);
+      }
+    }
+
+    if (evicted > 0) {
+      console.log(`[ExecutorCache] Cleanup: evicted ${evicted} executors, remaining: ${this.cache.size}`);
+    }
+  }
+
+  /**
+   * Evict the least recently used executor when at capacity
+   */
+  private evictLeastRecentlyUsed(): void {
+    let oldest: { chatbotId: string; lastActivity: number } | null = null;
+
+    for (const [chatbotId, entry] of this.cache.entries()) {
+      if (!oldest || entry.lastActivity < oldest.lastActivity) {
+        oldest = { chatbotId, lastActivity: entry.lastActivity };
+      }
+    }
+
+    if (oldest) {
+      this.cache.delete(oldest.chatbotId);
+      console.log(`[ExecutorCache] Evicted LRU executor ${oldest.chatbotId} (cache at capacity: ${this.config.maxExecutors})`);
+    }
+  }
+
+  /**
+   * Format duration for logging
+   */
+  private formatDuration(ms: number): string {
+    const hours = Math.floor(ms / (60 * 60 * 1000));
+    const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  }
+
+  /**
+   * Get cache statistics (for monitoring)
+   */
+  getStats(): {
+    size: number;
+    maxSize: number;
+    inactivityTTL: number;
+    entries: Array<{ chatbotId: string; idleTime: number }>;
+  } {
+    const now = Date.now();
+    return {
+      size: this.cache.size,
+      maxSize: this.config.maxExecutors,
+      inactivityTTL: this.config.inactivityTTL,
+      entries: Array.from(this.cache.entries()).map(([chatbotId, entry]) => ({
+        chatbotId,
+        idleTime: now - entry.lastActivity,
+      })),
+    };
   }
 }
 
@@ -195,8 +363,9 @@ export class AgentRunnerService {
     // Create executor
     const executor = createAdkExecutor(executorOptions);
 
-    // Initialize the executor (load package)
-    if (!executor.initialize()) {
+    // Initialize the executor (load package - may be async if from storage)
+    const initialized = await executor.initialize();
+    if (!initialized) {
       console.error(`[AgentRunner] Failed to initialize executor for ${chatbotId}`);
       return null;
     }

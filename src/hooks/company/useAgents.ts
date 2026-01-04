@@ -62,6 +62,9 @@ export interface AgentDetail {
   id: string;
   companyId: string;
   packageId: string | null;
+  packageType: "single_agent" | "multi_agent";
+  chatbotType: "chat" | "call";
+  isCustomPackage: boolean;
   name: string;
   description: string | null;
   type: string;

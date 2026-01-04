@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Palette,
   ImageIcon,
@@ -19,6 +19,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { ChatWindow } from "@/app/embed-widget/components/ChatWindow";
 import { Switch, Slider, Textarea, addToast, Modal, ModalContent, ModalHeader, ModalBody } from "@/components/ui";
 
 import {
@@ -46,19 +47,12 @@ const POSITION_OPTIONS = [
   { value: "bottom-left", label: "Bottom Left" },
 ];
 
-const LAUNCHER_ICON_OPTIONS = [
-  { value: "chat", label: "Chat Bubble" },
-  { value: "message", label: "Message" },
-  { value: "help", label: "Help" },
-  { value: "sparkle", label: "Sparkle" },
+const LAUNCHER_ICONS = [
+  { value: "chat", label: "Chat Bubble", Icon: MessageCircle },
+  { value: "message", label: "Message", Icon: MessageSquare },
+  { value: "help", label: "Help", Icon: HelpCircle },
+  { value: "sparkle", label: "Sparkle", Icon: Sparkles },
 ];
-
-const ICON_COMPONENTS: Record<string, React.ComponentType<{ className?: string }>> = {
-  chat: MessageCircle,
-  message: MessageSquare,
-  help: HelpCircle,
-  sparkle: Sparkles,
-};
 
 interface WidgetConfig {
   id: string;
@@ -67,33 +61,38 @@ interface WidgetConfig {
   position: string;
   primaryColor: string;
   accentColor: string;
+  userBubbleColor: string | null;
+  overrideAgentColor: boolean;
+  agentBubbleColor: string | null;
   borderRadius: string;
   buttonSize: string;
   title: string;
   subtitle: string | null;
   welcomeMessage: string;
-  offlineMessage: string | null;
+  placeholderText: string | null;
   logoUrl: string | null;
-  companyName: string | null;
+  avatarUrl: string | null;
   autoOpen: boolean;
   autoOpenDelay: string;
   showBranding: boolean;
   playSoundOnMessage: boolean;
-  showTypingIndicator: boolean;
   persistConversation: boolean;
   enableFileUpload: boolean;
   enableVoiceMessages: boolean;
-  enableEmoji: boolean;
   enableFeedback: boolean;
   requireEmail: boolean;
   requireName: boolean;
   customCss: string | null;
   allowedDomains: string[];
-  blockedDomains: string[];
   zIndex: string;
   launcherIcon: string;
   launcherText: string | null;
   hideLauncherOnMobile: boolean;
+  launcherIconBorderRadius: string;
+  launcherIconPulseGlow: boolean;
+  showLauncherText: boolean;
+  launcherTextBackgroundColor: string;
+  launcherTextColor: string;
   // Stream Display Options
   showAgentSwitchNotification: boolean;
   showThinking: boolean;
@@ -101,6 +100,8 @@ interface WidgetConfig {
   showInstantUpdates: boolean;
   // Multi-agent Display Options
   showAgentListOnTop: boolean;
+  agentListMinCards: string;
+  agentListingType: string;
   embedCode: string;
 }
 
@@ -137,33 +138,38 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
     position: "bottom-right",
     primaryColor: "#6437F3",
     accentColor: "#2b3dd8",
+    userBubbleColor: "",
+    overrideAgentColor: false,
+    agentBubbleColor: "#FFFFFF",
     borderRadius: "16",
     buttonSize: "60",
     title: "Chat with us",
     subtitle: "",
     welcomeMessage: "Hi there! How can we help you today?",
-    offlineMessage: "We're currently offline. Leave a message and we'll get back to you.",
+    placeholderText: "Type a message...",
     logoUrl: "",
-    companyName: "",
+    avatarUrl: "",
     autoOpen: false,
     autoOpenDelay: "5",
     showBranding: true,
     playSoundOnMessage: true,
-    showTypingIndicator: true,
     persistConversation: true,
     enableFileUpload: false,
     enableVoiceMessages: false,
-    enableEmoji: true,
     enableFeedback: true,
     requireEmail: false,
     requireName: false,
     customCss: "",
     allowedDomains: [] as string[],
-    blockedDomains: [] as string[],
     zIndex: "9999",
     launcherIcon: "chat",
     launcherText: "",
     hideLauncherOnMobile: false,
+    launcherIconBorderRadius: "50",
+    launcherIconPulseGlow: false,
+    showLauncherText: false,
+    launcherTextBackgroundColor: "#ffffff",
+    launcherTextColor: "#000000",
     // Stream Display Options
     showAgentSwitchNotification: true,
     showThinking: false,
@@ -171,6 +177,8 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
     showInstantUpdates: true,
     // Multi-agent Display Options
     showAgentListOnTop: true,
+    agentListMinCards: "3",
+    agentListingType: "detailed",
   });
 
   useEffect(() => {
@@ -180,33 +188,38 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
         position: config.position,
         primaryColor: config.primaryColor,
         accentColor: config.accentColor,
+        userBubbleColor: config.userBubbleColor || "",
+        overrideAgentColor: config.overrideAgentColor ?? false,
+        agentBubbleColor: config.agentBubbleColor || "#FFFFFF",
         borderRadius: config.borderRadius,
         buttonSize: config.buttonSize,
         title: config.title,
         subtitle: config.subtitle || "",
         welcomeMessage: config.welcomeMessage,
-        offlineMessage: config.offlineMessage || "",
+        placeholderText: config.placeholderText || "Type a message...",
         logoUrl: config.logoUrl || "",
-        companyName: config.companyName || "",
+        avatarUrl: config.avatarUrl || "",
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
         showBranding: config.showBranding,
         playSoundOnMessage: config.playSoundOnMessage,
-        showTypingIndicator: config.showTypingIndicator,
         persistConversation: config.persistConversation,
         enableFileUpload: config.enableFileUpload,
         enableVoiceMessages: config.enableVoiceMessages,
-        enableEmoji: config.enableEmoji,
         enableFeedback: config.enableFeedback,
         requireEmail: config.requireEmail,
         requireName: config.requireName,
         customCss: config.customCss || "",
         allowedDomains: config.allowedDomains,
-        blockedDomains: config.blockedDomains,
         zIndex: config.zIndex,
         launcherIcon: config.launcherIcon,
         launcherText: config.launcherText || "",
         hideLauncherOnMobile: config.hideLauncherOnMobile,
+        launcherIconBorderRadius: config.launcherIconBorderRadius || "50",
+        launcherIconPulseGlow: config.launcherIconPulseGlow ?? false,
+        showLauncherText: config.showLauncherText ?? false,
+        launcherTextBackgroundColor: config.launcherTextBackgroundColor || "#ffffff",
+        launcherTextColor: config.launcherTextColor || "#000000",
         // Stream Display Options
         showAgentSwitchNotification: config.showAgentSwitchNotification ?? true,
         showThinking: config.showThinking ?? false,
@@ -214,6 +227,8 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
         showInstantUpdates: config.showInstantUpdates ?? true,
         // Multi-agent Display Options
         showAgentListOnTop: config.showAgentListOnTop ?? true,
+        agentListMinCards: config.agentListMinCards ?? "3",
+        agentListingType: config.agentListingType ?? "detailed",
       });
     }
   }, [config]);
@@ -232,9 +247,9 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
         body: JSON.stringify({
           ...formData,
           subtitle: formData.subtitle || null,
-          offlineMessage: formData.offlineMessage || null,
+          placeholderText: formData.placeholderText || null,
           logoUrl: formData.logoUrl || null,
-          companyName: formData.companyName || null,
+          avatarUrl: formData.avatarUrl || null,
           customCss: formData.customCss || null,
           launcherText: formData.launcherText || null,
         }),
@@ -267,6 +282,56 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
       window.open(testUrl, "_blank");
     }
   };
+
+  // Build config JSON for the ChatWindow preview
+  // For multi-agent preview, provide sample agents to demonstrate the UI
+  const demoAgentsList = useMemo(() => {
+    if (!isMultiAgent) return undefined;
+    return [
+      { id: "agent-1", name: "Sales Agent", designation: "Customer Support", type: "worker" },
+      { id: "agent-2", name: "Tech Support", designation: "Technical Specialist", type: "worker" },
+      { id: "agent-3", name: "Billing Agent", designation: "Billing Support", type: "worker" },
+    ];
+  }, [isMultiAgent]);
+
+  const previewConfig = useMemo(() => ({
+    agentId: chatbotId,
+    companyId: companyId,
+    theme: formData.theme as "light" | "dark" | "auto",
+    primaryColor: formData.primaryColor,
+    accentColor: formData.accentColor,
+    userBubbleColor: formData.userBubbleColor || undefined,
+    overrideAgentColor: formData.overrideAgentColor,
+    agentBubbleColor: formData.agentBubbleColor || undefined,
+    borderRadius: parseInt(formData.borderRadius, 10),
+    position: formData.position as "bottom-right" | "bottom-left",
+    title: formData.title,
+    subtitle: formData.subtitle || undefined,
+    welcomeMessage: formData.welcomeMessage,
+    placeholderText: formData.placeholderText || undefined,
+    logoUrl: formData.logoUrl || undefined,
+    avatarUrl: formData.avatarUrl || undefined,
+    showBranding: formData.showBranding,
+    enableFileUpload: formData.enableFileUpload,
+    enableVoice: formData.enableVoiceMessages,
+    enableMarkdown: true,
+    isMultiAgent: isMultiAgent,
+    agentsList: demoAgentsList,
+    showAgentSwitchNotification: formData.showAgentSwitchNotification,
+    showThinking: formData.showThinking,
+    showToolCalls: formData.showToolCalls,
+    showInstantUpdates: formData.showInstantUpdates,
+    showAgentListOnTop: formData.showAgentListOnTop,
+    agentListMinCards: parseInt(formData.agentListMinCards, 10),
+    agentListingType: formData.agentListingType as "minimal" | "compact" | "standard" | "detailed",
+    autoOpen: formData.autoOpen,
+    autoOpenDelay: parseInt(formData.autoOpenDelay, 10),
+    playSoundOnMessage: formData.playSoundOnMessage,
+    persistConversation: formData.persistConversation,
+    requireEmail: formData.requireEmail,
+    requireName: formData.requireName,
+    customCss: formData.customCss || undefined,
+  }), [chatbotId, companyId, formData, isMultiAgent, demoAgentsList]);
 
   // Logo upload handlers
   const handleLogoFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -393,8 +458,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
     );
   }
 
-  const LauncherIcon = ICON_COMPONENTS[formData.launcherIcon] || MessageCircle;
-
   const tabItems: TabItem[] = [
     {
       key: "appearance",
@@ -422,21 +485,136 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
             }}
           />
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              type="color"
-              label="Primary Color"
-              value={formData.primaryColor}
-              onValueChange={(v) => updateField("primaryColor", v)}
-              className="h-10"
-            />
-            <Input
-              type="color"
-              label="Accent Color"
-              value={formData.accentColor}
-              onValueChange={(v) => updateField("accentColor", v)}
-              className="h-10"
-            />
+          {/* Color Pickers as 40x40 squares */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium block mb-2">Primary Color</label>
+              <div className="flex items-center gap-3">
+                <label
+                  className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                  style={{ backgroundColor: formData.primaryColor }}
+                >
+                  <input
+                    type="color"
+                    value={formData.primaryColor}
+                    onChange={(e) => updateField("primaryColor", e.target.value)}
+                    className="opacity-0 w-0 h-0"
+                  />
+                </label>
+                <Input
+                  value={formData.primaryColor}
+                  onValueChange={(v) => updateField("primaryColor", v)}
+                  className="w-28 font-mono text-sm"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-2">Accent Color</label>
+              <div className="flex items-center gap-3">
+                <label
+                  className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                  style={{ backgroundColor: formData.accentColor }}
+                >
+                  <input
+                    type="color"
+                    value={formData.accentColor}
+                    onChange={(e) => updateField("accentColor", e.target.value)}
+                    className="opacity-0 w-0 h-0"
+                  />
+                </label>
+                <Input
+                  value={formData.accentColor}
+                  onValueChange={(v) => updateField("accentColor", v)}
+                  className="w-28 font-mono text-sm"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Chat Bubble Colors */}
+          <div className="border-t border-divider pt-6">
+            <h3 className="font-semibold mb-4">Chat Bubble Colors</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium block mb-2">User Bubble Color</label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Background color for user messages (defaults to primary color if empty)
+                </p>
+                <div className="flex items-center gap-3">
+                  <label
+                    className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                    style={{ backgroundColor: formData.userBubbleColor || formData.primaryColor }}
+                  >
+                    <input
+                      type="color"
+                      value={formData.userBubbleColor || formData.primaryColor}
+                      onChange={(e) => updateField("userBubbleColor", e.target.value)}
+                      className="opacity-0 w-0 h-0"
+                    />
+                  </label>
+                  <Input
+                    value={formData.userBubbleColor || formData.primaryColor}
+                    onValueChange={(v) => updateField("userBubbleColor", v)}
+                    className="w-28 font-mono text-sm"
+                    maxLength={7}
+                  />
+                  {formData.userBubbleColor && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => updateField("userBubbleColor", "")}
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Override Agent Colors</span>
+                  <p className="text-sm text-muted-foreground">
+                    Use a single color for all agent messages instead of individual agent colors
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.overrideAgentColor}
+                  onValueChange={(v) => updateField("overrideAgentColor", v)}
+                />
+              </div>
+
+              {formData.overrideAgentColor && (
+                <div>
+                  <label className="text-sm font-medium block mb-2">Agent Bubble Color</label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Background color for all agent messages when override is enabled
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <label
+                      className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                      style={{ backgroundColor: formData.agentBubbleColor }}
+                    >
+                      <input
+                        type="color"
+                        value={formData.agentBubbleColor}
+                        onChange={(e) => updateField("agentBubbleColor", e.target.value)}
+                        className="opacity-0 w-0 h-0"
+                      />
+                    </label>
+                    <Input
+                      value={formData.agentBubbleColor}
+                      onValueChange={(v) => updateField("agentBubbleColor", v)}
+                      className="w-28 font-mono text-sm"
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
@@ -465,23 +643,125 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
             />
           </div>
 
-          <Select
-            label="Launcher Icon"
-            options={LAUNCHER_ICON_OPTIONS}
-            selectedKeys={new Set([formData.launcherIcon])}
-            onSelectionChange={(keys) => {
-              const selected = Array.from(keys)[0];
-              updateField("launcherIcon", selected as string);
-            }}
-          />
+          {/* Launcher Icon Selection as clickable buttons */}
+          <div>
+            <label className="text-sm font-medium block mb-2">Launcher Icon</label>
+            <div className="flex gap-2">
+              {LAUNCHER_ICONS.map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => updateField("launcherIcon", value)}
+                  className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center transition-all ${
+                    formData.launcherIcon === value
+                      ? "border-primary bg-primary/10"
+                      : "border-divider hover:border-primary/50"
+                  }`}
+                  title={label}
+                >
+                  <Icon className={`w-5 h-5 ${formData.launcherIcon === value ? "text-primary" : "text-muted-foreground"}`} />
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <Input
-            label="Launcher Text (Optional)"
-            placeholder="e.g., Need help?"
-            value={formData.launcherText}
-            onValueChange={(v) => updateField("launcherText", v)}
-            description="Show text next to the launcher button"
-          />
+          <div>
+            <label className="text-sm font-medium">Launcher Icon Border Radius: {formData.launcherIconBorderRadius}%</label>
+            <Slider
+              aria-label="Launcher icon border radius"
+              value={[parseInt(formData.launcherIconBorderRadius)]}
+              onValueChange={(v) => updateField("launcherIconBorderRadius", String(v[0]))}
+              min={0}
+              max={50}
+              step={5}
+              className="mt-2"
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+            <div>
+              <span className="font-medium">Launcher pulse glow</span>
+              <p className="text-sm text-muted-foreground">
+                Add a subtle pulsing glow animation to attract attention
+              </p>
+            </div>
+            <Switch
+              isSelected={formData.launcherIconPulseGlow}
+              onValueChange={(v) => updateField("launcherIconPulseGlow", v)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+            <div>
+              <span className="font-medium">Show launcher text</span>
+              <p className="text-sm text-muted-foreground">
+                Display text next to the launcher button
+              </p>
+            </div>
+            <Switch
+              isSelected={formData.showLauncherText}
+              onValueChange={(v) => updateField("showLauncherText", v)}
+            />
+          </div>
+
+          {formData.showLauncherText && (
+            <>
+              <Input
+                label="Launcher Text"
+                placeholder="e.g., Need help?"
+                value={formData.launcherText}
+                onValueChange={(v) => updateField("launcherText", v)}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium block mb-2">Text Background</label>
+                  <div className="flex items-center gap-3">
+                    <label
+                      className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                      style={{ backgroundColor: formData.launcherTextBackgroundColor }}
+                    >
+                      <input
+                        type="color"
+                        value={formData.launcherTextBackgroundColor}
+                        onChange={(e) => updateField("launcherTextBackgroundColor", e.target.value)}
+                        className="opacity-0 w-0 h-0"
+                      />
+                    </label>
+                    <Input
+                      value={formData.launcherTextBackgroundColor}
+                      onValueChange={(v) => updateField("launcherTextBackgroundColor", v)}
+                      className="w-24 font-mono text-sm"
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium block mb-2">Text Color</label>
+                  <div className="flex items-center gap-3">
+                    <label
+                      className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                      style={{ backgroundColor: formData.launcherTextColor }}
+                    >
+                      <input
+                        type="color"
+                        value={formData.launcherTextColor}
+                        onChange={(e) => updateField("launcherTextColor", e.target.value)}
+                        className="opacity-0 w-0 h-0"
+                      />
+                    </label>
+                    <Input
+                      value={formData.launcherTextColor}
+                      onValueChange={(v) => updateField("launcherTextColor", v)}
+                      className="w-24 font-mono text-sm"
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       ),
     },
@@ -505,13 +785,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
             onValueChange={(v) => updateField("subtitle", v)}
           />
 
-          <Input
-            label="Company Name"
-            placeholder="Your company name"
-            value={formData.companyName}
-            onValueChange={(v) => updateField("companyName", v)}
-          />
-
           <Textarea
             label="Welcome Message"
             value={formData.welcomeMessage}
@@ -520,12 +793,12 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
             description="First message shown when chat opens"
           />
 
-          <Textarea
-            label="Offline Message"
-            value={formData.offlineMessage}
-            onValueChange={(v) => updateField("offlineMessage", v)}
-            minRows={2}
-            description="Message shown when no agents are available"
+          <Input
+            label="Input Placeholder"
+            placeholder="e.g., Type your question..."
+            value={formData.placeholderText}
+            onValueChange={(v) => updateField("placeholderText", v)}
+            description="Placeholder text shown in the message input"
           />
 
           <div className="space-y-2">
@@ -637,19 +910,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
 
           <div className="flex items-center justify-between rounded-lg border border-divider p-4">
             <div>
-              <span className="font-medium">Show typing indicator</span>
-              <p className="text-sm text-muted-foreground">
-                Show when the AI is generating a response
-              </p>
-            </div>
-            <Switch
-              isSelected={formData.showTypingIndicator}
-              onValueChange={(v) => updateField("showTypingIndicator", v)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-divider p-4">
-            <div>
               <span className="font-medium">Persist conversation</span>
               <p className="text-sm text-muted-foreground">
                 Remember conversation history between visits
@@ -673,6 +933,69 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
               onValueChange={(v) => updateField("hideLauncherOnMobile", v)}
             />
           </div>
+
+          {/* Stream Display Options - moved from Features */}
+          <div className="border-t border-divider pt-6">
+            <h3 className="font-semibold mb-4">Stream Display Options</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Control what information is shown to users while the AI is generating responses.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show instant updates</span>
+                  <p className="text-sm text-muted-foreground">
+                    Update response in real-time as it streams
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showInstantUpdates}
+                  onValueChange={(v) => updateField("showInstantUpdates", v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show thinking process</span>
+                  <p className="text-sm text-muted-foreground">
+                    Display what the AI is thinking about while generating
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showThinking}
+                  onValueChange={(v) => updateField("showThinking", v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show tool calls</span>
+                  <p className="text-sm text-muted-foreground">
+                    Display when AI uses tools like search or calculations
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showToolCalls}
+                  onValueChange={(v) => updateField("showToolCalls", v)}
+                  isDisabled={!formData.showThinking}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                <div>
+                  <span className="font-medium">Show agent transfer notifications</span>
+                  <p className="text-sm text-muted-foreground">
+                    Notify when conversation is transferred to another agent
+                  </p>
+                </div>
+                <Switch
+                  isSelected={formData.showAgentSwitchNotification}
+                  onValueChange={(v) => updateField("showAgentSwitchNotification", v)}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       ),
     },
@@ -682,17 +1005,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
       icon: Zap,
       content: (
         <div className="space-y-6 p-6">
-          <div className="flex items-center justify-between rounded-lg border border-divider p-4">
-            <div>
-              <span className="font-medium">Enable emoji picker</span>
-              <p className="text-sm text-muted-foreground">Allow users to send emoji in messages</p>
-            </div>
-            <Switch
-              isSelected={formData.enableEmoji}
-              onValueChange={(v) => updateField("enableEmoji", v)}
-            />
-          </div>
-
           <div className="flex items-center justify-between rounded-lg border border-divider p-4">
             <div>
               <span className="font-medium">Enable feedback</span>
@@ -768,68 +1080,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
             </div>
           </div>
 
-          <div className="border-t border-divider pt-6">
-            <h3 className="font-semibold mb-4">Stream Display Options</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Control what information is shown to users while the AI is generating responses.
-            </p>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
-                <div>
-                  <span className="font-medium">Show instant updates</span>
-                  <p className="text-sm text-muted-foreground">
-                    Update response in real-time as it streams
-                  </p>
-                </div>
-                <Switch
-                  isSelected={formData.showInstantUpdates}
-                  onValueChange={(v) => updateField("showInstantUpdates", v)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
-                <div>
-                  <span className="font-medium">Show thinking process</span>
-                  <p className="text-sm text-muted-foreground">
-                    Display what the AI is thinking about while generating
-                  </p>
-                </div>
-                <Switch
-                  isSelected={formData.showThinking}
-                  onValueChange={(v) => updateField("showThinking", v)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
-                <div>
-                  <span className="font-medium">Show tool calls</span>
-                  <p className="text-sm text-muted-foreground">
-                    Display when AI uses tools like search or calculations
-                  </p>
-                </div>
-                <Switch
-                  isSelected={formData.showToolCalls}
-                  onValueChange={(v) => updateField("showToolCalls", v)}
-                  isDisabled={!formData.showThinking}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
-                <div>
-                  <span className="font-medium">Show agent transfer notifications</span>
-                  <p className="text-sm text-muted-foreground">
-                    Notify when conversation is transferred to another agent
-                  </p>
-                </div>
-                <Switch
-                  isSelected={formData.showAgentSwitchNotification}
-                  onValueChange={(v) => updateField("showAgentSwitchNotification", v)}
-                />
-              </div>
-            </div>
-          </div>
-
           {isMultiAgent && (
             <div className="border-t border-divider pt-6">
               <h3 className="font-semibold mb-4">Multi-Agent Display</h3>
@@ -850,6 +1100,102 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
                     onValueChange={(v) => updateField("showAgentListOnTop", v)}
                   />
                 </div>
+
+                {formData.showAgentListOnTop && (
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Agents listing type</label>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Choose how agents are displayed at the top of the widget
+                      </p>
+                    </div>
+
+                    {/* 4 Clickable preview cards in 2x2 grid */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Minimal */}
+                      <div
+                        onClick={() => updateField("agentListingType", "minimal")}
+                        className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
+                          formData.agentListingType === "minimal"
+                            ? "border-primary bg-primary/5"
+                            : "border-divider hover:border-primary/50"
+                        }`}
+                      >
+                        <p className="font-medium text-sm">Minimal</p>
+                        <p className="text-xs text-muted-foreground mb-2">Agent Name only</p>
+                        <div className="flex items-center gap-2 bg-muted/50 rounded p-2">
+                          <div>
+                            <p className="text-xs font-medium">Agent Name</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Compact */}
+                      <div
+                        onClick={() => updateField("agentListingType", "compact")}
+                        className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
+                          formData.agentListingType === "compact"
+                            ? "border-primary bg-primary/5"
+                            : "border-divider hover:border-primary/50"
+                        }`}
+                      >
+                        <p className="font-medium text-sm">Compact</p>
+                        <p className="text-xs text-muted-foreground mb-2">Name + Designation</p>
+                        <div className="flex items-center gap-2 bg-muted/50 rounded p-2">
+                          <div>
+                            <p className="text-xs font-medium">Agent Name</p>
+                            <p className="text-[10px] text-muted-foreground">Designation</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Standard */}
+                      <div
+                        onClick={() => updateField("agentListingType", "standard")}
+                        className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
+                          formData.agentListingType === "standard"
+                            ? "border-primary bg-primary/5"
+                            : "border-divider hover:border-primary/50"
+                        }`}
+                      >
+                        <p className="font-medium text-sm">Standard</p>
+                        <p className="text-xs text-muted-foreground mb-2">Avatar + Name</p>
+                        <div className="flex items-center gap-2 bg-muted/50 rounded p-2">
+                          <div
+                            className="h-8 w-8 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: formData.primaryColor + "33" }}
+                          />
+                          <div>
+                            <p className="text-xs font-medium">Agent Name</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detailed */}
+                      <div
+                        onClick={() => updateField("agentListingType", "detailed")}
+                        className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
+                          formData.agentListingType === "detailed"
+                            ? "border-primary bg-primary/5"
+                            : "border-divider hover:border-primary/50"
+                        }`}
+                      >
+                        <p className="font-medium text-sm">Detailed</p>
+                        <p className="text-xs text-muted-foreground mb-2">Avatar + Name + Designation</p>
+                        <div className="flex items-center gap-2 bg-muted/50 rounded p-2">
+                          <div
+                            className="h-8 w-8 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: formData.primaryColor + "33" }}
+                          />
+                          <div>
+                            <p className="text-xs font-medium">Agent Name</p>
+                            <p className="text-[10px] text-muted-foreground">Designation</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -896,16 +1242,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
             minRows={3}
             className="font-mono text-sm"
             description="One domain per line. Leave empty to allow all domains."
-          />
-
-          <Textarea
-            label="Blocked Domains"
-            placeholder="spam.example.com&#10;test.example.com"
-            value={formData.blockedDomains.join("\n")}
-            onValueChange={(v) => updateField("blockedDomains", v.split("\n").filter(Boolean))}
-            minRows={3}
-            className="font-mono text-sm"
-            description="Domains where the widget should never load"
           />
         </div>
       ),
@@ -954,118 +1290,64 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold">Preview</h2>
+              <h2 className="text-lg font-semibold">Live Widget Preview</h2>
             </CardHeader>
             <CardBody>
-              <div
-                className="relative bg-gradient-to-br from-muted to-muted/50 rounded-lg p-4 min-h-[400px] flex items-end"
-                style={{
-                  justifyContent: formData.position === "bottom-right" ? "flex-end" : "flex-start",
-                }}
-              >
-                <div className="space-y-3">
-                  <div
-                    className="bg-white dark:bg-muted shadow-lg w-[280px]"
-                    style={{
-                      borderRadius: `${formData.borderRadius}px`,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div className="p-3 text-white" style={{ backgroundColor: formData.primaryColor }}>
-                      <div className="flex items-center gap-2">
-                        {formData.logoUrl ? (
-                          <div
-                            className="w-8 h-8 rounded-full bg-white/20 bg-cover bg-center"
-                            style={{ backgroundImage: `url(${formData.logoUrl})` }}
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                            <MessageCircle className="h-4 w-4" />
-                          </div>
-                        )}
-                        <div>
-                          <div className="font-medium text-sm">{formData.title}</div>
-                          {formData.subtitle && (
-                            <div className="text-xs opacity-80">{formData.subtitle}</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              <div className="relative rounded-lg overflow-hidden bg-gradient-to-br from-muted to-muted/50">
+                {/* Chat Window Preview */}
+                <div className="h-[480px]">
+                  <ChatWindow
+                    isDemo={true}
+                    configJson={previewConfig}
+                    className="h-full"
+                  />
+                </div>
+              </div>
 
-                    <div className="p-3 min-h-[150px] bg-muted/50">
-                      <div
-                        className="inline-block text-white text-sm p-2 max-w-[200px]"
-                        style={{
-                          backgroundColor: formData.primaryColor,
-                          borderRadius: `${Math.min(parseInt(formData.borderRadius), 16)}px`,
-                        }}
-                      >
-                        {formData.welcomeMessage}
-                      </div>
-                    </div>
-
-                    <div className="p-3 border-t border-divider">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-muted rounded-full px-3 py-2 text-sm text-muted-foreground">
-                          Type a message...
-                        </div>
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center"
-                          style={{ backgroundColor: formData.accentColor }}
-                        >
-                          <svg
-                            className="w-4 h-4 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-
-                    {formData.showBranding && (
-                      <div className="text-center py-2 text-xs text-muted-foreground border-t border-divider">
-                        Powered by Buzzi
-                      </div>
-                    )}
-                  </div>
-
-                  <div
-                    className="flex items-center gap-2"
-                    style={{
-                      justifyContent:
-                        formData.position === "bottom-right" ? "flex-end" : "flex-start",
-                    }}
-                  >
-                    {formData.launcherText && (
-                      <div
-                        className="bg-white shadow-lg px-3 py-2 text-sm font-medium"
-                        style={{
-                          borderRadius: `${Math.min(parseInt(formData.borderRadius), 12)}px`,
-                        }}
-                      >
-                        {formData.launcherText}
-                      </div>
-                    )}
+              {/* Launcher Preview */}
+              <div className="mt-4 pt-4 border-t border-divider">
+                <p className="text-sm text-muted-foreground mb-3">Launcher Preview</p>
+                <div className="flex items-center justify-end gap-2 bg-gradient-to-br from-muted to-muted/50 p-4 rounded-lg">
+                  {/* Launcher Text */}
+                  {formData.showLauncherText && formData.launcherText && (
                     <div
-                      className="text-white shadow-lg flex items-center justify-center"
+                      className="px-3 py-2 rounded-lg text-sm font-medium shadow-lg"
                       style={{
-                        backgroundColor: formData.primaryColor,
-                        width: `${formData.buttonSize}px`,
-                        height: `${formData.buttonSize}px`,
-                        borderRadius: "50%",
+                        backgroundColor: formData.launcherTextBackgroundColor,
+                        color: formData.launcherTextColor,
+                        borderRadius: `${Math.min(parseInt(formData.borderRadius, 10), 16)}px`,
                       }}
                     >
-                      <LauncherIcon className="h-6 w-6" />
+                      {formData.launcherText}
                     </div>
-                  </div>
+                  )}
+                  {/* Launcher Button */}
+                  <button
+                    className="relative flex items-center justify-center text-white shadow-lg transition-transform hover:scale-105"
+                    style={{
+                      width: `${formData.buttonSize}px`,
+                      height: `${formData.buttonSize}px`,
+                      backgroundColor: formData.primaryColor,
+                      borderRadius: `${formData.launcherIconBorderRadius}%`,
+                      boxShadow: formData.launcherIconPulseGlow
+                        ? `0 0 20px ${formData.primaryColor}80`
+                        : undefined,
+                    }}
+                  >
+                    {formData.launcherIcon === "chat" && <MessageCircle size={24} />}
+                    {formData.launcherIcon === "message" && <MessageSquare size={24} />}
+                    {formData.launcherIcon === "help" && <HelpCircle size={24} />}
+                    {formData.launcherIcon === "sparkle" && <Sparkles size={24} />}
+                    {formData.launcherIconPulseGlow && (
+                      <span
+                        className="absolute inset-0 animate-ping opacity-30"
+                        style={{
+                          backgroundColor: formData.primaryColor,
+                          borderRadius: `${formData.launcherIconBorderRadius}%`,
+                        }}
+                      />
+                    )}
+                  </button>
                 </div>
               </div>
             </CardBody>

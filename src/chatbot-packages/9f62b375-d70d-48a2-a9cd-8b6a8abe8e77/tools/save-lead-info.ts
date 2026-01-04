@@ -13,7 +13,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { AgentContext } from "@/lib/ai/types";
 
-export const saveLeadInfoTool = tool(
+const saveLeadInfoToolBase = tool(
   async (
     {
       name,
@@ -107,3 +107,9 @@ export const saveLeadInfoTool = tool(
     }),
   }
 );
+
+// Add custom notification messages for UI display
+export const saveLeadInfoTool = Object.assign(saveLeadInfoToolBase, {
+  toolExecutingMessage: "Saving your contact details...",
+  toolCompletedMessage: "Contact details saved",
+});

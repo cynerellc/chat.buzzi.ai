@@ -13,7 +13,6 @@ import {
   Input,
   Select,
   Skeleton,
-  Slider,
   Switch,
   Tabs,
   Textarea,
@@ -26,7 +25,6 @@ import {
   usePackage,
   type AgentListItemData,
 } from "@/hooks/master-admin";
-import { MODEL_OPTIONS } from "@/lib/constants";
 
 interface PackageEditorPageProps {
   params: Promise<{ packageId: string }>;
@@ -875,34 +873,6 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
           minRows={2}
           description="Used by the supervisor to route conversations to the right agent"
         />
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Select
-            label="Model"
-            selectedKeys={new Set([agent.default_model_id])}
-            onSelectionChange={(keys) => {
-              const selected = Array.from(keys)[0] as string;
-              updateAgentField(agentIndex, "default_model_id", selected ?? "gpt-5-mini");
-            }}
-            options={[...MODEL_OPTIONS]}
-          />
-          <div>
-            <Slider
-              label={`Temperature: ${agent.default_temperature}%`}
-              min={0}
-              max={100}
-              step={1}
-              value={[agent.default_temperature]}
-              onValueChange={(values) =>
-                updateAgentField(agentIndex, "default_temperature", values[0] ?? 0)
-              }
-            />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>Precise</span>
-              <span>Creative</span>
-            </div>
-          </div>
-        </div>
 
         <div>
           <label className="text-sm font-medium text-foreground block mb-2">

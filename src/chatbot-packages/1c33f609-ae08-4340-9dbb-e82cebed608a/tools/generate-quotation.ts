@@ -14,7 +14,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { AgentContext } from "@/lib/ai/types";
 
-export const generateQuotationTool = tool(
+const generateQuotationToolBase = tool(
   async (
     {
       customerName,
@@ -186,3 +186,9 @@ export const generateQuotationTool = tool(
     }),
   }
 );
+
+// Add custom notification messages for UI display
+export const generateQuotationTool = Object.assign(generateQuotationToolBase, {
+  toolExecutingMessage: "Generating your quotation...",
+  toolCompletedMessage: "Quotation ready",
+});

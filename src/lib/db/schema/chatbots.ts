@@ -15,6 +15,7 @@ import {
   agentStatusEnum,
   agentTypeEnum,
   chatappSchema,
+  chatbotTypeEnum,
   packageTypeEnum,
 } from "./enums";
 
@@ -46,6 +47,7 @@ export interface AgentListItem {
   routing_prompt?: string; // Brief description for supervisor routing decisions (labeled "Duties" in UI)
   agent_type: "worker" | "supervisor"; // Role in multi-agent orchestration
   avatar_url?: string; // Profile image URL
+  color?: string; // Agent color for chat bubbles and avatar ring (hex format like #FF5733)
   default_system_prompt: string; // LLM system prompt (renamed from system_prompt)
   default_model_id: string; // e.g., "gpt-4o-mini", "claude-3-sonnet" (renamed from model_id)
   default_temperature: number; // 0-100 (renamed from temperature)
@@ -71,6 +73,12 @@ export const chatbotPackages = chatappSchema.table(
 
     // Package Type (single_agent or multi_agent)
     packageType: packageTypeEnum("package_type").default("single_agent").notNull(),
+
+    // Chatbot Type (chat or call)
+    chatbotType: chatbotTypeEnum("chatbot_type").default("chat").notNull(),
+
+    // Is Custom Package (created specifically for a company vs. template package)
+    isCustomPackage: boolean("is_custom_package").default(false).notNull(),
 
     // Code Bundle Storage
     // Path to the chatbot package bundle in storage (e.g., /chatbot-packages/{package_id}/index.js)
@@ -139,6 +147,12 @@ export const chatbots = chatappSchema.table(
 
     // Package Type (copied from chatbot_packages when creating)
     packageType: packageTypeEnum("package_type").default("single_agent").notNull(),
+
+    // Chatbot Type (copied from chatbot_packages when creating)
+    chatbotType: chatbotTypeEnum("chatbot_type").default("chat").notNull(),
+
+    // Is Custom Package (copied from chatbot_packages when creating by master admin)
+    isCustomPackage: boolean("is_custom_package").default(false).notNull(),
 
     // Chatbot Info
     name: varchar("name", { length: 255 }).notNull(),

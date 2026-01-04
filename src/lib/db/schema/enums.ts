@@ -167,6 +167,12 @@ export const packageTypeEnum = pgEnum("package_type", [
   "multi_agent",
 ]);
 
+// Chatbot Type Enum (chat or call)
+export const chatbotTypeEnum = pgEnum("chatbot_type", [
+  "chat",
+  "call",
+]);
+
 export const packageAgentTypeEnum = pgEnum("package_agent_type", [
   "worker",
   "supervisor",

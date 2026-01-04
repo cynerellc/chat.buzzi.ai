@@ -21,6 +21,7 @@ export interface WidgetAgentInfo {
   name: string;
   designation?: string;
   avatarUrl?: string;
+  color?: string; // Agent color for chat bubbles and avatar ring
   type: "worker" | "supervisor";
 }
 
@@ -50,10 +51,18 @@ export interface WidgetConfigJson {
     position: "bottom-right" | "bottom-left";
     primaryColor: string;
     accentColor: string;
+    userBubbleColor?: string; // User message bubble color (defaults to primaryColor)
+    overrideAgentColor: boolean; // When true, use agentBubbleColor instead of individual agent colors
+    agentBubbleColor?: string; // Agent message bubble color (when override is enabled)
     borderRadius: number;
     buttonSize: number;
     launcherIcon: string;
     launcherText?: string;
+    launcherIconBorderRadius: number; // percentage (0-50)
+    launcherIconPulseGlow: boolean;
+    showLauncherText: boolean;
+    launcherTextBackgroundColor: string;
+    launcherTextColor: string;
     zIndex: number;
   };
 
@@ -62,10 +71,8 @@ export interface WidgetConfigJson {
     title: string;
     subtitle?: string;
     welcomeMessage: string;
-    offlineMessage?: string;
     logoUrl?: string;
     avatarUrl?: string;
-    companyName?: string;
     showBranding: boolean;
   };
 
@@ -74,7 +81,6 @@ export interface WidgetConfigJson {
     autoOpen: boolean;
     autoOpenDelay: number;
     playSoundOnMessage: boolean;
-    showTypingIndicator: boolean;
     persistConversation: boolean;
     hideLauncherOnMobile: boolean;
   };
@@ -83,7 +89,6 @@ export interface WidgetConfigJson {
   features: {
     enableFileUpload: boolean;
     enableVoiceMessages: boolean;
-    enableEmoji: boolean;
     enableFeedback: boolean;
     requireEmail: boolean;
     requireName: boolean;
@@ -101,6 +106,7 @@ export interface WidgetConfigJson {
   multiAgent?: {
     showAgentListOnTop: boolean;
     agentListMinCards: number;
+    agentListingType: "minimal" | "compact" | "standard" | "detailed";
   };
 
   // Pre-chat form configuration
@@ -115,7 +121,6 @@ export interface WidgetConfigJson {
   // Security settings
   security: {
     allowedDomains: string[];
-    blockedDomains: string[];
   };
 }
 
@@ -127,9 +132,17 @@ export const WIDGET_CONFIG_DEFAULTS = {
     position: "bottom-right" as const,
     primaryColor: "#6437F3",
     accentColor: "#2b3dd8",
+    userBubbleColor: undefined as string | undefined, // Defaults to primaryColor when undefined
+    overrideAgentColor: false,
+    agentBubbleColor: "#FFFFFF", // White for light theme
     borderRadius: 16,
     buttonSize: 60,
     launcherIcon: "chat",
+    launcherIconBorderRadius: 50,
+    launcherIconPulseGlow: false,
+    showLauncherText: false,
+    launcherTextBackgroundColor: "#ffffff",
+    launcherTextColor: "#000000",
     zIndex: 9999,
   },
   branding: {
@@ -141,14 +154,12 @@ export const WIDGET_CONFIG_DEFAULTS = {
     autoOpen: false,
     autoOpenDelay: 5,
     playSoundOnMessage: true,
-    showTypingIndicator: true,
     persistConversation: true,
     hideLauncherOnMobile: false,
   },
   features: {
     enableFileUpload: false,
     enableVoiceMessages: false,
-    enableEmoji: true,
     enableFeedback: true,
     requireEmail: false,
     requireName: false,
@@ -162,6 +173,7 @@ export const WIDGET_CONFIG_DEFAULTS = {
   multiAgent: {
     showAgentListOnTop: true,
     agentListMinCards: 3,
+    agentListingType: "detailed" as const,
   },
   preChatForm: {
     enabled: false,
@@ -169,7 +181,6 @@ export const WIDGET_CONFIG_DEFAULTS = {
   },
   security: {
     allowedDomains: [],
-    blockedDomains: [],
   },
 };
 

@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
-export const ticketCreateTool = tool(
+const ticketCreateToolBase = tool(
   async ({ title, description, priority, category }) => {
     // TODO: Implement actual ticketing system integration
     const ticketId = `TKT-${Date.now().toString(36).toUpperCase()}`;
@@ -23,3 +23,8 @@ export const ticketCreateTool = tool(
     }),
   }
 );
+
+export const ticketCreateTool = Object.assign(ticketCreateToolBase, {
+  toolExecutingMessage: "Creating support ticket...",
+  toolCompletedMessage: "Support ticket created",
+});

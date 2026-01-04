@@ -12,7 +12,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { AgentContext } from "@/lib/ai/types";
 
-export const knowledgeLookupTool = tool(
+const knowledgeLookupToolBase = tool(
   async (
     {
       query,
@@ -82,3 +82,9 @@ export const knowledgeLookupTool = tool(
     }),
   }
 );
+
+// Add custom notification messages for UI display
+export const knowledgeLookupTool = Object.assign(knowledgeLookupToolBase, {
+  toolExecutingMessage: "Looking up information...",
+  toolCompletedMessage: "Information found",
+});

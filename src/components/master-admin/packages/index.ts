@@ -6,3 +6,4 @@ export { PackageUploadModal } from "./package-upload-modal";
 export { PackageVersions, type PackageVersion } from "./package-versions";
 export { PackageDeployments, type PackageDeployment } from "./package-deployments";
 export { CodeViewerModal } from "./code-viewer-modal";
+export { CodeEditorModal } from "./code-editor-modal";

@@ -193,7 +193,7 @@ export interface ConfirmationDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   isDanger?: boolean;
@@ -223,7 +223,7 @@ export function ConfirmationDialog({
         )}
         <span className="font-semibold text-lg">{title}</span>
       </div>
-      <p className="text-muted-foreground mb-6">{message}</p>
+      <div className="text-muted-foreground mb-6">{message}</div>
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onClose} disabled={isLoading}>
           {cancelLabel}

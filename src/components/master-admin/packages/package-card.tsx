@@ -16,12 +16,12 @@ import {
 
 import { cn } from "@/lib/utils";
 import type { PackageListItem } from "@/hooks/master-admin";
-import { Badge, Button, Card, type BadgeVariant } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 
 interface PackageCardProps {
   package: PackageListItem;
   onConfigure: (pkg: PackageListItem) => void;
-  onViewCode: (pkg: PackageListItem) => void;
+  onEditCode: (pkg: PackageListItem) => void;
 }
 
 const defaultCategoryConfig = {
@@ -49,7 +49,7 @@ const categoryConfig: Record<string, { icon: typeof Bot; gradient: string; iconB
   custom: defaultCategoryConfig,
 };
 
-export function PackageCard({ package: pkg, onConfigure, onViewCode }: PackageCardProps) {
+export function PackageCard({ package: pkg, onConfigure, onEditCode }: PackageCardProps) {
   const category = categoryConfig[pkg.category ?? "custom"] ?? defaultCategoryConfig;
   const Icon = category.icon;
   const isMultiAgent = pkg.packageType === "multi_agent";
@@ -131,10 +131,10 @@ export function PackageCard({ package: pkg, onConfigure, onViewCode }: PackageCa
           <Button
             variant="ghost"
             className="w-full mt-2"
-            onPress={() => onViewCode(pkg)}
+            onPress={() => onEditCode(pkg)}
           >
             <Code size={14} className="mr-1" />
-            View Code
+            Edit Code
           </Button>
         </div>
       </Card>

@@ -15,8 +15,8 @@ import type { AgentContext } from "@/lib/ai/types";
  * - PAYMENT_GATEWAY_API_KEY (secured_variable): API key for authentication
  * - PAYMENT_GATEWAY_SECRET (secured_variable): API secret for signing requests
  */
-export const createPaymentGatewayTool = (context: AgentContext) =>
-  tool(
+export const createPaymentGatewayTool = (context: AgentContext) => {
+  const toolBase = tool(
     async ({ customerId, action, amount }) => {
       // Access package variables for payment gateway configuration
       const gatewayUrl = context.variables.get("PAYMENT_GATEWAY_URL");
@@ -147,3 +147,9 @@ export const createPaymentGatewayTool = (context: AgentContext) =>
       }),
     }
   );
+
+  return Object.assign(toolBase, {
+    toolExecutingMessage: "Processing payment request...",
+    toolCompletedMessage: "Payment operation complete",
+  });
+};

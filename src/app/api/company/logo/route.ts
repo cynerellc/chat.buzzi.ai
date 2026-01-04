@@ -1,28 +1,33 @@
 /**
  * Company Logo Upload API
  *
- * POST /api/company/logo
- * Uploads a company logo to Supabase storage
- * Path: public/companies/[company-id]/settings/logo.[extension]
+ * POST /api/company/logo?chatbotId=xxx
+ * Uploads a company logo to R2 storage with WebP conversion
+ * Path: chatapp/companies/{companyId}/settings/logo-{chatbotId}.webp
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
-import { getSupabaseClient, getSignedStorageUrl, STORAGE_BUCKET } from "@/lib/supabase/client";
-
-/**
- * Get the storage path for company logo
- */
-function getLogoStoragePath(companyId: string, extension: string): string {
-  return `public/companies/${companyId}/settings/logo.${extension}`;
-}
+import { uploadWidgetLogo, getWidgetLogoUrl, deleteWidgetLogo } from "@/lib/r2";
 
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication and get company context
     const { company } = await requireCompanyAdmin();
     const companyId = company.id;
+
+    // Get chatbotId from query params
+    const { searchParams } = new URL(request.url);
+    const chatbotId = searchParams.get("chatbotId");
+
+    if (!chatbotId) {
+      return NextResponse.json(
+        { error: "chatbotId query parameter is required" },
+        { status: 400 }
+      );
+    }
 
     // Parse the multipart form data
     const formData = await request.formData();
@@ -33,10 +38,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: "Invalid file type. Allowed types: JPEG, PNG, GIF, WebP" },
+        { error: "Invalid file type. Allowed types: JPEG, PNG, GIF, WebP, SVG" },
         { status: 400 }
       );
     }
@@ -50,67 +55,105 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine file extension from MIME type
-    const extensionMap: Record<string, string> = {
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/gif": "gif",
-      "image/webp": "webp",
-    };
-    const extension = extensionMap[file.type] || "png";
-
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const inputBuffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase storage
-    const supabase = getSupabaseClient();
-    const storagePath = getLogoStoragePath(companyId, extension);
-
-    // Delete old logo files first (different extensions might exist)
-    // M4: Parallelize deletion instead of sequential loop
-    const oldExtensions = ["jpg", "png", "gif", "webp"];
-    await Promise.all(
-      oldExtensions.map((ext) => {
-        const oldPath = getLogoStoragePath(companyId, ext);
-        return supabase.storage.from(STORAGE_BUCKET).remove([oldPath]);
-      })
-    );
-
-    // Upload new logo
-    const { data, error } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: true,
-      });
-
-    if (error) {
-      console.error("Logo upload error:", error);
+    // Convert to WebP using sharp
+    // SVG files are converted to PNG first, then to WebP
+    let webpBuffer: Buffer;
+    try {
+      webpBuffer = await sharp(inputBuffer)
+        .resize(512, 512, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({
+          quality: 85,
+          effort: 4,
+        })
+        .toBuffer();
+    } catch (err) {
+      console.error("Image conversion error:", err);
       return NextResponse.json(
-        { error: "Failed to upload logo: " + error.message },
-        { status: 500 }
+        { error: "Failed to process image. Please try a different file." },
+        { status: 400 }
       );
     }
 
-    // Get signed URL (for private bucket)
-    const signedUrl = await getSignedStorageUrl(storagePath);
-    if (!signedUrl) {
-      return NextResponse.json(
-        { error: "Failed to generate signed URL for logo" },
-        { status: 500 }
-      );
-    }
+    // Upload to R2
+    const logoUrl = await uploadWidgetLogo(companyId, chatbotId, webpBuffer);
 
-    // L2: Only return logoUrl, remove redundant path field
     return NextResponse.json({
       success: true,
-      logoUrl: signedUrl,
+      logoUrl,
     });
   } catch (error) {
     console.error("Logo upload error:", error);
     return NextResponse.json(
       { error: "Failed to upload logo" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/company/logo?chatbotId=xxx
+ * Deletes a company logo from R2 storage
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { company } = await requireCompanyAdmin();
+    const companyId = company.id;
+
+    const { searchParams } = new URL(request.url);
+    const chatbotId = searchParams.get("chatbotId");
+
+    if (!chatbotId) {
+      return NextResponse.json(
+        { error: "chatbotId query parameter is required" },
+        { status: 400 }
+      );
+    }
+
+    await deleteWidgetLogo(companyId, chatbotId);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Logo delete error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete logo" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET /api/company/logo?chatbotId=xxx
+ * Returns the public URL for a company logo
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { company } = await requireCompanyAdmin();
+    const companyId = company.id;
+
+    const { searchParams } = new URL(request.url);
+    const chatbotId = searchParams.get("chatbotId");
+
+    if (!chatbotId) {
+      return NextResponse.json(
+        { error: "chatbotId query parameter is required" },
+        { status: 400 }
+      );
+    }
+
+    const logoUrl = getWidgetLogoUrl(companyId, chatbotId);
+
+    return NextResponse.json({ logoUrl });
+  } catch (error) {
+    console.error("Logo fetch error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch logo URL" },
       { status: 500 }
     );
   }

@@ -26,6 +26,7 @@ interface AgentData {
   name: string;
   designation?: string | null;
   avatar_url?: string | null;
+  color?: string | null;
   routing_prompt?: string | null;
   default_system_prompt: string;
   default_model_id: string;
@@ -174,30 +175,64 @@ export function AgentDetailForm({
         </Button>
       </div>
 
-      {/* Avatar Section - Only show separate card when NOT showing AI settings */}
+      {/* Avatar & Color Section - Only show separate card when NOT showing AI settings */}
       {!showAISettings && (
         <Card>
           <CardHeader>
-            <h3 className="font-semibold">Agent Avatar</h3>
+            <h3 className="font-semibold">Agent Appearance</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Customize the avatar for this agent
+              Customize the avatar and color for this agent
             </p>
           </CardHeader>
           <CardBody>
-            <div className="flex items-center gap-4">
-              <AgentAvatarPicker
-                value={editedAgent.avatar_url || undefined}
-                onChange={(url) =>
-                  setEditedAgent((prev) => prev ? { ...prev, avatar_url: url ?? "" } : null)
-                }
-                agentName={editedAgent.name}
-                size="lg"
-              />
+            <div className="space-y-6">
+              {/* Avatar Picker */}
+              <div className="flex items-center gap-4">
+                <AgentAvatarPicker
+                  value={editedAgent.avatar_url || undefined}
+                  onChange={(url) =>
+                    setEditedAgent((prev) => prev ? { ...prev, avatar_url: url ?? "" } : null)
+                  }
+                  agentName={editedAgent.name}
+                  size="lg"
+                />
+                <div>
+                  <p className="text-sm font-medium">Click to change avatar</p>
+                  <p className="text-xs text-muted-foreground">
+                    Select a preset or upload a custom image
+                  </p>
+                </div>
+              </div>
+
+              {/* Agent Color Picker */}
               <div>
-                <p className="text-sm font-medium">Click to change avatar</p>
-                <p className="text-xs text-muted-foreground">
-                  Select a preset or upload a custom image
+                <label className="text-sm font-medium block mb-2">Agent Color</label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Color used for this agent&apos;s chat bubbles and avatar ring
                 </p>
+                <div className="flex items-center gap-3">
+                  <label
+                    className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                    style={{ backgroundColor: editedAgent.color || "#6437F3" }}
+                  >
+                    <input
+                      type="color"
+                      value={editedAgent.color || "#6437F3"}
+                      onChange={(e) =>
+                        setEditedAgent((prev) => prev ? { ...prev, color: e.target.value } : null)
+                      }
+                      className="opacity-0 w-0 h-0"
+                    />
+                  </label>
+                  <Input
+                    value={editedAgent.color || "#6437F3"}
+                    onChange={(e) =>
+                      setEditedAgent((prev) => prev ? { ...prev, color: e.target.value } : null)
+                    }
+                    className="w-28 font-mono text-sm"
+                    maxLength={7}
+                  />
+                </div>
               </div>
             </div>
           </CardBody>
@@ -216,22 +251,50 @@ export function AgentDetailForm({
         </CardHeader>
         <CardBody>
           <FormSection>
-            {/* Avatar Picker - Inline when showing AI settings */}
+            {/* Avatar Picker and Color - Inline when showing AI settings */}
             {showAISettings && (
-              <div className="flex items-center gap-4 mb-4">
-                <AgentAvatarPicker
-                  value={editedAgent.avatar_url || undefined}
-                  onChange={(url) =>
-                    setEditedAgent((prev) => prev ? { ...prev, avatar_url: url ?? "" } : null)
-                  }
-                  agentName={editedAgent.name}
-                  size="lg"
-                />
+              <div className="flex flex-wrap items-start gap-6 mb-4">
+                <div className="flex items-center gap-4">
+                  <AgentAvatarPicker
+                    value={editedAgent.avatar_url || undefined}
+                    onChange={(url) =>
+                      setEditedAgent((prev) => prev ? { ...prev, avatar_url: url ?? "" } : null)
+                    }
+                    agentName={editedAgent.name}
+                    size="lg"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Agent Avatar</p>
+                    <p className="text-xs text-muted-foreground">
+                      Click to select a preset or upload custom
+                    </p>
+                  </div>
+                </div>
                 <div>
-                  <p className="text-sm font-medium">Agent Avatar</p>
-                  <p className="text-xs text-muted-foreground">
-                    Click to select a preset or upload custom
-                  </p>
+                  <p className="text-sm font-medium mb-2">Agent Color</p>
+                  <div className="flex items-center gap-3">
+                    <label
+                      className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                      style={{ backgroundColor: editedAgent.color || "#6437F3" }}
+                    >
+                      <input
+                        type="color"
+                        value={editedAgent.color || "#6437F3"}
+                        onChange={(e) =>
+                          setEditedAgent((prev) => prev ? { ...prev, color: e.target.value } : null)
+                        }
+                        className="opacity-0 w-0 h-0"
+                      />
+                    </label>
+                    <Input
+                      value={editedAgent.color || "#6437F3"}
+                      onChange={(e) =>
+                        setEditedAgent((prev) => prev ? { ...prev, color: e.target.value } : null)
+                      }
+                      className="w-28 font-mono text-sm"
+                      maxLength={7}
+                    />
+                  </div>
                 </div>
               </div>
             )}

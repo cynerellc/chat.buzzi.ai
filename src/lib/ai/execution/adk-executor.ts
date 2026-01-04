@@ -8,7 +8,7 @@
  * - Streaming execution with event mapping
  */
 
-import { LlmAgent, FunctionTool, Runner, InMemorySessionService } from "@google/adk";
+import { LlmAgent, FunctionTool, Runner, InMemorySessionService, StreamingMode } from "@google/adk";
 import type { Session, BaseTool, Event } from "@google/adk";
 import { Type } from "@google/genai";
 import type { Content, Schema } from "@google/genai";
@@ -35,6 +35,7 @@ import type {
 } from "@buzzi-ai/agent-sdk";
 
 import { getPackage } from "@/chatbot-packages/registry";
+import { loadPackage } from "@/lib/packages";
 
 // Register OpenAI LLM with ADK at module load
 registerOpenAILlm();
@@ -365,6 +366,9 @@ export class AdkExecutor {
   private cachedContext: AgentContext | null = null;
   private ragServiceCache: Map<string, RAGService> = new Map();
 
+  // Tool messages cache: toolName -> { executing, completed }
+  private toolMessagesCache: Map<string, { executing?: string; completed?: string }> = new Map();
+
   constructor(options: AdkExecutorOptions) {
     this.options = options;
 
@@ -391,13 +395,23 @@ export class AdkExecutor {
 
   /**
    * Initialize the executor by loading the package
+   * First tries static registry, then falls back to dynamic loader
    */
-  initialize(): boolean {
+  async initialize(): Promise<boolean> {
+    // Try static registry first (for built-in/sample packages)
     this.pkg = getPackage(this.options.packageId);
+
+    // If not found, try dynamic loader (for packages in storage)
+    if (!this.pkg) {
+      console.log(`[AdkExecutor] Package ${this.options.packageId} not in registry, trying dynamic loader...`);
+      this.pkg = await loadPackage(this.options.packageId);
+    }
+
     if (!this.pkg) {
       console.error(`[AdkExecutor] Failed to load package ${this.options.packageId}`);
       return false;
     }
+
     return true;
   }
 
@@ -480,6 +494,22 @@ export class AdkExecutor {
   }
 
   /**
+   * Cache tool messages for SSE notifications
+   */
+  private cacheToolMessages(tools: (Tool | LangChainTool)[]): void {
+    for (const tool of tools) {
+      // SDK tools have toolExecutingMessage and toolCompletedMessage
+      const sdkTool = tool as Tool;
+      if (sdkTool.toolExecutingMessage || sdkTool.toolCompletedMessage) {
+        this.toolMessagesCache.set(tool.name, {
+          executing: sdkTool.toolExecutingMessage,
+          completed: sdkTool.toolCompletedMessage,
+        });
+      }
+    }
+  }
+
+  /**
    * Create ADK LlmAgent from package and configuration
    */
   private createAdkAgent(context: AgentContext): LlmAgent {
@@ -493,6 +523,9 @@ export class AdkExecutor {
     const buzziTools = this.pkg.mainAgent.getTools(context as unknown as SDKAgentContext);
     const adkTools: BaseTool[] = convertToolsToAdk(buzziTools, context);
 
+    // Cache tool messages for SSE notifications
+    this.cacheToolMessages(buzziTools);
+
     // Add knowledge base tool if enabled
     if (this.rag.isEnabled()) {
       adkTools.push(
@@ -504,6 +537,11 @@ export class AdkExecutor {
             : undefined
         )
       );
+      // Add default messages for knowledge base tool
+      this.toolMessagesCache.set("search_knowledge_base", {
+        executing: "Searching knowledge base...",
+        completed: "Knowledge retrieved",
+      });
     }
 
     if (isMultiAgent) {
@@ -513,7 +551,7 @@ export class AdkExecutor {
       // Build supervisor system prompt with routing guidance
       const supervisorPrompt = this.buildSupervisorSystemPrompt();
 
-      return new LlmAgent({
+      const supervisor = new LlmAgent({
         name: "supervisor",
         model: this.options.agentConfig.modelId,
         instruction: supervisorPrompt,
@@ -523,6 +561,15 @@ export class AdkExecutor {
           temperature: this.options.agentConfig.temperature / 100,
         },
       });
+
+      // WORKAROUND: Fix ADK bug where rootAgent is not updated when sub-agents are added
+      // ADK's setParentAgentForSubAgents() sets parentAgent but not rootAgent on sub-agents.
+      // This causes transfer_to_agent to fail when a worker tries to transfer to a sibling,
+      // because getAgentByName uses rootAgent.findAgent() which only searches descendants.
+      // Without this fix, salesman.rootAgent = salesman (not supervisor), so it can't find accounts.
+      this.fixSubAgentRootReferences(supervisor);
+
+      return supervisor;
     } else {
       // Single agent mode
       return new LlmAgent({
@@ -553,6 +600,8 @@ export class AdkExecutor {
       if (buzziWorker) {
         const buzziTools = buzziWorker.getTools(context as unknown as SDKAgentContext);
         workerTools.push(...convertToolsToAdk(buzziTools, context));
+        // Cache worker tool messages for SSE notifications
+        this.cacheToolMessages(buzziTools);
       }
 
       // Add knowledge base tool if this worker has KB enabled (using pooled RAGService)
@@ -578,6 +627,46 @@ export class AdkExecutor {
         },
       });
     });
+  }
+
+  /**
+   * Fix rootAgent references on all sub-agents recursively.
+   *
+   * ADK Bug: When sub-agents are created before being added to a parent,
+   * their `rootAgent` is set to themselves in the constructor. When the parent
+   * calls `setParentAgentForSubAgents()`, it sets `parentAgent` but never
+   * updates `rootAgent`. This breaks `getAgentByName()` which uses
+   * `rootAgent.findAgent()` to locate agents for transfer.
+   *
+   * This method walks the agent tree and fixes all rootAgent references
+   * to point to the actual root (supervisor).
+   */
+  private fixSubAgentRootReferences(rootAgent: LlmAgent): void {
+    const fixRecursively = (agent: LlmAgent) => {
+      // TypeScript doesn't allow direct assignment to readonly property,
+      // but we need to fix ADK's bug. Use Object.defineProperty.
+      if (agent.rootAgent !== rootAgent) {
+        Object.defineProperty(agent, 'rootAgent', {
+          value: rootAgent,
+          writable: false,
+          configurable: true,
+        });
+      }
+
+      // Recursively fix sub-agents
+      for (const subAgent of agent.subAgents) {
+        if (subAgent instanceof LlmAgent) {
+          fixRecursively(subAgent);
+        }
+      }
+    };
+
+    // Fix all sub-agents of the root
+    for (const subAgent of rootAgent.subAgents) {
+      if (subAgent instanceof LlmAgent) {
+        fixRecursively(subAgent);
+      }
+    }
   }
 
   /**
@@ -648,7 +737,7 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
           timestamp: Date.now(),
         };
 
-        if (!this.initialize()) {
+        if (!(await this.initialize())) {
           yield {
             type: "error",
             data: {
@@ -662,26 +751,12 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
         }
       }
 
-      yield {
-        type: "thinking",
-        data: { step: "Initializing agent...", progress: 0.2 },
-        timestamp: Date.now(),
-      };
-
-      yield {
-        type: "thinking",
-        data: { step: "Loading conversation history...", progress: 0.3 },
-        timestamp: Date.now(),
-      };
+    
 
       // Get or create session
       await this.sessionAdapter.getOrCreateSession(options.sessionId);
 
-      yield {
-        type: "thinking",
-        data: { step: "Generating response...", progress: 0.4 },
-        timestamp: Date.now(),
-      };
+   
 
       // Get cached runner (creates agent internally if needed)
       const runner = this.getOrCreateRunner(options.context);
@@ -696,11 +771,14 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
         parts: [{ text: options.message }],
       } as unknown as Content;
 
-      // Run the agent
+      // Run the agent with SSE streaming mode for real-time token streaming
       for await (const event of runner.runAsync({
         userId: DEFAULT_USER_ID,
         sessionId: options.sessionId,
         newMessage: newMessage as unknown as Parameters<typeof runner.runAsync>[0]["newMessage"],
+        runConfig: {
+          streamingMode: StreamingMode.SSE,
+        },
       })) {
         // Map ADK events to AgentStreamEvent
         const adkEvent = event as Event;
@@ -728,12 +806,18 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
                 continue; // Skip - actual transfer handled via EventActions below
               }
 
-              toolsUsed.push(funcCall.name || "unknown");
+              const toolName = funcCall.name || "unknown";
+              toolsUsed.push(toolName);
+
+              // Look up custom notification message from tool definition
+              const toolMessages = this.toolMessagesCache.get(toolName);
+
               yield {
                 type: "tool_call",
                 data: {
-                  toolName: funcCall.name || "unknown",
+                  toolName,
                   status: "executing",
+                  notification: toolMessages?.executing,
                   arguments: funcCall.args,
                 },
                 timestamp: Date.now(),
@@ -749,11 +833,16 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
                 continue;
               }
 
+              const toolName = funcResp.name || "unknown";
+              // Look up custom notification message from tool definition
+              const toolMessages = this.toolMessagesCache.get(toolName);
+
               yield {
                 type: "tool_call",
                 data: {
-                  toolName: funcResp.name || "unknown",
+                  toolName,
                   status: "completed",
+                  notification: toolMessages?.completed,
                   result: { success: true, data: funcResp.response },
                 },
                 timestamp: Date.now(),
@@ -776,13 +865,24 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
               (a) => a.agent_identifier === targetAgentId
             );
 
+            // Look up previous agent details
+            const previousAgent = previousAgentId
+              ? this.options.agentsListConfig?.find(
+                  (a) => a.agent_identifier === previousAgentId
+                )
+              : null;
+
             yield {
               type: "notification",
               data: {
-                message: `Transferring to ${targetAgent?.name || targetAgentId}...`,
+                message: `${targetAgent?.name || targetAgentId} has joined`,
                 targetAgentId: targetAgentId,
                 targetAgentName: targetAgent?.name || targetAgentId,
+                targetAgentDesignation: targetAgent?.designation,
+                targetAgentAvatarUrl: targetAgent?.avatar_url,
                 previousAgentId: previousAgentId,
+                previousAgentName: previousAgent?.name,
+                previousAgentAvatarUrl: previousAgent?.avatar_url,
                 level: "info",
               },
               timestamp: Date.now(),

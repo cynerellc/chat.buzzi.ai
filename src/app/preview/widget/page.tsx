@@ -22,6 +22,7 @@ function WidgetPreviewContent() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [config, setConfig] = useState<WidgetConfig>({ primaryColor: "#6437F3" });
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
   // Compute validation error as derived value (not state)
   const validationError = useMemo(() => {
@@ -47,9 +48,11 @@ function WidgetPreviewContent() {
             launcherIcon: data.config.launcherIcon || "chat",
           });
         }
+        setIsConfigLoaded(true);
       })
       .catch(() => {
         // Use defaults if config fetch fails
+        setIsConfigLoaded(true);
       });
   }, [chatbotId, companyId, validationError]);
 
@@ -156,18 +159,22 @@ function WidgetPreviewContent() {
         )}
 
         {/* Launcher Button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-[60px] h-[60px] rounded-full border-none cursor-pointer flex items-center justify-center shadow-xl transition-transform hover:scale-105"
-          style={{ backgroundColor: config.primaryColor }}
-          aria-label={isOpen ? "Close chat" : "Open chat"}
-        >
-          {isOpen ? (
-            <X className="w-6 h-6 text-white" />
-          ) : (
-            <MessageCircle className="w-7 h-7 text-white" />
-          )}
-        </button>
+        {isConfigLoaded ? (
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="w-[60px] h-[60px] rounded-full border-none cursor-pointer flex items-center justify-center shadow-xl transition-transform hover:scale-105"
+            style={{ backgroundColor: config.primaryColor }}
+            aria-label={isOpen ? "Close chat" : "Open chat"}
+          >
+            {isOpen ? (
+              <X className="w-6 h-6 text-white" />
+            ) : (
+              <MessageCircle className="w-7 h-7 text-white" />
+            )}
+          </button>
+        ) : (
+          <div className="w-[60px] h-[60px] rounded-full bg-gray-300 animate-pulse" />
+        )}
       </div>
     </div>
   );
