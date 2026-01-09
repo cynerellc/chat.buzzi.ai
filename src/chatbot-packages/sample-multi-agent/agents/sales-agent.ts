@@ -21,7 +21,6 @@ export const salesAgentConfig: BuzziAgentConfig = {
   type: AgentTypes.Worker,
   supervisor: "5a7b9c1d",
   tools: [productCatalogTool, orderLookupTool],
-  specialization: "sales",
 };
 
 export const salesAgent = createBuzziAgent(salesAgentConfig);

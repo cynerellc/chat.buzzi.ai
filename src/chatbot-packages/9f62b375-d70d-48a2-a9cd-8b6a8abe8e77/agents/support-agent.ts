@@ -33,7 +33,6 @@ export const supportAgentConfig: BuzziAgentConfig = {
   agentId: "support-main",
   type: AgentTypes.Worker,
   tools: [knowledgeLookupTool, saveLeadInfoTool],
-  specialization: "customer-support",
 };
 
 /**

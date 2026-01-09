@@ -36,7 +36,6 @@ export const accountsConfig: BuzziAgentConfig = {
   type: AgentTypes.Worker,
   supervisor: "orchestrator",
   tools: [generateQuotationTool],
-  specialization: "accounts-quotations",
 };
 
 /**

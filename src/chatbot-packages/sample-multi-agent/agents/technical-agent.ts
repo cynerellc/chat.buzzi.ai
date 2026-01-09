@@ -21,7 +21,6 @@ export const technicalAgentConfig: BuzziAgentConfig = {
   type: AgentTypes.Worker,
   supervisor: "5a7b9c1d",
   tools: [knowledgeBaseTool, ticketCreateTool],
-  specialization: "technical-support",
 };
 
 export const technicalAgent = createBuzziAgent(technicalAgentConfig);

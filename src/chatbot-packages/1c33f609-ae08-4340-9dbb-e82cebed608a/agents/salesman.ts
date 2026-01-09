@@ -33,7 +33,6 @@ export const salesmanConfig: BuzziAgentConfig = {
   type: AgentTypes.Worker,
   supervisor: "orchestrator",
   tools: [saveLeadInfoTool],
-  specialization: "sales-representative",
 };
 
 /**

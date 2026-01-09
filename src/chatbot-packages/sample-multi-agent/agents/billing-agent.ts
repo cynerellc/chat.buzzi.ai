@@ -36,7 +36,6 @@ export const billingAgentConfig: BuzziAgentConfig = {
   tools: [billingInfoTool, paymentHistoryTool],
   // Context-aware tools (factory functions that receive AgentContext)
   contextAwareTools: [createPaymentGatewayTool],
-  specialization: "billing",
 };
 
 export const billingAgent = createBuzziAgent(billingAgentConfig);
