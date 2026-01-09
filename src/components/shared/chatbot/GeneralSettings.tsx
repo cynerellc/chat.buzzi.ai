@@ -12,7 +12,7 @@ interface ChatbotData {
   status: string;
   packageName: string;
   modelId: string;
-  temperature: number;
+  modelSettings: Record<string, unknown>;
   conversationCount: number;
 }
 
@@ -130,7 +130,7 @@ export function GeneralSettings({ chatbot, apiUrl, onRefresh }: GeneralSettingsP
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Temperature</p>
-              <p className="font-medium">{chatbot.temperature}%</p>
+              <p className="font-medium">{Math.round(((chatbot.modelSettings?.temperature as number) ?? 0.7) * 100)}%</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Conversations</p>

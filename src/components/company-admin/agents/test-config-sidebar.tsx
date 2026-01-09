@@ -26,7 +26,10 @@ export function TestConfigSidebar({
 
   // Get model display name
   const modelId = agentConfig?.default_model_id || agent.modelId || "gpt-4o-mini";
-  const temperature = agentConfig?.default_temperature ?? agent.temperature ?? 70;
+  // Temperature is now stored in model_settings as 0-1, convert to percentage for display
+  // agent.temperature is still in 0-100 scale for backward compatibility
+  const temperatureValue = (agentConfig?.model_settings?.temperature as number) ?? (agent.temperature ? agent.temperature / 100 : 0.7);
+  const temperaturePercent = Math.round(temperatureValue * 100);
   const systemPrompt =
     agentConfig?.default_system_prompt || agent.systemPrompt || "No system prompt set";
 
@@ -72,17 +75,17 @@ export function TestConfigSidebar({
               <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all"
-                  style={{ width: `${temperature}%` }}
+                  style={{ width: `${temperaturePercent}%` }}
                 />
               </div>
               <span className="text-sm font-mono w-12 text-right">
-                {(temperature / 100).toFixed(2)}
+                {temperatureValue.toFixed(2)}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {temperature < 30
+              {temperaturePercent < 30
                 ? "More focused and deterministic"
-                : temperature < 70
+                : temperaturePercent < 70
                   ? "Balanced creativity and focus"
                   : "More creative and varied"}
             </p>

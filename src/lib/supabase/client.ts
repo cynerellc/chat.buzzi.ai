@@ -111,3 +111,90 @@ export const PRESET_AVATARS_PATH = "public/general/avatars";
 export function getKnowledgeStoragePath(companyId: string, fileName: string): string {
   return `knowledge/${companyId}/${fileName}`;
 }
+
+/**
+ * Conversation files storage path prefix
+ */
+export const CONVERSATION_FILES_PATH = "conversation-files";
+
+/**
+ * Get the storage path for conversation files (voice messages, uploads)
+ * @param companyId - Company ID
+ * @param conversationId - Conversation ID
+ * @param fileName - File name (e.g., "{messageId}.webm" or "uploads/{fileName}")
+ */
+export function getConversationFilePath(
+  companyId: string,
+  conversationId: string,
+  fileName: string
+): string {
+  return `${CONVERSATION_FILES_PATH}/${companyId}/${conversationId}/${fileName}`;
+}
+
+/**
+ * Upload a file to conversation storage
+ * @param companyId - Company ID for multi-tenant isolation
+ * @param conversationId - Conversation ID for access control
+ * @param fileName - File name (e.g., "{messageId}.webm")
+ * @param fileBuffer - File content as Buffer
+ * @param mimeType - MIME type of the file
+ * @returns Storage path and signed URL for access
+ */
+export async function uploadConversationFile(
+  companyId: string,
+  conversationId: string,
+  fileName: string,
+  fileBuffer: Buffer,
+  mimeType: string
+): Promise<{ storagePath: string; signedUrl: string }> {
+  const supabase = getSupabaseClient();
+  const storagePath = getConversationFilePath(companyId, conversationId, fileName);
+
+  const { error: uploadError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(storagePath, fileBuffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Failed to upload file: ${uploadError.message}`);
+  }
+
+  // Generate signed URL for access (1 hour expiry for playback)
+  const signedUrl = await getConversationFileUrl(storagePath);
+  if (!signedUrl) {
+    throw new Error("Failed to generate signed URL for uploaded file");
+  }
+
+  return { storagePath, signedUrl };
+}
+
+/**
+ * Default expiry for conversation file URLs (1 hour)
+ */
+export const CONVERSATION_FILE_URL_EXPIRY = 60 * 60; // 1 hour in seconds
+
+/**
+ * Get a signed URL for a conversation file
+ * @param storagePath - Full storage path of the file
+ * @param expiresIn - Expiry time in seconds (default: 1 hour)
+ * @returns Signed URL or null if generation fails
+ */
+export async function getConversationFileUrl(
+  storagePath: string,
+  expiresIn: number = CONVERSATION_FILE_URL_EXPIRY
+): Promise<string | null> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .createSignedUrl(storagePath, expiresIn);
+
+  if (error) {
+    console.error(`Error creating signed URL for ${storagePath}:`, error);
+    return null;
+  }
+
+  return data.signedUrl;
+}

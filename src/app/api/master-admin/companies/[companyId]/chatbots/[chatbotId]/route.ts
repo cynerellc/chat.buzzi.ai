@@ -21,7 +21,7 @@ const agentSchema = z.object({
   routing_prompt: z.string().nullable().optional(),
   default_system_prompt: z.string(),
   default_model_id: z.string(),
-  default_temperature: z.number().min(0).max(100),
+  model_settings: z.record(z.string(), z.unknown()).default({ temperature: 0.7, max_tokens: 4096, top_p: 1 }),
   knowledge_base_enabled: z.boolean().nullable().optional(),
   knowledge_categories: z.array(z.string()).nullable().optional(),
   tools: z.array(z.unknown()).optional(),

@@ -4,6 +4,7 @@ import { Bot, Save } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
 import { AgentAvatarPicker, FormFieldWrapper, FormSection } from "@/components/shared";
+import { ModelSettingsForm } from "@/components/shared/chatbot/ModelSettingsForm";
 import {
   addToast,
   Badge,
@@ -12,13 +13,10 @@ import {
   CardBody,
   CardHeader,
   Input,
-  Select,
-  Slider,
   Switch,
   TagInput,
   Textarea,
 } from "@/components/ui";
-import { MODEL_OPTIONS } from "@/lib/constants";
 
 interface AgentData {
   agent_identifier: string;
@@ -30,7 +28,7 @@ interface AgentData {
   routing_prompt?: string | null;
   default_system_prompt: string;
   default_model_id: string;
-  default_temperature: number;
+  model_settings?: Record<string, unknown>;
   knowledge_base_enabled?: boolean | null;
   knowledge_categories?: string[] | null;
 }
@@ -357,34 +355,20 @@ export function AgentDetailForm({
                   className="font-mono text-sm"
                 />
               </FormFieldWrapper>
-              <div className="grid grid-cols-2 gap-4">
-                <FormFieldWrapper label="Model">
-                  <Select
-                    selectedKeys={new Set([editedAgent.default_model_id])}
-                    onSelectionChange={(keys) => {
-                      const modelId = Array.from(keys)[0] as string;
-                      setEditedAgent((prev) => prev ? { ...prev, default_model_id: modelId } : null);
-                    }}
-                    options={[...MODEL_OPTIONS]}
-                  />
-                </FormFieldWrapper>
-                <FormFieldWrapper label={`Temperature: ${editedAgent.default_temperature}%`}>
-                  <Slider
-                    value={[editedAgent.default_temperature]}
-                    onValueChange={(value) => {
-                      const temp = value[0];
-                      if (temp !== undefined) {
-                        setEditedAgent((prev) =>
-                          prev ? { ...prev, default_temperature: temp } : null
-                        );
-                      }
-                    }}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </FormFieldWrapper>
-              </div>
+              <ModelSettingsForm
+                modelId={editedAgent.default_model_id}
+                settings={editedAgent.model_settings ?? {}}
+                onChange={(settings) =>
+                  setEditedAgent((prev) =>
+                    prev ? { ...prev, model_settings: settings } : null
+                  )
+                }
+                onModelChange={(modelId) =>
+                  setEditedAgent((prev) =>
+                    prev ? { ...prev, default_model_id: modelId } : null
+                  )
+                }
+              />
             </FormSection>
           </CardBody>
         </Card>

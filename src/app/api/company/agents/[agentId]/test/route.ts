@@ -61,11 +61,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     };
 
     // Get agent config from agentsList (first agent is primary)
-    const agentsList = (agent.agentsList as { default_system_prompt: string; default_model_id: string; default_temperature: number }[]) || [];
+    const agentsList = (agent.agentsList as { default_system_prompt: string; default_model_id: string; model_settings?: Record<string, unknown> }[]) || [];
     const primaryAgent = agentsList[0];
     const systemPrompt = primaryAgent?.default_system_prompt || "";
-    const modelId = primaryAgent?.default_model_id || "gpt-5-mini";
-    const temperature = primaryAgent?.default_temperature ?? 70;
+    const modelId = primaryAgent?.default_model_id || "gpt-5-mini-2025-08-07";
+    const modelSettings = primaryAgent?.model_settings ?? { temperature: 0.7 };
+    const temperature = typeof modelSettings.temperature === "number" ? modelSettings.temperature : 0.7;
 
     // Simulate AI response based on the agent configuration
     const simulatedResponse = generateSimulatedResponse(
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       body.conversationHistory || []
     );
 
-    const reasoning = `Using agent "${agent.name}" with model ${modelId} at temperature ${temperature / 100}`;
+    const reasoning = `Using agent "${agent.name}" with model ${modelId} at temperature ${temperature}`;
     const tokensUsed = Math.floor(Math.random() * 500) + 100;
 
     // Handle streaming response

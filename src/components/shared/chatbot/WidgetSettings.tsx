@@ -96,7 +96,6 @@ interface WidgetConfig {
   // Stream Display Options
   showAgentSwitchNotification: boolean;
   showThinking: boolean;
-  showToolCalls: boolean;
   showInstantUpdates: boolean;
   // Multi-agent Display Options
   showAgentListOnTop: boolean;
@@ -173,7 +172,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
     // Stream Display Options
     showAgentSwitchNotification: true,
     showThinking: false,
-    showToolCalls: false,
     showInstantUpdates: true,
     // Multi-agent Display Options
     showAgentListOnTop: true,
@@ -223,7 +221,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
         // Stream Display Options
         showAgentSwitchNotification: config.showAgentSwitchNotification ?? true,
         showThinking: config.showThinking ?? false,
-        showToolCalls: config.showToolCalls ?? false,
         showInstantUpdates: config.showInstantUpdates ?? true,
         // Multi-agent Display Options
         showAgentListOnTop: config.showAgentListOnTop ?? true,
@@ -319,7 +316,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
     agentsList: demoAgentsList,
     showAgentSwitchNotification: formData.showAgentSwitchNotification,
     showThinking: formData.showThinking,
-    showToolCalls: formData.showToolCalls,
     showInstantUpdates: formData.showInstantUpdates,
     showAgentListOnTop: formData.showAgentListOnTop,
     agentListMinCards: parseInt(formData.agentListMinCards, 10),
@@ -965,20 +961,6 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
                 <Switch
                   isSelected={formData.showThinking}
                   onValueChange={(v) => updateField("showThinking", v)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-divider p-4">
-                <div>
-                  <span className="font-medium">Show tool calls</span>
-                  <p className="text-sm text-muted-foreground">
-                    Display when AI uses tools like search or calculations
-                  </p>
-                </div>
-                <Switch
-                  isSelected={formData.showToolCalls}
-                  onValueChange={(v) => updateField("showToolCalls", v)}
-                  isDisabled={!formData.showThinking}
                 />
               </div>
 

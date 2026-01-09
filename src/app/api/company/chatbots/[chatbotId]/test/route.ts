@@ -104,12 +104,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
           // Send debug info if enabled
           if (body.debug !== false) {
+            const modelSettings = selectedAgent.model_settings ?? { temperature: 0.7 };
             sendEvent("debug", {
               sessionId,
               chatbotId,
               agentIdentifier: selectedAgent.agent_identifier,
               model: selectedAgent.default_model_id,
-              temperature: selectedAgent.default_temperature,
+              modelSettings,
               knowledgeBaseEnabled: selectedAgent.knowledge_base_enabled ?? false,
               knowledgeCategories: selectedAgent.knowledge_categories ?? [],
               historyLength: history.length,
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
             agentConfig: {
               systemPrompt: selectedAgent.default_system_prompt,
               modelId: selectedAgent.default_model_id,
-              temperature: selectedAgent.default_temperature,
+              modelSettings: selectedAgent.model_settings ?? { temperature: 0.7 },
               knowledgeBaseEnabled: selectedAgent.knowledge_base_enabled ?? false,
               knowledgeCategories: selectedAgent.knowledge_categories ?? [],
             },

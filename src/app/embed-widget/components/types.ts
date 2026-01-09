@@ -40,6 +40,11 @@ export interface Message {
   agentName?: string;
   agentAvatarUrl?: string;
   agentColor?: string;
+  // Voice message fields
+  type?: "text" | "audio";
+  audioUrl?: string;
+  transcript?: string;
+  duration?: number;
 }
 
 // ============================================================================
@@ -93,6 +98,10 @@ export interface ChatWindowConfig {
   enableTypingIndicator?: boolean;
   enableMarkdown?: boolean;
   launcherIcon?: string;
+  buttonSize?: number;
+  launcherIconBorderRadius?: number;
+  launcherIconPulseGlow?: boolean;
+  hideLauncherOnMobile?: boolean;
   isMultiAgent?: boolean;
   agentsList?: AgentInfo[];
   customer?: {
@@ -104,7 +113,6 @@ export interface ChatWindowConfig {
   // Stream Display Options
   showAgentSwitchNotification?: boolean;
   showThinking?: boolean;
-  showToolCalls?: boolean;
   showInstantUpdates?: boolean;
   // Multi-agent Display Options
   showAgentListOnTop?: boolean;

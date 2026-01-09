@@ -77,6 +77,16 @@ export interface ToolDefinition {
     properties: Record<string, ToolParameter>;
     required?: string[];
   };
+  /**
+   * Message to display when tool starts executing
+   * @example "Checking your orders..."
+   */
+  toolExecutingMessage?: string;
+  /**
+   * Message to display when tool completes
+   * @example "Order details retrieved"
+   */
+  toolCompletedMessage?: string;
 }
 
 export interface ToolResult {
@@ -390,6 +400,8 @@ export interface ToolCallEvent extends StreamEvent {
     status: "executing" | "completed" | "failed";
     arguments?: Record<string, unknown>;
     result?: ToolResult;
+    /** User-friendly notification message for this tool status */
+    notification?: string;
   };
 }
 
@@ -531,8 +543,9 @@ export function agentToConfig(
 
   // Default values if no agent in list
   const systemPrompt = agentConfig?.default_system_prompt || "";
-  const modelId = agentConfig?.default_model_id || "gpt-4o-mini";
-  const temperature = agentConfig?.default_temperature ?? 70;
+  const modelId = agentConfig?.default_model_id || "gpt-5-mini-2025-08-07";
+  const modelSettings = agentConfig?.model_settings ?? { temperature: 0.7 };
+  const temperatureValue = typeof modelSettings.temperature === "number" ? modelSettings.temperature : 0.7;
   const knowledgeBaseEnabled = agentConfig?.knowledge_base_enabled ?? false;
   const knowledgeCategories = agentConfig?.knowledge_categories || [];
   const identifier = agentConfig?.agent_identifier || "main";
@@ -549,7 +562,7 @@ export function agentToConfig(
     llmConfig: {
       provider,
       model: modelId,
-      temperature: temperature / 100, // Convert from 0-100 to 0-1
+      temperature: temperatureValue, // Already in 0-1 format
       maxTokens: 4096,
       apiKey: provider === "openai" ? companyApiKeys?.openai : companyApiKeys?.anthropic,
     },

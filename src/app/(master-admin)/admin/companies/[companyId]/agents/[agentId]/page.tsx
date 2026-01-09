@@ -34,7 +34,7 @@ import {
   type BadgeVariant,
   type TabItem,
 } from "@/components/ui";
-import { MODEL_OPTIONS } from "@/lib/constants";
+import { ModelSettingsForm } from "@/components/shared/chatbot";
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -53,7 +53,7 @@ interface AgentDetails {
   packageName: string;
   systemPrompt: string;
   modelId: string;
-  temperature: number;
+  modelSettings: Record<string, unknown>;
   behavior: Record<string, unknown>;
   isActive: boolean;
   conversationCount: number;
@@ -103,7 +103,7 @@ export default function AgentConfigurationPage({
     packageId: "",
     systemPrompt: "",
     modelId: "gpt-5-mini",
-    temperature: 70,
+    modelSettings: { temperature: 0.7, max_tokens: 4096, top_p: 1 } as Record<string, unknown>,
     isActive: true,
     maxTokens: 2048,
     responseFormat: "text",
@@ -140,7 +140,7 @@ export default function AgentConfigurationPage({
         packageId: agentData.packageId,
         systemPrompt: agentData.systemPrompt,
         modelId: agentData.modelId,
-        temperature: agentData.temperature,
+        modelSettings: agentData.modelSettings ?? { temperature: 0.7, max_tokens: 4096, top_p: 1 },
         isActive: agentData.isActive,
         maxTokens: (agentData.behavior?.maxTokens as number) ?? 2048,
         responseFormat:
@@ -165,7 +165,7 @@ export default function AgentConfigurationPage({
             packageId: formData.packageId,
             systemPrompt: formData.systemPrompt,
             modelId: formData.modelId,
-            temperature: formData.temperature,
+            modelSettings: formData.modelSettings,
             isActive: formData.isActive,
             behavior: {
               maxTokens: formData.maxTokens,
@@ -222,7 +222,7 @@ export default function AgentConfigurationPage({
         packageId: agentData.packageId,
         systemPrompt: agentData.systemPrompt,
         modelId: agentData.modelId,
-        temperature: agentData.temperature,
+        modelSettings: agentData.modelSettings ?? { temperature: 0.7, max_tokens: 4096, top_p: 1 },
         isActive: agentData.isActive,
         maxTokens: (agentData.behavior?.maxTokens as number) ?? 2048,
         responseFormat:
@@ -417,38 +417,25 @@ export default function AgentConfigurationPage({
 
           <Card className="p-6">
             <h3 className="font-semibold mb-4">Model Configuration</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Select
-                label="AI Model"
-                selectedKeys={new Set([formData.modelId])}
-                onSelectionChange={(keys) => {
-                  const selected = Array.from(keys)[0] as string;
-                  updateField("modelId", selected ?? "gpt-5-mini");
-                }}
-                options={[...MODEL_OPTIONS]}
-                disabled={!isEditing}
+            {isEditing ? (
+              <ModelSettingsForm
+                modelId={formData.modelId}
+                settings={formData.modelSettings}
+                onChange={(settings) => updateField("modelSettings", settings)}
+                onModelChange={(modelId) => updateField("modelId", modelId)}
               />
-              <div>
-                <label className="text-sm font-medium text-foreground block mb-2">
-                  Temperature: {formData.temperature}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={formData.temperature}
-                  onChange={(e) =>
-                    updateField("temperature", parseInt(e.target.value))
-                  }
-                  className="w-full accent-primary"
-                  disabled={!isEditing}
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>Precise</span>
-                  <span>Creative</span>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">Model</p>
+                  <p className="font-medium">{formData.modelId}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Temperature</p>
+                  <p className="font-medium">{Math.round(((formData.modelSettings?.temperature as number) ?? 0.7) * 100)}%</p>
                 </div>
               </div>
-            </div>
+            )}
           </Card>
 
           <Card className="p-6">

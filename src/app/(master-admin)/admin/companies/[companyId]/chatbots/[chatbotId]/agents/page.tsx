@@ -74,7 +74,7 @@ export default function ChatbotAgentsPage() {
                   )}
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span>Model: {agent.default_model_id}</span>
-                    <span>Temp: {agent.default_temperature}%</span>
+                    <span>Temp: {Math.round(((agent.model_settings?.temperature as number) ?? 0.7) * 100)}%</span>
                   </div>
                 </div>
                 <ArrowRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors shrink-0 mt-2" />

@@ -228,7 +228,6 @@ function buildWidgetConfigJson(
     streamDisplay: {
       showAgentSwitchNotification: wc?.showAgentSwitchNotification ?? WIDGET_CONFIG_DEFAULTS.streamDisplay.showAgentSwitchNotification,
       showThinking: wc?.showThinking ?? WIDGET_CONFIG_DEFAULTS.streamDisplay.showThinking,
-      showToolCalls: wc?.showToolCalls ?? WIDGET_CONFIG_DEFAULTS.streamDisplay.showToolCalls,
       showInstantUpdates: wc?.showInstantUpdates ?? WIDGET_CONFIG_DEFAULTS.streamDisplay.showInstantUpdates,
     },
 

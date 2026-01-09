@@ -5,6 +5,7 @@ import {
   Building2,
   CreditCard,
   Package,
+  Brain,
   BarChart3,
   FileText,
   Settings,
@@ -32,6 +33,7 @@ const masterAdminSections: SidebarSection[] = [
     items: [
       { key: "plans", label: "Subscription Plans", href: "/admin/plans", icon: CreditCard },
       { key: "packages", label: "Chatbot Packages", href: "/admin/packages", icon: Package },
+      { key: "models", label: "AI Models", href: "/admin/models", icon: Brain },
     ],
   },
   {

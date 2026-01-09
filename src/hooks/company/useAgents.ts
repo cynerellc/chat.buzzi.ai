@@ -49,7 +49,7 @@ export interface AgentListItemConfig {
   avatar_url?: string;
   default_system_prompt: string;
   default_model_id: string;
-  default_temperature: number;
+  model_settings?: Record<string, unknown>;
   knowledge_base_enabled?: boolean;
   knowledge_categories?: string[];
   tools?: unknown[];

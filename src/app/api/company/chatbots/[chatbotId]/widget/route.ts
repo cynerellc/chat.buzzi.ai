@@ -67,7 +67,6 @@ export interface WidgetConfigResponse {
   // Stream Display Options
   showAgentSwitchNotification: boolean;
   showThinking: boolean;
-  showToolCalls: boolean;
   showInstantUpdates: boolean;
   // Multi-agent Display Options
   showAgentListOnTop: boolean;
@@ -193,7 +192,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // Stream Display Options
       showAgentSwitchNotification: config.showAgentSwitchNotification,
       showThinking: config.showThinking,
-      showToolCalls: config.showToolCalls,
       showInstantUpdates: config.showInstantUpdates,
       // Multi-agent Display Options
       showAgentListOnTop: config.showAgentListOnTop,
@@ -270,7 +268,6 @@ interface UpdateWidgetConfigRequest {
   // Stream Display Options
   showAgentSwitchNotification?: boolean;
   showThinking?: boolean;
-  showToolCalls?: boolean;
   showInstantUpdates?: boolean;
   // Multi-agent Display Options
   showAgentListOnTop?: boolean;
@@ -382,7 +379,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Stream Display Options
     if (body.showAgentSwitchNotification !== undefined) updateData.showAgentSwitchNotification = body.showAgentSwitchNotification;
     if (body.showThinking !== undefined) updateData.showThinking = body.showThinking;
-    if (body.showToolCalls !== undefined) updateData.showToolCalls = body.showToolCalls;
     if (body.showInstantUpdates !== undefined) updateData.showInstantUpdates = body.showInstantUpdates;
 
     // Multi-agent Display Options
@@ -449,7 +445,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       // Stream Display Options
       showAgentSwitchNotification: updatedConfig.showAgentSwitchNotification,
       showThinking: updatedConfig.showThinking,
-      showToolCalls: updatedConfig.showToolCalls,
       showInstantUpdates: updatedConfig.showInstantUpdates,
       // Multi-agent Display Options
       showAgentListOnTop: updatedConfig.showAgentListOnTop,

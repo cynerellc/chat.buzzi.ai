@@ -122,3 +122,48 @@ export async function invalidateMasterDashboardCache(): Promise<void> {
   const { REDIS_KEYS } = await import("./client");
   await cacheDelete(REDIS_KEYS.DASHBOARD_MASTER_STATS);
 }
+
+// ============================================================================
+// Widget Session Cache
+// ============================================================================
+
+/**
+ * Cached widget session data
+ */
+export interface CachedWidgetSession {
+  conversationId: string;
+  chatbotId: string;
+  companyId: string;
+  status: string;
+}
+
+/**
+ * Get cached widget session data
+ */
+export async function getWidgetSessionCache(
+  sessionId: string
+): Promise<CachedWidgetSession | null> {
+  const { REDIS_KEYS } = await import("./client");
+  return cacheGet<CachedWidgetSession>(REDIS_KEYS.widgetSession(sessionId));
+}
+
+/**
+ * Set widget session data in cache
+ */
+export async function setWidgetSessionCache(
+  sessionId: string,
+  data: CachedWidgetSession
+): Promise<boolean> {
+  const { REDIS_KEYS, REDIS_TTL } = await import("./client");
+  return cacheSet(REDIS_KEYS.widgetSession(sessionId), data, REDIS_TTL.WIDGET_SESSION);
+}
+
+/**
+ * Invalidate widget session cache
+ */
+export async function invalidateWidgetSessionCache(
+  sessionId: string
+): Promise<void> {
+  const { REDIS_KEYS } = await import("./client");
+  await cacheDelete(REDIS_KEYS.widgetSession(sessionId));
+}

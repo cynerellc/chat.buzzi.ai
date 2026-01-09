@@ -16,6 +16,7 @@ import type { Content, Schema } from "@google/genai";
 import { RAGService } from "../rag/service";
 import { HistoryService } from "./history-service";
 import { registerOpenAILlm } from "../adk/openai-llm";
+import { registerGeminiLlm } from "../adk/gemini-llm";
 
 import type {
   AgentContext,
@@ -36,9 +37,11 @@ import type {
 
 import { getPackage } from "@/chatbot-packages/registry";
 import { loadPackage } from "@/lib/packages";
+import { profiler } from "@/lib/profiler";
 
-// Register OpenAI LLM with ADK at module load
+// Register LLM providers with ADK at module load
 registerOpenAILlm();
+registerGeminiLlm();
 
 // ============================================================================
 // Constants
@@ -62,7 +65,8 @@ export interface AdkExecutorOptions {
   agentConfig: {
     systemPrompt: string;
     modelId: string;
-    temperature: number;
+    /** Model settings object (temperature, top_p, etc.) */
+    modelSettings: Record<string, unknown>;
     knowledgeBaseEnabled: boolean;
     knowledgeCategories: string[];
   };
@@ -269,6 +273,40 @@ const knowledgeBaseSearchSchema: Schema = {
 };
 
 /**
+ * Build knowledge base usage instructions for system prompts.
+ * These are GENERIC instructions about HOW to use the tool.
+ * Business-specific instructions about WHEN to use it should be
+ * configured in the agent's system prompt field by the user.
+ *
+ * @param categories - The knowledge categories this agent has access to
+ */
+function buildKnowledgeBaseInstructions(categories?: string[]): string {
+  const categoryList = categories && categories.length > 0
+    ? categories.map(c => `"${c}"`).join(", ")
+    : "all available categories";
+
+  return `
+
+## Knowledge Base Tool
+
+You have access to the \`search_knowledge_base\` tool to retrieve information from the knowledge base.
+
+**Available categories**: ${categoryList}
+
+**How to use**:
+- Call \`search_knowledge_base\` with a descriptive query string
+- The tool searches across your available knowledge categories and returns relevant information
+- Results include content snippets with source references
+
+**Best practices**:
+- Search FIRST when the user's question might be answered by documented information
+- Use specific, descriptive search queries (e.g., "return policy for electronics" not just "policy")
+- If results are found, incorporate them into your response and cite the source
+- If no relevant results are found, inform the user and offer alternative assistance
+- Prefer searching over asking clarifying questions when the answer might be in the knowledge base`;
+}
+
+/**
  * Create a knowledge base search tool for ADK
  */
 function createKnowledgeBaseTool(
@@ -398,21 +436,33 @@ export class AdkExecutor {
    * First tries static registry, then falls back to dynamic loader
    */
   async initialize(): Promise<boolean> {
-    // Try static registry first (for built-in/sample packages)
-    this.pkg = getPackage(this.options.packageId);
+    const initSpan = profiler.startSpan("executor_init", "executor", {
+      packageId: this.options.packageId,
+    });
 
-    // If not found, try dynamic loader (for packages in storage)
-    if (!this.pkg) {
-      console.log(`[AdkExecutor] Package ${this.options.packageId} not in registry, trying dynamic loader...`);
-      this.pkg = await loadPackage(this.options.packageId);
+    try {
+      // Try static registry first (for built-in/sample packages)
+      const registrySpan = profiler.startSpan("executor_registry_lookup", "executor");
+      this.pkg = getPackage(this.options.packageId);
+      registrySpan.end({ found: !!this.pkg });
+
+      // If not found, try dynamic loader (for packages in storage)
+      if (!this.pkg) {
+        console.log(`[AdkExecutor] Package ${this.options.packageId} not in registry, trying dynamic loader...`);
+        const dynamicSpan = profiler.startSpan("executor_dynamic_load", "executor");
+        this.pkg = await loadPackage(this.options.packageId);
+        dynamicSpan.end({ found: !!this.pkg });
+      }
+
+      if (!this.pkg) {
+        console.error(`[AdkExecutor] Failed to load package ${this.options.packageId}`);
+        return false;
+      }
+
+      return true;
+    } finally {
+      initSpan.end();
     }
-
-    if (!this.pkg) {
-      console.error(`[AdkExecutor] Failed to load package ${this.options.packageId}`);
-      return false;
-    }
-
-    return true;
   }
 
   /**
@@ -498,12 +548,21 @@ export class AdkExecutor {
    */
   private cacheToolMessages(tools: (Tool | LangChainTool)[]): void {
     for (const tool of tools) {
-      // SDK tools have toolExecutingMessage and toolCompletedMessage
-      const sdkTool = tool as Tool;
-      if (sdkTool.toolExecutingMessage || sdkTool.toolCompletedMessage) {
+      // Check for toolExecutingMessage and toolCompletedMessage on the tool object
+      // These can be on SDK tools or LangChain tools with Object.assign'd properties
+      const toolWithMessages = tool as Tool & {
+        toolExecutingMessage?: string;
+        toolCompletedMessage?: string;
+      };
+
+      if (toolWithMessages.toolExecutingMessage || toolWithMessages.toolCompletedMessage) {
+        console.log(`[AdkExecutor] Caching tool messages for "${tool.name}":`, {
+          executing: toolWithMessages.toolExecutingMessage,
+          completed: toolWithMessages.toolCompletedMessage,
+        });
         this.toolMessagesCache.set(tool.name, {
-          executing: sdkTool.toolExecutingMessage,
-          completed: sdkTool.toolCompletedMessage,
+          executing: toolWithMessages.toolExecutingMessage,
+          completed: toolWithMessages.toolCompletedMessage,
         });
       }
     }
@@ -513,15 +572,23 @@ export class AdkExecutor {
    * Create ADK LlmAgent from package and configuration
    */
   private createAdkAgent(context: AgentContext): LlmAgent {
+    const createAgentSpan = profiler.startSpan("executor_create_agent", "executor");
+
     if (!this.pkg) {
+      createAgentSpan.end();
       throw new Error("Package not loaded. Call initialize() first.");
     }
 
     const isMultiAgent = this.isMultiAgentPackage();
 
     // Get tools from the main agent
+    const toolsSpan = profiler.startSpan("executor_get_tools", "executor");
     const buzziTools = this.pkg.mainAgent.getTools(context as unknown as SDKAgentContext);
+    toolsSpan.end({ toolCount: buzziTools.length });
+
+    const convertSpan = profiler.startSpan("executor_convert_tools", "executor");
     const adkTools: BaseTool[] = convertToolsToAdk(buzziTools, context);
+    convertSpan.end();
 
     // Cache tool messages for SSE notifications
     this.cacheToolMessages(buzziTools);
@@ -549,7 +616,17 @@ export class AdkExecutor {
       const subAgents = this.createSubAgents(context);
 
       // Build supervisor system prompt with routing guidance
-      const supervisorPrompt = this.buildSupervisorSystemPrompt();
+      // Also add KB instructions if enabled (with available categories)
+      let supervisorPrompt = this.buildSupervisorSystemPrompt();
+      if (this.rag.isEnabled()) {
+        const categories = this.options.agentConfig.knowledgeCategories;
+        supervisorPrompt += buildKnowledgeBaseInstructions(categories);
+      }
+
+      // Get temperature from modelSettings
+      const supervisorTemp = typeof this.options.agentConfig.modelSettings.temperature === "number"
+        ? this.options.agentConfig.modelSettings.temperature
+        : 0.7;
 
       const supervisor = new LlmAgent({
         name: "supervisor",
@@ -558,7 +635,7 @@ export class AdkExecutor {
         tools: adkTools,
         subAgents,
         generateContentConfig: {
-          temperature: this.options.agentConfig.temperature / 100,
+          temperature: supervisorTemp,
         },
       });
 
@@ -569,18 +646,33 @@ export class AdkExecutor {
       // Without this fix, salesman.rootAgent = salesman (not supervisor), so it can't find accounts.
       this.fixSubAgentRootReferences(supervisor);
 
+      createAgentSpan.end({ mode: "multi-agent", subAgentCount: subAgents.length });
       return supervisor;
     } else {
       // Single agent mode
-      return new LlmAgent({
+      // Get temperature from modelSettings
+      const singleAgentTemp = typeof this.options.agentConfig.modelSettings.temperature === "number"
+        ? this.options.agentConfig.modelSettings.temperature
+        : 0.7;
+
+      // Augment system prompt with KB instructions if knowledge base is enabled
+      // Include the available categories so the agent knows what it can search
+      const singleAgentPrompt = this.rag.isEnabled()
+        ? this.options.agentConfig.systemPrompt + buildKnowledgeBaseInstructions(this.options.agentConfig.knowledgeCategories)
+        : this.options.agentConfig.systemPrompt;
+
+      const agent = new LlmAgent({
         name: "main",
         model: this.options.agentConfig.modelId,
-        instruction: this.options.agentConfig.systemPrompt,
+        instruction: singleAgentPrompt,
         tools: adkTools,
         generateContentConfig: {
-          temperature: this.options.agentConfig.temperature / 100,
+          temperature: singleAgentTemp,
         },
       });
+
+      createAgentSpan.end({ mode: "single-agent" });
+      return agent;
     }
   }
 
@@ -595,35 +687,65 @@ export class AdkExecutor {
       // Find the BuzziAgent for this worker
       const buzziWorker = this.pkg!.getAgent(worker.agent_identifier);
 
+      console.log(`[AdkExecutor] Creating sub-agent "${worker.agent_identifier}":`, {
+        found: !!buzziWorker,
+        packageAgentIds: this.pkg!.getAllAgents().map(a => a.agentId),
+      });
+
       // Get tools for this worker
       const workerTools: BaseTool[] = [];
       if (buzziWorker) {
         const buzziTools = buzziWorker.getTools(context as unknown as SDKAgentContext);
+        console.log(`[AdkExecutor] Worker "${worker.agent_identifier}" tools:`, buzziTools.map(t => t.name));
         workerTools.push(...convertToolsToAdk(buzziTools, context));
         // Cache worker tool messages for SSE notifications
         this.cacheToolMessages(buzziTools);
+      } else {
+        console.warn(`[AdkExecutor] Worker agent "${worker.agent_identifier}" not found in package`);
       }
 
+      // Check if this worker has knowledge base enabled
+      const workerHasKb = worker.knowledge_base_enabled === true &&
+        worker.knowledge_categories &&
+        worker.knowledge_categories.length > 0;
+
       // Add knowledge base tool if this worker has KB enabled (using pooled RAGService)
-      if (worker.knowledge_categories && worker.knowledge_categories.length > 0) {
-        const workerRag = this.getOrCreateRagService(worker.knowledge_categories);
+      if (workerHasKb) {
+        const workerRag = this.getOrCreateRagService(worker.knowledge_categories!);
         workerTools.push(
           createKnowledgeBaseTool(workerRag, this.options.companyId, worker.knowledge_categories)
         );
+        // Cache tool messages for worker KB tool
+        this.toolMessagesCache.set("search_knowledge_base", {
+          executing: "Searching knowledge base...",
+          completed: "Knowledge retrieved",
+        });
       }
 
       // Determine description for routing
       // ADK uses the description to decide when to delegate to this sub-agent
       const routingDescription = this.getWorkerRoutingDescription(worker);
 
+      // Get temperature from model_settings or use default
+      const workerModelSettings = worker.model_settings ?? { temperature: 0.7 };
+      const workerTemperature = typeof workerModelSettings.temperature === "number"
+        ? workerModelSettings.temperature
+        : 0.7;
+
+      // Augment system prompt with KB instructions if this worker has KB enabled
+      // Include this worker's specific categories so it knows what it can search
+      const workerPrompt = workerHasKb
+        ? worker.default_system_prompt + buildKnowledgeBaseInstructions(worker.knowledge_categories)
+        : worker.default_system_prompt;
+
       return new LlmAgent({
         name: worker.agent_identifier,
         description: routingDescription,
         model: worker.default_model_id || this.options.agentConfig.modelId,
-        instruction: worker.default_system_prompt,
+        instruction: workerPrompt,
         tools: workerTools,
         generateContentConfig: {
-          temperature: (worker.default_temperature ?? 70) / 100,
+          temperature: workerTemperature,
         },
       });
     });
@@ -723,10 +845,13 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
   async *processMessageStream(
     options: ExecuteMessageOptions
   ): AsyncGenerator<AgentStreamEvent> {
+    const streamSpan = profiler.startSpan("executor_process_stream", "streaming", {
+      sessionId: options.sessionId,
+    });
     const startTime = performance.now();
     const sources: RAGSource[] = [];
     const toolsUsed: string[] = [];
-    let fullContent = "";
+    const contentBuffer: string[] = []; // Use array for efficient string building
 
     try {
       // Ensure package is loaded
@@ -747,19 +872,31 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
             },
             timestamp: Date.now(),
           };
+          streamSpan.end({ error: "PACKAGE_LOAD_ERROR" });
           return;
         }
       }
 
     
 
-      // Get or create session
-      await this.sessionAdapter.getOrCreateSession(options.sessionId);
+      // Detailed timing for ADK executor internals
+      const adkTimings: Record<string, number> = {};
+      const adkStart = performance.now();
+      let adkStepStart = performance.now();
 
-   
+      // Get or create session
+      const sessionSpan = profiler.startSpan("executor_session_load", "context");
+      await this.sessionAdapter.getOrCreateSession(options.sessionId);
+      sessionSpan.end();
+      adkTimings.sessionLoad = performance.now() - adkStepStart;
+      adkStepStart = performance.now();
 
       // Get cached runner (creates agent internally if needed)
+      const runnerSpan = profiler.startSpan("executor_get_runner", "executor");
       const runner = this.getOrCreateRunner(options.context);
+      runnerSpan.end();
+      adkTimings.runnerCreate = performance.now() - adkStepStart;
+      adkStepStart = performance.now();
 
       // Track current agent for smart transfer notifications
       let currentAgentId: string | null = null;
@@ -772,6 +909,13 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
       } as unknown as Content;
 
       // Run the agent with SSE streaming mode for real-time token streaming
+      const llmSpan = profiler.startSpan("llm_inference", "llm", {
+        modelId: this.options.agentConfig.modelId,
+      });
+      let tokenCount = 0;
+      let firstTokenTime: number | null = null;
+      const llmCallStart = performance.now();
+
       for await (const event of runner.runAsync({
         userId: DEFAULT_USER_ID,
         sessionId: options.sessionId,
@@ -787,7 +931,12 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
         if (adkEvent.content?.parts) {
           for (const part of adkEvent.content.parts) {
             if ("text" in part && part.text) {
-              fullContent += part.text;
+              // Track time to first token
+              if (!firstTokenTime) {
+                firstTokenTime = performance.now() - llmCallStart;
+              }
+              contentBuffer.push(part.text);
+              tokenCount++;
               yield {
                 type: "delta",
                 data: { content: part.text },
@@ -808,6 +957,9 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
 
               const toolName = funcCall.name || "unknown";
               toolsUsed.push(toolName);
+
+              // Start tool profiling span
+              profiler.startSpan(`tool:${toolName}`, "tool");
 
               // Look up custom notification message from tool definition
               const toolMessages = this.toolMessagesCache.get(toolName);
@@ -834,6 +986,10 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
               }
 
               const toolName = funcResp.name || "unknown";
+
+              // End tool profiling span
+              profiler.getActiveSpan(`tool:${toolName}`)?.end();
+
               // Look up custom notification message from tool definition
               const toolMessages = this.toolMessagesCache.get(toolName);
 
@@ -891,11 +1047,37 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
         }
       }
 
+      // End LLM inference span
+      const llmTotalTime = performance.now() - llmCallStart;
+      adkTimings.llmInference = llmTotalTime;
+      adkTimings.timeToFirstToken = firstTokenTime ?? llmTotalTime;
+      llmSpan.end({ tokenCount, toolsUsed: toolsUsed.length });
+
+      // Build full content from buffer
+      const fullContent = contentBuffer.join("");
+
       // Save to history
+      const historyStart = performance.now();
+      const historySpan = profiler.startSpan("executor_history_save", "db");
       await this.history.append(options.sessionId, [
         { role: "user", content: options.message },
         { role: "assistant", content: fullContent },
       ]);
+      historySpan.end();
+      adkTimings.historySave = performance.now() - historyStart;
+      adkTimings.total = performance.now() - adkStart;
+
+      // Print detailed ADK timing report if profiler enabled
+      if (process.env.ENABLE_PROFILER === "true") {
+        console.log("\n[AdkExecutor] Detailed Timing Breakdown:");
+        console.log("─".repeat(50));
+        for (const [key, value] of Object.entries(adkTimings)) {
+          const pct = ((value / adkTimings.total) * 100).toFixed(1);
+          console.log(`  ${key.padEnd(25)} ${value.toFixed(2).padStart(10)}ms (${pct.padStart(5)}%)`);
+        }
+        console.log(`  ${"tokenCount".padEnd(25)} ${String(tokenCount).padStart(10)}`);
+        console.log("─".repeat(50));
+      }
 
       // Emit complete event
       const processingTimeMs = performance.now() - startTime;
@@ -913,6 +1095,8 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
         },
         timestamp: Date.now(),
       };
+
+      streamSpan.end({ success: true, processingTimeMs, tokenCount });
     } catch (error) {
       console.error("[AdkExecutor] Streaming error:", error);
 
@@ -925,6 +1109,8 @@ When a customer's request matches an agent's specialty, delegate to them. Handle
         },
         timestamp: Date.now(),
       };
+
+      streamSpan.end({ error: true });
     }
   }
 

@@ -2,7 +2,7 @@
  * OpenAI LLM Provider for Google ADK
  *
  * This module provides an OpenAI implementation of the BaseLlm interface,
- * allowing the use of OpenAI models (gpt-4o, gpt-4o-mini, etc.) with ADK.
+ * allowing the use of OpenAI models (gpt-5 series) with ADK.
  */
 
 import OpenAI from "openai";
@@ -364,12 +364,8 @@ export class OpenAILlm extends BaseLlm {
    * Supported OpenAI models
    */
   static readonly supportedModels: Array<string | RegExp> = [
-    /^gpt-4o.*/,
-    /^gpt-4-turbo.*/,
-    /^gpt-4.*/,
-    /^gpt-3\.5-turbo.*/,
-    /^o1.*/,
-    /^o3.*/,
+    // GPT-5 series
+    /^gpt-5.*/,
   ];
 
   constructor({ model }: { model: string }) {
@@ -419,25 +415,60 @@ export class OpenAILlm extends BaseLlm {
       // Get temperature from config
       const temperature = llmRequest.config?.temperature ?? 0.7;
 
-      // Determine max tokens based on model
-      const isReasoningModel = /^(o1|o3|gpt-5)/.test(this.model);
+      // Determine model capabilities
+      // GPT-5 models use max_completion_tokens instead of max_tokens
+      const usesMaxCompletionTokens = /^gpt-5/.test(this.model);
+      // GPT-5-mini and GPT-5-nano don't support custom temperature
+      const noCustomTemperature = /^gpt-5-(mini|nano)/.test(this.model);
       const maxTokens = llmRequest.config?.maxOutputTokens ?? 4096;
 
       if (stream) {
+        // Debug: Log what we're sending to OpenAI
+        if (process.env.ENABLE_PROFILER === "true") {
+          const systemMessages = messages.filter(m => m.role === "system");
+          const userMessages = messages.filter(m => m.role === "user");
+          const assistantMessages = messages.filter(m => m.role === "assistant");
+          const toolMessages = messages.filter(m => m.role === "tool");
+
+          // Estimate token count (rough: 4 chars per token)
+          const totalChars = messages.reduce((sum, m) => {
+            if (typeof m.content === "string") return sum + m.content.length;
+            if (Array.isArray(m.content)) {
+              return sum + m.content.reduce((s, p) => s + (typeof p === "string" ? p.length : JSON.stringify(p).length), 0);
+            }
+            return sum;
+          }, 0);
+          const estimatedTokens = Math.ceil(totalChars / 4);
+
+          console.log(`\n[OpenAILlm] Request to ${this.model}:`);
+          console.log(`  Messages: ${messages.length} total (${systemMessages.length} system, ${userMessages.length} user, ${assistantMessages.length} assistant, ${toolMessages.length} tool)`);
+          console.log(`  Estimated input tokens: ~${estimatedTokens}`);
+          console.log(`  Tools defined: ${tools?.length ?? 0}`);
+          if (systemMessages.length > 0 && typeof systemMessages[0].content === "string") {
+            console.log(`  System prompt length: ${systemMessages[0].content.length} chars`);
+          }
+        }
+
         // Streaming mode
+        const apiCallStart = performance.now();
         const streamResponse = await this.client.chat.completions.create({
           model: this.model,
           messages,
           tools: tools && tools.length > 0 ? tools : undefined,
-          temperature: isReasoningModel ? undefined : temperature,
-          max_completion_tokens: isReasoningModel ? maxTokens : undefined,
-          max_tokens: isReasoningModel ? undefined : maxTokens,
+          temperature: noCustomTemperature ? undefined : temperature,
+          max_completion_tokens: usesMaxCompletionTokens ? maxTokens : undefined,
+          max_tokens: usesMaxCompletionTokens ? undefined : maxTokens,
           stream: true,
         });
+
+        if (process.env.ENABLE_PROFILER === "true") {
+          console.log(`[OpenAILlm] Stream started after ${(performance.now() - apiCallStart).toFixed(0)}ms`);
+        }
 
         // Track accumulated tool calls for streaming
         const accumulatedToolCalls: Map<number, OpenAIToolCall> = new Map();
         let accumulatedContent = "";
+        let firstTokenReceived = false;
 
         for await (const chunk of streamResponse) {
           const choice = chunk.choices[0];
@@ -447,6 +478,10 @@ export class OpenAILlm extends BaseLlm {
 
           // Accumulate content
           if (delta.content) {
+            if (!firstTokenReceived && process.env.ENABLE_PROFILER === "true") {
+              console.log(`[OpenAILlm] First token received after ${(performance.now() - apiCallStart).toFixed(0)}ms`);
+              firstTokenReceived = true;
+            }
             accumulatedContent += delta.content;
             yield buildLlmResponse(
               [{ text: delta.content }],
@@ -489,11 +524,8 @@ export class OpenAILlm extends BaseLlm {
           if (choice.finish_reason) {
             const parts: LocalPart[] = [];
 
-            if (accumulatedContent) {
-              parts.push({ text: accumulatedContent });
-            }
-
-            // Add completed tool calls
+            // Only include accumulated tool calls in final response
+            // Don't include text - it was already streamed as deltas
             for (const toolCall of accumulatedToolCalls.values()) {
               try {
                 parts.push({
@@ -508,6 +540,7 @@ export class OpenAILlm extends BaseLlm {
               }
             }
 
+            // Only emit final response if there are tool calls or to signal completion
             yield buildLlmResponse(
               parts,
               false,
@@ -522,9 +555,9 @@ export class OpenAILlm extends BaseLlm {
           model: this.model,
           messages,
           tools: tools && tools.length > 0 ? tools : undefined,
-          temperature: isReasoningModel ? undefined : temperature,
-          max_completion_tokens: isReasoningModel ? maxTokens : undefined,
-          max_tokens: isReasoningModel ? undefined : maxTokens,
+          temperature: noCustomTemperature ? undefined : temperature,
+          max_completion_tokens: usesMaxCompletionTokens ? maxTokens : undefined,
+          max_tokens: usesMaxCompletionTokens ? undefined : maxTokens,
           stream: false,
         });
 

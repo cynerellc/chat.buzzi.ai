@@ -23,6 +23,7 @@ import { ThinkingBubble, type ToolCallState } from "./ThinkingBubble";
 import { UserBubble } from "./UserBubble";
 import { AgentBubble } from "./AgentBubble";
 import { MessageInput } from "./MessageInput";
+import { VoiceMessageBubble } from "./VoiceMessageBubble";
 import type {
   AgentInfo,
   ChatWindowConfig,
@@ -74,6 +75,7 @@ export function ChatWindow({
   const [preChatName, setPreChatName] = useState("");
   const [preChatEmail, setPreChatEmail] = useState("");
   const [preChatSubmitted, setPreChatSubmitted] = useState(false);
+  const [isInitializingSession, setIsInitializingSession] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -85,16 +87,13 @@ export function ChatWindow({
   const visibleAgentsRef = useRef<Set<string>>(visibleAgents);
   const animatedAgentsRef = useRef<Set<string>>(new Set());
 
-  // Voice recording for push-to-talk
-  const handleVoiceTranscript = useCallback((text: string) => {
-    if (text.trim()) {
-      sendMessageRef.current(text);
-    }
-  }, []);
+  // State for voice message sending
+  const [isSendingVoice, setIsSendingVoice] = useState(false);
 
+  // Voice recording for push-to-talk
   const {
     isRecording,
-    isTranscribing,
+    isStarting: isVoiceStarting,
     isSupported: isVoiceSupported,
     duration: recordingDuration,
     audioData,
@@ -102,9 +101,11 @@ export function ChatWindow({
     stopRecording,
     cancelRecording,
   } = useVoiceRecording({
-    sessionId: session?.sessionId,
-    onTranscript: handleVoiceTranscript,
     maxDuration: 60,
+    onError: (err) => {
+      console.error("Voice recording error:", err);
+      setError(err);
+    },
   });
 
   // Initialize config - either from props (demo) or URL params (production)
@@ -139,7 +140,6 @@ export function ChatWindow({
         agentsList: configJson.agentsList,
         showAgentSwitchNotification: configJson.showAgentSwitchNotification ?? true,
         showThinking: configJson.showThinking ?? false,
-        showToolCalls: configJson.showToolCalls ?? false,
         showInstantUpdates: configJson.showInstantUpdates ?? true,
         showAgentListOnTop: configJson.showAgentListOnTop ?? true,
         agentListMinCards: configJson.agentListMinCards ?? 3,
@@ -373,11 +373,23 @@ export function ChatWindow({
   }, [isDemo]);
 
   // Create session when config is ready (skip in demo mode)
+  // Try to resume existing session first if persistence is enabled
   useEffect(() => {
-    if (config && !session && !isDemo) {
-      createSession();
+    if (config && !session && !isDemo && !isInitializingSession) {
+      setIsInitializingSession(true);
+      if (config.persistConversation) {
+        resumeSession().then((resumed) => {
+          if (!resumed) {
+            createSession();
+          }
+          setIsInitializingSession(false);
+        });
+      } else {
+        createSession();
+        setIsInitializingSession(false);
+      }
     }
-  }, [config, session, isDemo]);
+  }, [config, session, isDemo, isInitializingSession]);
 
   // Connect SSE when session is ready (skip in demo mode)
   useEffect(() => {
@@ -452,7 +464,6 @@ export function ChatWindow({
                 // Stream Display Options
                 showAgentSwitchNotification: jsonConfig.streamDisplay?.showAgentSwitchNotification ?? true,
                 showThinking: jsonConfig.streamDisplay?.showThinking ?? false,
-                showToolCalls: jsonConfig.streamDisplay?.showToolCalls ?? false,
                 showInstantUpdates: jsonConfig.streamDisplay?.showInstantUpdates ?? true,
                 // Multi-agent Display Options
                 showAgentListOnTop: jsonConfig.multiAgent?.showAgentListOnTop ?? true,
@@ -548,9 +559,99 @@ export function ChatWindow({
       const data = await response.json();
       setSession(data);
       notifyParent("widget:session", data);
+
+      // Save session to localStorage if persistence is enabled
+      if (config.persistConversation) {
+        const storageKey = `buzzi_widget_${config.agentId}_session`;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            sessionId: data.sessionId,
+            conversationId: data.conversationId,
+            endUserId: data.endUserId,
+            createdAt: new Date().toISOString(),
+          }));
+        } catch {
+          // localStorage not available
+        }
+      }
     } catch {
       setError("Failed to connect. Please try again.");
       notifyParent("widget:error", { message: "Failed to create session" });
+    }
+  };
+
+  const resumeSession = async (): Promise<boolean> => {
+    if (!config || !config.persistConversation) return false;
+
+    const storageKey = `buzzi_widget_${config.agentId}_session`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) return false;
+
+      const { sessionId, conversationId, endUserId } = JSON.parse(stored);
+      if (!sessionId) return false;
+
+      // Try to resume via API
+      const response = await fetch("/api/widget/session/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          agentId: config.agentId,
+          companyId: config.companyId,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.valid) {
+          setSession({ sessionId, conversationId, endUserId });
+
+          // Load messages from database
+          if (data.messages && data.messages.length > 0) {
+            const loadedMessages: Message[] = data.messages.map((m: { id: string; role: string; content: string; timestamp: string; agentId?: string }) => {
+              const agent = m.agentId ? config.agentsList?.find(a => a.id === m.agentId) : config.agentsList?.[0];
+              return {
+                id: m.id,
+                role: m.role as "user" | "assistant" | "system",
+                content: m.content,
+                timestamp: new Date(m.timestamp),
+                status: "sent" as const,
+                agentId: m.agentId || agent?.id,
+                agentName: agent?.name,
+                agentAvatarUrl: agent?.avatarUrl,
+                agentColor: agent?.color,
+              };
+            });
+            setMessages(loadedMessages);
+
+            // Set the last active agent if multi-agent
+            if (config.isMultiAgent && loadedMessages.length > 0) {
+              const lastAssistantMsg = [...loadedMessages].reverse().find(m => m.role === "assistant");
+              if (lastAssistantMsg?.agentId) {
+                setActiveAgentId(lastAssistantMsg.agentId);
+                // Collect all unique agent IDs that appeared in the conversation
+                const visibleIds = new Set<string>();
+                loadedMessages.forEach(m => {
+                  if (m.agentId) visibleIds.add(m.agentId);
+                });
+                setVisibleAgents(visibleIds);
+              }
+            }
+          }
+
+          notifyParent("widget:session", { sessionId, conversationId, endUserId });
+          return true;
+        }
+      }
+
+      // Invalid session - clear localStorage
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(`buzzi_widget_${config.agentId}_conversation`);
+      return false;
+    } catch {
+      // localStorage not available or parse error
+      return false;
     }
   };
 
@@ -584,19 +685,27 @@ export function ChatWindow({
 
     eventSource.addEventListener("tool_call", (event) => {
       // Always update thinkingState for tool calls (to show ThinkingBubble)
-      // Only include tool details if showToolCalls is enabled
+      // Only include tool details if showThinking is enabled (tool calls shown inside thinking)
       try {
         const data = JSON.parse(event.data);
+        // Map SSE status values to ThinkingBubble expected values
+        const toolStatus = data.status === "executing" ? "running"
+          : data.status === "completed" ? "completed"
+          : data.status || "running";
+
         setThinkingState((prev) => ({
           ...prev,
-          // Only include toolCalls array if showToolCalls is enabled
-          toolCalls: config?.showToolCalls !== false
+          // Update thinking text with notification message from tool
+          text: data.notification || prev?.text,
+          // Only include toolCalls array if showThinking is enabled
+          toolCalls: config?.showThinking
             ? [
-                ...(prev?.toolCalls || []).filter((t) => t.name !== data.name),
+                ...(prev?.toolCalls || []).filter((t) => t.name !== data.toolName),
                 {
-                  name: data.name,
-                  status: data.status || "running",
-                  args: data.args,
+                  name: data.toolName,
+                  status: toolStatus,
+                  args: data.arguments,
+                  notification: data.notification,
                 },
               ]
             : prev?.toolCalls,
@@ -974,7 +1083,7 @@ export function ChatWindow({
                       ...prev,
                       // Update thinking text with notification if provided
                       text: data.notification || prev?.text,
-                      toolCalls: config?.showToolCalls !== false
+                      toolCalls: config?.showThinking
                         ? [
                             ...(prev?.toolCalls || []).filter(
                               (t) => t.name !== data.toolName
@@ -1248,10 +1357,487 @@ export function ChatWindow({
     sendMessageRef.current = handleSendMessage;
   }, [handleSendMessage]);
 
+  // Handle voice message sending
+  const handleSendVoiceMessage = useCallback(
+    async (audioBlob: Blob, duration: number) => {
+      console.log("[Voice] Sending voice message, blob size:", audioBlob.size, "duration:", duration, "session:", session?.sessionId);
+      if (isDemo) {
+        console.log("[Voice] Demo mode, skipping voice message");
+        return;
+      }
+      if (!session) {
+        console.error("[Voice] No session available, cannot send voice message");
+        setError("Session not initialized. Please refresh and try again.");
+        return;
+      }
+
+      const messageId = `voice-${Date.now()}`;
+      const responseId = `response-${Date.now()}`;
+
+      // Add user voice message (content will be updated with transcript after ack)
+      const userMessage: Message = {
+        id: messageId,
+        role: "user",
+        content: "", // Will be filled with transcript from server
+        type: "audio",
+        duration,
+        timestamp: new Date(),
+        status: "sending",
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setIsTyping(true);
+      setIsSendingVoice(true);
+      setThinkingState(null);
+
+      // Add placeholder for streaming response
+      let currentActiveAgentId = activeAgentId;
+      const getActiveAgent = () =>
+        config?.agentsList?.find((a) => a.id === currentActiveAgentId);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: responseId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+          status: "sending",
+          agentId: currentActiveAgentId || undefined,
+          agentName: getActiveAgent()?.name,
+          agentAvatarUrl: getActiveAgent()?.avatarUrl,
+          agentColor: getActiveAgent()?.color,
+        },
+      ]);
+      setStreamingMessageId(responseId);
+
+      try {
+        // Send voice message via FormData
+        const formData = new FormData();
+        const extension = audioBlob.type.includes("webm") ? "webm" : "mp4";
+        formData.append("audio", audioBlob, `recording.${extension}`);
+        formData.append("duration", duration.toString());
+
+        const response = await fetch(
+          `/api/widget/${session.sessionId}/message`,
+          {
+            method: "POST",
+            body: formData, // No Content-Type header - browser sets it with boundary
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to send voice message");
+        }
+
+        // Read the streaming response (same as text messages)
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error("No response body");
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let streamedContent = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          let currentEventType = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              currentEventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ") && currentEventType) {
+              const dataStr = line.slice(6);
+              try {
+                const data = JSON.parse(dataStr);
+
+                switch (currentEventType) {
+                  case "ack":
+                    // Update user voice message with transcript and audio URL
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === messageId
+                          ? {
+                              ...msg,
+                              status: "sent",
+                              content: data.transcript || "",
+                              transcript: data.transcript || "",
+                              audioUrl: data.audioUrl,
+                              duration: data.duration || duration,
+                            }
+                          : msg
+                      )
+                    );
+                    break;
+
+                  case "thinking":
+                    setIsTyping(true);
+                    const thinkingText = data.content || data.step;
+                    const isStatusMessage =
+                      thinkingText &&
+                      (thinkingText.toLowerCase().includes("generating") ||
+                        thinkingText.toLowerCase().includes("initializing") ||
+                        thinkingText.toLowerCase().includes("processing") ||
+                        thinkingText === "Thinking...");
+
+                    if (
+                      !isStatusMessage &&
+                      config?.showThinking !== false &&
+                      thinkingText
+                    ) {
+                      setThinkingState((prev) => ({
+                        ...prev,
+                        text: thinkingText,
+                      }));
+                    }
+                    break;
+
+                  case "tool_call":
+                    const toolStatus =
+                      data.status === "executing"
+                        ? "running"
+                        : data.status === "completed"
+                          ? "completed"
+                          : data.status || "running";
+
+                    setThinkingState((prev) => ({
+                      ...prev,
+                      text: data.notification || prev?.text,
+                      toolCalls:
+                        config?.showThinking
+                          ? [
+                              ...(prev?.toolCalls || []).filter(
+                                (t) => t.name !== data.toolName
+                              ),
+                              {
+                                name: data.toolName,
+                                status: toolStatus,
+                                args: data.arguments,
+                                notification: data.notification,
+                              },
+                            ]
+                          : prev?.toolCalls,
+                    }));
+                    break;
+
+                  case "notification":
+                    if (data.message && data.targetAgentId) {
+                      const isAgentAlreadyVisible = visibleAgents.has(
+                        data.targetAgentId
+                      );
+
+                      if (!isAgentAlreadyVisible) {
+                        setVisibleAgents(
+                          (prev) => new Set([...prev, data.targetAgentId])
+                        );
+                      }
+
+                      currentActiveAgentId = data.targetAgentId;
+                      setActiveAgentId(data.targetAgentId);
+
+                      if (
+                        !isAgentAlreadyVisible &&
+                        config?.showAgentSwitchNotification !== false
+                      ) {
+                        const previousAgentId = data.previousAgentId;
+                        const previousAgent = previousAgentId
+                          ? config?.agentsList?.find(
+                              (a) => a.id === previousAgentId
+                            )
+                          : config?.agentsList?.find(
+                              (a) => a.type === "supervisor"
+                            ) || config?.agentsList?.[0];
+
+                        const newAgent = config?.agentsList?.find(
+                          (a) => a.id === data.targetAgentId
+                        );
+
+                        setMessages((prev) => {
+                          const streamingIdx = prev.findIndex(
+                            (m) => m.id === responseId
+                          );
+
+                          const transferMsg: Message = {
+                            id: `transfer-${Date.now()}`,
+                            role: "system",
+                            content: data.message,
+                            timestamp: new Date(),
+                            isNotification: true,
+                            isTransfer: true,
+                            targetAgentId: data.targetAgentId,
+                            targetAgentName:
+                              newAgent?.name || data.targetAgentName,
+                            targetAgentAvatarUrl:
+                              newAgent?.avatarUrl || data.targetAgentAvatarUrl,
+                            targetAgentDesignation:
+                              newAgent?.designation ||
+                              data.targetAgentDesignation,
+                            previousAgentId:
+                              previousAgent?.id || data.previousAgentId,
+                            previousAgentName:
+                              previousAgent?.name || data.previousAgentName,
+                            previousAgentAvatarUrl:
+                              previousAgent?.avatarUrl ||
+                              data.previousAgentAvatarUrl,
+                          };
+
+                          if (streamingIdx === -1) {
+                            return [...prev, transferMsg];
+                          }
+
+                          const streamingMsg = prev[streamingIdx];
+                          const updatedStreamingMsg = streamingMsg
+                            ? {
+                                ...streamingMsg,
+                                agentId:
+                                  data.targetAgentId || streamingMsg.agentId,
+                                agentName:
+                                  newAgent?.name || streamingMsg.agentName,
+                                agentAvatarUrl:
+                                  newAgent?.avatarUrl ||
+                                  streamingMsg.agentAvatarUrl,
+                                agentColor:
+                                  newAgent?.color || streamingMsg.agentColor,
+                              }
+                            : null;
+
+                          return [
+                            ...prev.slice(0, streamingIdx),
+                            transferMsg,
+                            ...(updatedStreamingMsg
+                              ? [updatedStreamingMsg]
+                              : []),
+                            ...prev.slice(streamingIdx + 1),
+                          ];
+                        });
+                      }
+                    }
+                    break;
+
+                  case "delta":
+                    setThinkingState(null);
+
+                    if (config?.showInstantUpdates === false) {
+                      streamedContent += data.content;
+                      break;
+                    }
+
+                    streamedContent += data.content;
+                    const deltaActiveAgent = getActiveAgent();
+
+                    setMessages((prev) => {
+                      const streamingIdx = prev.findIndex(
+                        (m) => m.id === responseId && m.role === "assistant"
+                      );
+
+                      if (streamingIdx === -1) return prev;
+
+                      const streamingMsg = prev[streamingIdx];
+                      if (!streamingMsg) return prev;
+
+                      return [
+                        ...prev.slice(0, streamingIdx),
+                        {
+                          ...streamingMsg,
+                          content: streamingMsg.content + data.content,
+                          agentId:
+                            currentActiveAgentId || streamingMsg.agentId,
+                          agentName:
+                            deltaActiveAgent?.name || streamingMsg.agentName,
+                          agentAvatarUrl:
+                            deltaActiveAgent?.avatarUrl ||
+                            streamingMsg.agentAvatarUrl,
+                          agentColor:
+                            deltaActiveAgent?.color || streamingMsg.agentColor,
+                        },
+                        ...prev.slice(streamingIdx + 1),
+                      ];
+                    });
+                    break;
+
+                  case "complete":
+                    setThinkingState(null);
+                    const completeActiveAgent = getActiveAgent();
+
+                    setMessages((prev) => {
+                      const streamingIdx = prev.findIndex(
+                        (m) => m.id === responseId && m.role === "assistant"
+                      );
+
+                      if (streamingIdx === -1) return prev;
+
+                      const streamingMsg = prev[streamingIdx];
+                      if (!streamingMsg) return prev;
+
+                      return [
+                        ...prev.slice(0, streamingIdx),
+                        {
+                          ...streamingMsg,
+                          id: data.messageId || streamingMsg.id,
+                          content: data.content,
+                          status: "sent" as const,
+                          agentId:
+                            data.agentId ||
+                            currentActiveAgentId ||
+                            streamingMsg.agentId,
+                          agentName:
+                            data.agentName ||
+                            completeActiveAgent?.name ||
+                            streamingMsg.agentName,
+                          agentAvatarUrl:
+                            data.agentAvatarUrl ||
+                            completeActiveAgent?.avatarUrl ||
+                            streamingMsg.agentAvatarUrl,
+                          agentColor:
+                            completeActiveAgent?.color ||
+                            streamingMsg.agentColor,
+                        },
+                        ...prev.slice(streamingIdx + 1),
+                      ];
+                    });
+
+                    if (data.agentId) {
+                      setActiveAgentId(data.agentId);
+                    }
+                    break;
+
+                  case "done":
+                    setIsTyping(false);
+                    setIsSendingVoice(false);
+                    setStreamingMessageId(null);
+                    setThinkingState(null);
+
+                    const doneActiveAgent = getActiveAgent();
+
+                    setMessages((prev) => {
+                      const streamingIdx = prev.findIndex(
+                        (m) => m.id === responseId && m.role === "assistant"
+                      );
+
+                      if (streamingIdx === -1) return prev;
+
+                      const streamingMsg = prev[streamingIdx];
+                      if (!streamingMsg) return prev;
+
+                      return [
+                        ...prev.slice(0, streamingIdx),
+                        {
+                          ...streamingMsg,
+                          id: data.messageId || streamingMsg.id,
+                          content: data.content || streamingMsg.content,
+                          status: "sent" as const,
+                          agentId:
+                            currentActiveAgentId || streamingMsg.agentId,
+                          agentName:
+                            doneActiveAgent?.name || streamingMsg.agentName,
+                          agentAvatarUrl:
+                            doneActiveAgent?.avatarUrl ||
+                            streamingMsg.agentAvatarUrl,
+                          agentColor:
+                            doneActiveAgent?.color || streamingMsg.agentColor,
+                        },
+                        ...prev.slice(streamingIdx + 1),
+                      ];
+                    });
+
+                    notifyParent("widget:message", {
+                      role: "assistant",
+                      content: data.content,
+                    });
+                    break;
+
+                  case "error":
+                    console.error("Voice stream error:", data);
+                    setError(data.message || "Failed to process voice message");
+                    setIsTyping(false);
+                    setIsSendingVoice(false);
+                    setStreamingMessageId(null);
+                    setThinkingState(null);
+                    break;
+                }
+              } catch {
+                // Ignore parse errors
+              }
+              currentEventType = "";
+            }
+          }
+        }
+
+        // Ensure final state is clean
+        setIsTyping(false);
+        setIsSendingVoice(false);
+        setStreamingMessageId(null);
+        setThinkingState(null);
+      } catch {
+        // Mark user message as error
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId ? { ...msg, status: "error" } : msg
+          )
+        );
+        // Remove streaming placeholder
+        setMessages((prev) => prev.filter((m) => m.id !== responseId));
+        setError("Failed to send voice message");
+        setIsTyping(false);
+        setIsSendingVoice(false);
+        setStreamingMessageId(null);
+        setThinkingState(null);
+      }
+    },
+    [session, config, activeAgentId, isDemo, visibleAgents]
+  );
+
+  // Handle voice recording completion (PTT release)
+  const handleVoiceRecordingStop = useCallback(async () => {
+    // Only proceed if we're actually recording or starting to record
+    if (!isRecording && !isVoiceStarting) {
+      return;
+    }
+
+    console.log("[Voice] Stopping recording, duration:", recordingDuration);
+    const audioBlob = await stopRecording();
+    console.log("[Voice] Recording stopped, blob:", audioBlob ? `${audioBlob.size} bytes, type: ${audioBlob.type}` : "null");
+
+    if (audioBlob && audioBlob.size > 0) {
+      handleSendVoiceMessage(audioBlob, recordingDuration);
+    } else if (!audioBlob) {
+      console.log("[Voice] No audio blob - recording may have been too short (try holding the button longer)");
+    } else {
+      console.log("[Voice] Audio blob is empty");
+    }
+  }, [isRecording, isVoiceStarting, stopRecording, recordingDuration, handleSendVoiceMessage]);
+
   // Keep visibleAgentsRef in sync for SSE callback
   useEffect(() => {
     visibleAgentsRef.current = visibleAgents;
   }, [visibleAgents]);
+
+  // Handle global mouse/touch release for PTT recording
+  // When recording starts, the UI switches from mic button to waveform,
+  // removing the button that had onMouseUp. This ensures we still capture the release.
+  useEffect(() => {
+    if (isRecording) {
+      const handleGlobalRelease = () => {
+        handleVoiceRecordingStop();
+      };
+
+      // Listen for mouse/touch release anywhere on document
+      document.addEventListener("mouseup", handleGlobalRelease);
+      document.addEventListener("touchend", handleGlobalRelease);
+
+      return () => {
+        document.removeEventListener("mouseup", handleGlobalRelease);
+        document.removeEventListener("touchend", handleGlobalRelease);
+      };
+    }
+  }, [isRecording, handleVoiceRecordingStop]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -1271,6 +1857,60 @@ export function ChatWindow({
 
   const handleMinimize = () => {
     notifyParent("widget:minimize", {});
+  };
+
+  const handleNewChat = () => {
+    // 1. Close existing SSE connection
+    eventSourceRef.current?.close();
+
+    // 2. Clear localStorage (both session and conversation)
+    if (config) {
+      try {
+        localStorage.removeItem(`buzzi_widget_${config.agentId}_session`);
+        localStorage.removeItem(`buzzi_widget_${config.agentId}_conversation`);
+      } catch {
+        // localStorage not available
+      }
+    }
+
+    // 3. Reset states
+    setSession(null);
+    setIsInitializingSession(false);
+    setActiveAgentId(null);
+    setVisibleAgents(new Set());
+    setThinkingState(null);
+    setIsTyping(false);
+    setIsSending(false);
+    setStreamingMessageId(null);
+    animatedAgentsRef.current = new Set();
+
+    // 4. Reset messages with welcome message if configured
+    if (config?.welcomeMessage) {
+      const firstAgent = config.agentsList?.[0];
+      setMessages([{
+        id: "welcome",
+        role: "assistant",
+        content: config.welcomeMessage,
+        timestamp: new Date(),
+        agentId: firstAgent?.id,
+        agentName: firstAgent?.name,
+        agentAvatarUrl: firstAgent?.avatarUrl,
+        agentColor: firstAgent?.color,
+      }]);
+    } else {
+      setMessages([]);
+    }
+
+    // 5. Re-set first agent as active for multi-agent
+    if (config?.isMultiAgent && config?.agentsList?.length) {
+      const firstAgentId = config.agentsList[0]?.id;
+      if (firstAgentId) {
+        setActiveAgentId(firstAgentId);
+        setVisibleAgents(new Set([firstAgentId]));
+      }
+    }
+
+    // Session will be auto-created by the useEffect since session is now null
   };
 
   const handlePreChatSubmit = (e: FormEvent) => {
@@ -1522,22 +2162,48 @@ export function ChatWindow({
             )}
           </div>
         </div>
-        <button
-          onClick={handleMinimize}
-          className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
-          aria-label="Close"
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+        <div className="flex items-center gap-1">
+          {/* New Chat button - show when there are user messages */}
+          {messages.some(m => m.role === "user") && (
+            <button
+              onClick={handleNewChat}
+              className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
+              aria-label="Start new conversation"
+              title="Start new conversation"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <line x1="12" y1="8" x2="12" y2="14" />
+                <line x1="9" y1="11" x2="15" y2="11" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={handleMinimize}
+            className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
+            aria-label="Close"
           >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Multi-agent horizontal agents list */}
@@ -1813,6 +2479,54 @@ export function ChatWindow({
                       {message.agentName}
                     </p>
                   )}
+                  {/* Voice message bubble */}
+                  {message.type === "audio" && message.audioUrl ? (
+                    <VoiceMessageBubble
+                      audioUrl={message.audioUrl}
+                      transcript={message.transcript || message.content || ""}
+                      duration={message.duration || 0}
+                      isDark={isDark}
+                      primaryColor={config.primaryColor}
+                      bubbleColor={isUser ? (config.userBubbleColor || config.primaryColor) : undefined}
+                      isUser={isUser}
+                    />
+                  ) : message.type === "audio" && !message.audioUrl ? (
+                    /* Voice message still uploading */
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-3 min-w-[200px]",
+                        isUser ? "rounded-br-sm" : "rounded-bl-sm",
+                        message.status === "sending" && "opacity-70"
+                      )}
+                      style={{
+                        backgroundColor: isUser
+                          ? (config.userBubbleColor || config.primaryColor)
+                          : (isDark ? "#374151" : "#f3f4f6"),
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"
+                          style={{
+                            borderColor: isUser
+                              ? "rgba(255,255,255,0.5) transparent transparent transparent"
+                              : `${config.primaryColor} transparent transparent transparent`,
+                          }}
+                        />
+                        <span
+                          className="text-sm"
+                          style={{
+                            color: isUser
+                              ? getContrastTextColor(config.userBubbleColor || config.primaryColor)
+                              : (isDark ? "#e5e7eb" : "#374151"),
+                          }}
+                        >
+                          Processing voice...
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                  /* Regular text message bubble */
                   <div
                     className={cn(
                       "rounded-2xl px-4 py-2.5",
@@ -1894,6 +2608,7 @@ export function ChatWindow({
                       </span>
                     ) : null}
                   </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1910,7 +2625,7 @@ export function ChatWindow({
             }
             thinkingText={thinkingState?.text}
             toolCalls={
-              config.showToolCalls && thinkingState?.toolCalls
+              config.showThinking && thinkingState?.toolCalls
                 ? (thinkingState.toolCalls as ToolCallState[])
                 : undefined
             }
@@ -1939,7 +2654,7 @@ export function ChatWindow({
           style={isFocused ? { ["--tw-ring-color" as string]: config.primaryColor } : undefined}
         >
           {/* Recording waveform - replaces textarea when recording */}
-          {isRecording ? (
+          {isRecording || isVoiceStarting ? (
             <>
               {/* Audio waveform visualization */}
               <div className="flex-1 flex items-center gap-2 py-1">
@@ -1961,8 +2676,7 @@ export function ChatWindow({
                     isDark ? "text-zinc-400" : "text-gray-500"
                   )}
                 >
-                  {Math.floor(recordingDuration / 60)}:
-                  {(recordingDuration % 60).toString().padStart(2, "0")}
+                  {isVoiceStarting ? "Starting..." : `${Math.floor(recordingDuration / 60)}:${(recordingDuration % 60).toString().padStart(2, "0")}`}
                 </span>
               </div>
               {/* Cancel button */}
@@ -1989,9 +2703,9 @@ export function ChatWindow({
                 </svg>
               </button>
             </>
-          ) : isTranscribing ? (
+          ) : isSendingVoice ? (
             <>
-              {/* Transcribing state */}
+              {/* Sending voice message state */}
               <div className="flex-1 flex items-center gap-2 py-1">
                 <div
                   className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent"
@@ -2003,7 +2717,7 @@ export function ChatWindow({
                     isDark ? "text-zinc-400" : "text-gray-500"
                   )}
                 >
-                  Transcribing...
+                  Sending voice message...
                 </span>
               </div>
             </>
@@ -2055,10 +2769,10 @@ export function ChatWindow({
                 <button
                   type="button"
                   onMouseDown={startRecording}
-                  onMouseUp={stopRecording}
-                  onMouseLeave={stopRecording}
+                  onMouseUp={handleVoiceRecordingStop}
+                  onMouseLeave={handleVoiceRecordingStop}
                   onTouchStart={startRecording}
-                  onTouchEnd={stopRecording}
+                  onTouchEnd={handleVoiceRecordingStop}
                   className={cn(
                     "rounded-full p-2 transition-colors shrink-0",
                     isDark

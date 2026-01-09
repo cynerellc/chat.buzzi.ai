@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { MessageCircle, X, Loader2 } from "lucide-react";
+import { MessageCircle, MessageSquare, HelpCircle, Sparkles, X, Loader2 } from "lucide-react";
 
 // Validate UUID format
 function isValidUUID(str: string): boolean {
@@ -13,6 +13,14 @@ function isValidUUID(str: string): boolean {
 interface WidgetConfig {
   primaryColor?: string;
   launcherIcon?: string;
+  position?: "bottom-right" | "bottom-left";
+  borderRadius?: number;
+  buttonSize?: number;
+  launcherIconBorderRadius?: number;
+  launcherIconPulseGlow?: boolean;
+  autoOpen?: boolean;
+  autoOpenDelay?: number;
+  soundEnabled?: boolean;
 }
 
 function WidgetPreviewContent() {
@@ -21,7 +29,18 @@ function WidgetPreviewContent() {
   const companyId = searchParams.get("companyId");
 
   const [isOpen, setIsOpen] = useState(false);
-  const [config, setConfig] = useState<WidgetConfig>({ primaryColor: "#6437F3" });
+  const [config, setConfig] = useState<WidgetConfig>({
+    primaryColor: "#6437F3",
+    launcherIcon: "chat",
+    position: "bottom-right",
+    borderRadius: 16,
+    buttonSize: 60,
+    launcherIconBorderRadius: 50,
+    launcherIconPulseGlow: false,
+    autoOpen: false,
+    autoOpenDelay: 5000,
+    soundEnabled: false,
+  });
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
   // Compute validation error as derived value (not state)
@@ -46,6 +65,14 @@ function WidgetPreviewContent() {
           setConfig({
             primaryColor: data.config.primaryColor || "#6437F3",
             launcherIcon: data.config.launcherIcon || "chat",
+            position: data.config.position || "bottom-right",
+            borderRadius: data.config.borderRadius ?? 16,
+            buttonSize: data.config.buttonSize ?? 60,
+            launcherIconBorderRadius: data.config.launcherIconBorderRadius ?? 50,
+            launcherIconPulseGlow: data.config.launcherIconPulseGlow ?? false,
+            autoOpen: data.config.autoOpen ?? false,
+            autoOpenDelay: data.config.autoOpenDelay ?? 5000,
+            soundEnabled: data.config.soundEnabled ?? false,
           });
         }
         setIsConfigLoaded(true);
@@ -55,6 +82,17 @@ function WidgetPreviewContent() {
         setIsConfigLoaded(true);
       });
   }, [chatbotId, companyId, validationError]);
+
+  // Auto-open widget after delay if configured
+  useEffect(() => {
+    if (!isConfigLoaded || !config.autoOpen || isOpen) return;
+
+    const timer = setTimeout(() => {
+      setIsOpen(true);
+    }, config.autoOpenDelay || 5000);
+
+    return () => clearTimeout(timer);
+  }, [isConfigLoaded, config.autoOpen, config.autoOpenDelay, isOpen]);
 
   if (validationError) {
     return (
@@ -140,12 +178,22 @@ function WidgetPreviewContent() {
       </footer>
 
       {/* Widget */}
-      <div className="fixed bottom-5 right-5 z-[999999]">
+      <div
+        className="fixed bottom-5 z-[999999]"
+        style={{
+          right: config.position === "bottom-left" ? "auto" : "20px",
+          left: config.position === "bottom-left" ? "20px" : "auto",
+        }}
+      >
         {/* Chat Window */}
         {isOpen && (
           <div
-            className="absolute bottom-[80px] right-0 w-[380px] h-[600px] max-h-[calc(100vh-120px)] rounded-2xl overflow-hidden shadow-2xl transition-all duration-200"
+            className="absolute w-[380px] h-[600px] max-h-[calc(100vh-120px)] overflow-hidden shadow-2xl transition-all duration-200"
             style={{
+              bottom: `${(config.buttonSize || 60) + 20}px`,
+              right: config.position === "bottom-left" ? "auto" : 0,
+              left: config.position === "bottom-left" ? 0 : "auto",
+              borderRadius: `${config.borderRadius || 16}px`,
               opacity: isOpen ? 1 : 0,
               transform: isOpen ? "translateY(0) scale(1)" : "translateY(20px) scale(0.95)",
             }}
@@ -162,18 +210,50 @@ function WidgetPreviewContent() {
         {isConfigLoaded ? (
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="w-[60px] h-[60px] rounded-full border-none cursor-pointer flex items-center justify-center shadow-xl transition-transform hover:scale-105"
-            style={{ backgroundColor: config.primaryColor }}
+            className="relative border-none cursor-pointer flex items-center justify-center shadow-xl transition-transform hover:scale-105"
+            style={{
+              width: `${config.buttonSize || 60}px`,
+              height: `${config.buttonSize || 60}px`,
+              backgroundColor: config.primaryColor,
+              borderRadius: `${config.launcherIconBorderRadius || 50}%`,
+              boxShadow: config.launcherIconPulseGlow
+                ? `0 0 20px ${config.primaryColor}80`
+                : undefined,
+            }}
             aria-label={isOpen ? "Close chat" : "Open chat"}
           >
             {isOpen ? (
               <X className="w-6 h-6 text-white" />
             ) : (
-              <MessageCircle className="w-7 h-7 text-white" />
+              <>
+                {config.launcherIcon === "chat" && <MessageCircle className="w-7 h-7 text-white" />}
+                {config.launcherIcon === "message" && <MessageSquare className="w-7 h-7 text-white" />}
+                {config.launcherIcon === "help" && <HelpCircle className="w-7 h-7 text-white" />}
+                {config.launcherIcon === "sparkle" && <Sparkles className="w-7 h-7 text-white" />}
+                {!["chat", "message", "help", "sparkle"].includes(config.launcherIcon || "") && (
+                  <MessageCircle className="w-7 h-7 text-white" />
+                )}
+              </>
+            )}
+            {config.launcherIconPulseGlow && !isOpen && (
+              <span
+                className="absolute inset-0 animate-ping opacity-30"
+                style={{
+                  backgroundColor: config.primaryColor,
+                  borderRadius: `${config.launcherIconBorderRadius || 50}%`,
+                }}
+              />
             )}
           </button>
         ) : (
-          <div className="w-[60px] h-[60px] rounded-full bg-gray-300 animate-pulse" />
+          <div
+            className="bg-gray-300 animate-pulse"
+            style={{
+              width: `${config.buttonSize || 60}px`,
+              height: `${config.buttonSize || 60}px`,
+              borderRadius: `${config.launcherIconBorderRadius || 50}%`,
+            }}
+          />
         )}
       </div>
     </div>

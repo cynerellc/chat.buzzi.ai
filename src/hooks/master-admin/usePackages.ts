@@ -25,7 +25,7 @@ export interface AgentListItemData {
   avatar_url?: string;
   default_system_prompt: string;
   default_model_id: string;
-  default_temperature: number;
+  model_settings?: Record<string, unknown>; // Dynamic settings based on model's settingsSchema
   knowledge_categories?: string[];
   tools?: unknown[];
   managed_agent_ids?: string[];

@@ -178,8 +178,8 @@ Guidelines:
 - If you don't know something, say so and offer to escalate to a human
 - Keep responses concise but helpful
 - Always ask clarifying questions if needed`,
-              default_model_id: "gpt-4o-mini",
-              default_temperature: 70,
+              default_model_id: "gpt-5-mini-2025-08-07",
+              model_settings: { temperature: 0.7, max_tokens: 4096, top_p: 1 },
               tools: ["knowledge_lookup", "save_lead_info"],
               sort_order: 0,
             },
@@ -247,8 +247,8 @@ Guidelines:
               name: "Sales Orchestrator",
               agent_type: "supervisor",
               default_system_prompt: `You route sales inquiries to the appropriate specialist. Analyze the customer's question and delegate to the most suitable agent.`,
-              default_model_id: "gpt-4o",
-              default_temperature: 50,
+              default_model_id: "gpt-5-2025-08-07",
+              model_settings: { temperature: 0.5, max_tokens: 4096, top_p: 1 },
               managed_agent_ids: ["salesman", "accounts"],
               sort_order: 0,
             },
@@ -264,8 +264,8 @@ Guidelines:
 - Highlight relevant features and benefits
 - Collect contact information when appropriate
 - Qualify leads based on budget, timeline, and needs`,
-              default_model_id: "gpt-4o-mini",
-              default_temperature: 75,
+              default_model_id: "gpt-5-mini-2025-08-07",
+              model_settings: { temperature: 0.75, max_tokens: 4096, top_p: 1 },
               tools: ["save_lead_info"],
               sort_order: 1,
             },
@@ -274,8 +274,8 @@ Guidelines:
               name: "Accounts Specialist",
               agent_type: "worker",
               default_system_prompt: `You generate quotations from pricing in the knowledge base. Be accurate and professional when providing pricing information.`,
-              default_model_id: "gpt-4o-mini",
-              default_temperature: 60,
+              default_model_id: "gpt-5-mini-2025-08-07",
+              model_settings: { temperature: 0.6, max_tokens: 4096, top_p: 1 },
               tools: ["generate_quotation"],
               knowledge_categories: ["pricing", "products"],
               sort_order: 2,

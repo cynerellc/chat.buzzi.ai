@@ -136,15 +136,19 @@ export async function GET(request: NextRequest) {
         autoOpen: widgetConfig.autoOpen,
         autoOpenDelay: parseInt(widgetConfig.autoOpenDelay) * 1000 || DEFAULT_CONFIG.autoOpenDelay,
         soundEnabled: widgetConfig.playSoundOnMessage,
+        persistConversation: widgetConfig.persistConversation,
         enableVoice: widgetConfig.enableVoiceMessages,
         enableFileUpload: widgetConfig.enableFileUpload,
         launcherIcon: widgetConfig.launcherIcon,
         launcherText: widgetConfig.launcherText || undefined,
+        buttonSize: parseInt(widgetConfig.buttonSize) || 60,
+        launcherIconBorderRadius: parseInt(widgetConfig.launcherIconBorderRadius) || 50,
+        launcherIconPulseGlow: widgetConfig.launcherIconPulseGlow ?? false,
+        hideLauncherOnMobile: widgetConfig.hideLauncherOnMobile ?? false,
         customCss: widgetConfig.customCss || undefined,
         // Stream Display Options
         showAgentSwitchNotification: widgetConfig.showAgentSwitchNotification,
         showThinking: widgetConfig.showThinking,
-        showToolCalls: widgetConfig.showToolCalls,
         showInstantUpdates: widgetConfig.showInstantUpdates,
         // Multi-agent Display Options
         showAgentListOnTop: widgetConfig.showAgentListOnTop,
@@ -156,6 +160,7 @@ export async function GET(request: NextRequest) {
         title: agent.name,
         avatarUrl,
         welcomeMessage: behavior.greeting || DEFAULT_CONFIG.title,
+        persistConversation: true,
       }),
       // Multi-agent configuration
       isMultiAgent,

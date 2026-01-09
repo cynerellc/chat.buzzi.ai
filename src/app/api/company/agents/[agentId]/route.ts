@@ -83,14 +83,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         : agentVariableValues[pv.name] || null,
     }));
 
+    // Get temperature from model_settings for backward compatibility
+    const modelSettings = primaryAgent?.model_settings ?? {};
+    const temperatureValue = typeof modelSettings.temperature === "number"
+      ? Math.round(modelSettings.temperature * 100)
+      : 70;
+
     return NextResponse.json({
       agent: {
         ...agent,
         // Provide backward-compatible fields from primary agent
         avatarUrl: primaryAgent?.avatar_url ?? null,
         systemPrompt: primaryAgent?.default_system_prompt ?? "",
-        modelId: primaryAgent?.default_model_id ?? "gpt-5-mini",
-        temperature: primaryAgent?.default_temperature ?? 70,
+        modelId: primaryAgent?.default_model_id ?? "gpt-5-mini-2025-08-07",
+        temperature: temperatureValue, // Backward compatible (0-100)
+        modelSettings: modelSettings, // New format
         knowledgeCategories: primaryAgent?.knowledge_categories ?? [],
         variableValues: variableValuesWithDefinitions,
         // Also include the raw variable values for editing
@@ -115,7 +122,8 @@ interface UpdateAgentRequest {
   avatarUrl?: string | null;
   systemPrompt?: string;
   modelId?: string;
-  temperature?: number;
+  temperature?: number; // Backward compatible (0-100)
+  modelSettings?: Record<string, unknown>; // New format
   knowledgeCategories?: string[];
   // Other fields
   behavior?: Record<string, unknown>;
@@ -175,6 +183,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       body.systemPrompt !== undefined ||
       body.modelId !== undefined ||
       body.temperature !== undefined ||
+      body.modelSettings !== undefined ||
       body.knowledgeCategories !== undefined;
 
     if (hasAgentConfigChanges) {
@@ -184,12 +193,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         name: existingAgent.name,
         agent_type: "worker" as const,
         default_system_prompt: "",
-        default_model_id: "gpt-5-mini",
-        default_temperature: 70,
+        default_model_id: "gpt-5-mini-2025-08-07",
+        model_settings: { temperature: 0.7, max_tokens: 4096, top_p: 1 },
         knowledge_categories: [],
         tools: [],
         sort_order: 0,
       };
+
+      // Handle model_settings - support both new format and backward-compatible temperature
+      let newModelSettings = primaryAgent.model_settings ?? { temperature: 0.7, max_tokens: 4096, top_p: 1 };
+      if (body.modelSettings !== undefined) {
+        newModelSettings = body.modelSettings;
+      } else if (body.temperature !== undefined) {
+        // Convert backward-compatible temperature (0-100) to new format (0-1)
+        newModelSettings = { ...newModelSettings, temperature: body.temperature / 100 };
+      }
 
       // Update primary agent with new values
       const updatedPrimaryAgent: AgentListItem = {
@@ -197,7 +215,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         avatar_url: body.avatarUrl !== undefined ? (body.avatarUrl ?? undefined) : primaryAgent.avatar_url,
         default_system_prompt: body.systemPrompt !== undefined ? body.systemPrompt : primaryAgent.default_system_prompt,
         default_model_id: body.modelId !== undefined ? body.modelId : primaryAgent.default_model_id,
-        default_temperature: body.temperature !== undefined ? body.temperature : primaryAgent.default_temperature,
+        model_settings: newModelSettings,
         knowledge_categories: body.knowledgeCategories !== undefined ? body.knowledgeCategories : primaryAgent.knowledge_categories,
       };
 
@@ -221,14 +239,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       const nextVersion = (latestVersion?.version ?? 0) + 1;
 
+      // Get temperature for version (convert from model_settings or use backward-compatible)
+      const versionModelSettings = currentAgentsList[0]?.model_settings ?? {};
+      const versionTemp = body.temperature
+        ?? (typeof versionModelSettings.temperature === "number" ? Math.round(versionModelSettings.temperature * 100) : 70);
+
       // Create version snapshot
       await db.insert(agentVersions).values({
         chatbotId: agentId,
         version: nextVersion,
         changelog: "System prompt updated",
         systemPrompt: body.systemPrompt,
-        modelId: body.modelId || currentAgentsList[0]?.default_model_id || "gpt-5-mini",
-        temperature: body.temperature ?? currentAgentsList[0]?.default_temperature ?? 70,
+        modelId: body.modelId || currentAgentsList[0]?.default_model_id || "gpt-5-mini-2025-08-07",
+        temperature: versionTemp,
         behavior: body.behavior || existingAgent.behavior,
       });
     }

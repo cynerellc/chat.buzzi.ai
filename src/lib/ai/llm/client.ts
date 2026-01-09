@@ -33,48 +33,55 @@ const DEFAULT_TIMEOUT_MS = 60000;
 
 // Model context window limits (for token estimation)
 const MODEL_CONTEXT_LIMITS: Record<string, number> = {
-  // OpenAI models
-  "gpt-4o": 128000,
-  "gpt-4o-mini": 128000,
-  "gpt-4-turbo": 128000,
-  "gpt-4": 8192,
-  "gpt-3.5-turbo": 16385,
+  // OpenAI GPT-5 models
+  "gpt-5": 400000,
+  "gpt-5-mini": 400000,
+  "gpt-5-2025-08-07": 400000,
+  "gpt-5-mini-2025-08-07": 400000,
+  // OpenAI GPT-4.1 models
+  "gpt-4.1": 1000000,
+  "gpt-4.1-mini": 1000000,
+  "gpt-4.1-nano": 1000000,
+  // OpenAI o-series
+  "o1": 200000,
+  "o1-mini": 128000,
+  "o3": 200000,
+  "o3-mini": 200000,
+  "o4-mini": 200000,
   // Anthropic models
-  "claude-3-5-sonnet-20241022": 200000,
-  "claude-3-5-haiku-20241022": 200000,
-  "claude-3-opus-20240229": 200000,
-  "claude-3-sonnet-20240229": 200000,
-  "claude-3-haiku-20240307": 200000,
+  "claude-sonnet-4": 200000,
+  "claude-opus-4": 200000,
+  "claude-3-5-sonnet-latest": 200000,
+  "claude-3-5-haiku-latest": 200000,
 };
 
 // Models that use max_completion_tokens instead of max_tokens
 const MODELS_USING_COMPLETION_TOKENS = new Set([
-  "gpt-4o",
-  "gpt-4o-mini",
-  "gpt-4o-2024-05-13",
-  "gpt-4o-2024-08-06",
-  "gpt-4o-2024-11-20",
-  "gpt-4o-mini-2024-07-18",
   "gpt-5",
   "gpt-5-mini",
-  "gpt-5-turbo",
+  "gpt-5-2025-08-07",
+  "gpt-5-mini-2025-08-07",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
   "o1",
   "o1-mini",
-  "o1-preview",
+  "o3",
   "o3-mini",
+  "o4-mini",
 ]);
 
 // Check if a model uses max_completion_tokens (covers future models too)
 function usesCompletionTokens(model: string): boolean {
   if (MODELS_USING_COMPLETION_TOKENS.has(model)) return true;
-  // Newer OpenAI models (gpt-4o+, gpt-5+, o1+, o3+) use max_completion_tokens
-  return /^(gpt-4o|gpt-5|o1|o3)/.test(model);
+  // Modern OpenAI models use max_completion_tokens
+  return /^(gpt-5|gpt-4\.1|o1|o3|o4)/.test(model);
 }
 
 // Models that don't support custom temperature (reasoning models)
 function supportsTemperature(model: string): boolean {
-  // o1, o3, and gpt-5 reasoning models don't support custom temperature
-  if (/^(o1|o3|gpt-5)/.test(model)) return false;
+  // o-series reasoning models don't support custom temperature
+  if (/^(o1|o3|o4)/.test(model)) return false;
   return true;
 }
 

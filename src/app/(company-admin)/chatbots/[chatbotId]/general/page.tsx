@@ -14,7 +14,7 @@ export default function ChatbotGeneralPage() {
         status: chatbot.status,
         packageName: chatbot.package?.name ?? "Custom",
         modelId: chatbot.modelId,
-        temperature: chatbot.temperature,
+        modelSettings: { temperature: chatbot.temperature / 100 },
         conversationCount: chatbot.totalConversations,
       }
     : null;

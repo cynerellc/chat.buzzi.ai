@@ -161,11 +161,14 @@ export const DATE_FORMATS = {
   ISO: "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
 } as const;
 
-// AI Model Options for agent configuration
+/**
+ * @deprecated Use useActiveModels() hook instead. Models are now stored in database (chatapp.ai_models table).
+ * This constant is kept for backward compatibility and will be removed in a future release.
+ */
 export const MODEL_OPTIONS = [
-  // OpenAI GPT-5 Series (Latest - Dec 2025)
-  { value: "gpt-5", label: "GPT-5" },
-  { value: "gpt-5-mini", label: "GPT-5 Mini" },
+  // OpenAI GPT-5 Series
+  { value: "gpt-5-2025-08-07", label: "GPT-5" },
+  { value: "gpt-5-mini-2025-08-07", label: "GPT-5 Mini" },
   // OpenAI GPT-4.1 Series
   { value: "gpt-4.1", label: "GPT-4.1" },
   { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
@@ -176,9 +179,6 @@ export const MODEL_OPTIONS = [
   { value: "o4-mini", label: "o4-mini (Reasoning)" },
   { value: "o1", label: "o1 (Reasoning)" },
   { value: "o1-mini", label: "o1-mini (Reasoning)" },
-  // OpenAI GPT-4o (Legacy)
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
   // Anthropic Models
   { value: "claude-sonnet-4", label: "Claude Sonnet 4" },
   { value: "claude-opus-4", label: "Claude Opus 4" },

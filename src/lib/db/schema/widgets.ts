@@ -81,7 +81,6 @@ export const widgetConfigs = chatappSchema.table(
     // Stream Display Options
     showAgentSwitchNotification: boolean("show_agent_switch_notification").default(true).notNull(),
     showThinking: boolean("show_thinking").default(false).notNull(),
-    showToolCalls: boolean("show_tool_calls").default(false).notNull(),
     showInstantUpdates: boolean("show_instant_updates").default(true).notNull(),
 
     // Multi-agent Display Options

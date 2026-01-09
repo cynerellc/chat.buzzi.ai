@@ -11,6 +11,7 @@ import { companies } from "@/lib/db/schema/companies";
 import { conversations, endUsers } from "@/lib/db/schema/conversations";
 import { eq, and } from "drizzle-orm";
 import { withRateLimit } from "@/lib/redis/rate-limit";
+import { setWidgetSessionCache } from "@/lib/redis/cache";
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
@@ -111,6 +112,16 @@ export async function POST(request: NextRequest) {
     if (!conversation) {
       throw new Error("Failed to create conversation");
     }
+
+    // 7.5. Cache session mapping for faster message handling
+    setWidgetSessionCache(sessionId, {
+      conversationId: conversation.id,
+      chatbotId: agentId,
+      companyId,
+      status: "active",
+    }).catch((err) => {
+      console.error("Failed to cache widget session:", err);
+    });
 
     // 8. Return session info (session is stored in conversation record)
 

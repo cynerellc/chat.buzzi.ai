@@ -36,3 +36,6 @@ export * from "./analytics";
 
 // Operational Tables (API Keys, Rate Limits, Usage Records, Channel Configs)
 export * from "./operations";
+
+// AI Models
+export * from "./models";

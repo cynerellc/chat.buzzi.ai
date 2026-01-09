@@ -190,3 +190,10 @@ export const variableDataTypeEnum = pgEnum("variable_data_type", [
   "boolean",
   "json",
 ]);
+
+// AI Model Provider Enum
+export const aiModelProviderEnum = pgEnum("ai_model_provider", [
+  "openai",
+  "google",
+  "anthropic",
+]);

@@ -58,6 +58,9 @@ export const REDIS_KEYS = {
 
   // Session store
   session: (token: string) => `session:${token}`,
+
+  // Widget session cache (sessionId -> conversation data)
+  widgetSession: (sessionId: string) => `widget_session:${sessionId}`,
 } as const;
 
 /**
@@ -68,4 +71,5 @@ export const REDIS_TTL = {
   PERMISSIONS: 15 * 60, // 15 minutes
   SESSION: 30 * 24 * 60 * 60, // 30 days
   INFLIGHT_REQUEST: 5, // 5 seconds
+  WIDGET_SESSION: 2 * 60 * 60, // 2 hours - widget sessions are typically short-lived
 } as const;

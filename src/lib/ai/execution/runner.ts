@@ -23,6 +23,7 @@ import { eq, and } from "drizzle-orm";
 
 import { AdkExecutor, createAdkExecutor } from "./adk-executor";
 import { createVariableContext } from "../types";
+import { profiler } from "@/lib/profiler";
 
 import type {
   AgentContext,
@@ -284,13 +285,20 @@ export class AgentRunnerService {
    * Load a chatbot executor by ID
    */
   async loadExecutor(chatbotId: string): Promise<AdkExecutor | null> {
+    const loadSpan = profiler.startSpan("runner_load_executor", "executor", { chatbotId });
+
     // Check cache first
+    const cacheSpan = profiler.startSpan("runner_cache_check", "executor");
     const cached = this.executorCache.get(chatbotId);
+    cacheSpan.end({ hit: !!cached });
+
     if (cached) {
+      loadSpan.end({ fromCache: true });
       return cached;
     }
 
     // Load chatbot with package info
+    const dbSpan = profiler.startSpan("db_load_chatbot", "db");
     const chatbotData = await db
       .select({
         id: chatbots.id,
@@ -308,14 +316,17 @@ export class AgentRunnerService {
       .leftJoin(chatbotPackages, eq(chatbots.packageId, chatbotPackages.id))
       .where(and(eq(chatbots.id, chatbotId), eq(chatbots.status, "active")))
       .limit(1);
+    dbSpan.end({ found: chatbotData.length > 0 });
 
     if (chatbotData.length === 0) {
       console.error(`[AgentRunner] Chatbot ${chatbotId} not found or not active`);
+      loadSpan.end({ error: "not_found" });
       return null;
     }
 
     const chatbot = chatbotData[0];
     if (!chatbot) {
+      loadSpan.end({ error: "no_data" });
       return null;
     }
 
@@ -323,6 +334,7 @@ export class AgentRunnerService {
     const agentsList = chatbot.agentsList as AgentListItem[] || [];
     if (agentsList.length === 0) {
       console.error(`[AgentRunner] Chatbot ${chatbotId} has no agents configured`);
+      loadSpan.end({ error: "no_agents" });
       return null;
     }
 
@@ -330,20 +342,16 @@ export class AgentRunnerService {
     const primaryAgent = agentsList.find((a) => a.agent_type === "supervisor") || agentsList[0];
     if (!primaryAgent) {
       console.error(`[AgentRunner] Chatbot ${chatbotId} has no primary agent`);
+      loadSpan.end({ error: "no_primary_agent" });
       return null;
     }
 
-    // Determine knowledge categories (combine all agents' categories)
-    const allCategories: string[] = [];
-    for (const agent of agentsList) {
-      if (agent.knowledge_categories && agent.knowledge_categories.length > 0) {
-        allCategories.push(...agent.knowledge_categories);
-      }
-    }
-    const uniqueCategories = [...new Set(allCategories)];
-
-    // Check if knowledge base is enabled for any agent
-    const kbEnabled = agentsList.some((a) => a.knowledge_base_enabled === true);
+    // Use primary agent's knowledge base settings (not aggregated from all agents)
+    // KB is enabled only if BOTH: knowledge_base_enabled is true AND categories are configured
+    const hasKbCategories = Array.isArray(primaryAgent.knowledge_categories) &&
+      primaryAgent.knowledge_categories.length > 0;
+    const primaryKbEnabled = primaryAgent.knowledge_base_enabled === true && hasKbCategories;
+    const primaryKbCategories = primaryKbEnabled ? primaryAgent.knowledge_categories! : [];
 
     // Build AdkExecutor options
     const executorOptions = {
@@ -353,9 +361,9 @@ export class AgentRunnerService {
       agentConfig: {
         systemPrompt: primaryAgent.default_system_prompt,
         modelId: primaryAgent.default_model_id,
-        temperature: primaryAgent.default_temperature,
-        knowledgeBaseEnabled: kbEnabled,
-        knowledgeCategories: uniqueCategories,
+        modelSettings: primaryAgent.model_settings ?? { temperature: 0.7 },
+        knowledgeBaseEnabled: primaryKbEnabled,
+        knowledgeCategories: primaryKbCategories,
       },
       agentsListConfig: agentsList,
     };
@@ -364,9 +372,13 @@ export class AgentRunnerService {
     const executor = createAdkExecutor(executorOptions);
 
     // Initialize the executor (load package - may be async if from storage)
+    const initSpan = profiler.startSpan("runner_init_executor", "executor");
     const initialized = await executor.initialize();
+    initSpan.end({ success: initialized });
+
     if (!initialized) {
       console.error(`[AgentRunner] Failed to initialize executor for ${chatbotId}`);
+      loadSpan.end({ error: "init_failed" });
       return null;
     }
 
@@ -374,6 +386,7 @@ export class AgentRunnerService {
     this.executorCache.set(chatbotId, executor);
 
     console.log(`[AgentRunner] Loaded executor for chatbot ${chatbotId}`);
+    loadSpan.end({ fromCache: false });
     return executor;
   }
 
@@ -591,12 +604,19 @@ export class AgentRunnerService {
   async *sendMessageStream(
     options: SendMessageOptions
   ): AsyncGenerator<AgentStreamEvent> {
+    // Detailed timing for sendMessageStream internals
+    const timings: Record<string, number> = {};
+    const startTotal = performance.now();
+    let stepStart = performance.now();
+
     // Load conversation
     const conversationData = await db
       .select()
       .from(conversations)
       .where(eq(conversations.id, options.conversationId))
       .limit(1);
+    timings.loadConversation = performance.now() - stepStart;
+    stepStart = performance.now();
 
     const conversation = conversationData[0];
     if (!conversation) {
@@ -628,6 +648,9 @@ export class AgentRunnerService {
 
     // Load executor
     const executor = await this.loadExecutor(conversation.chatbotId);
+    timings.loadExecutor = performance.now() - stepStart;
+    stepStart = performance.now();
+
     if (!executor) {
       yield {
         type: "error",
@@ -648,9 +671,13 @@ export class AgentRunnerService {
       type: "text",
       content: options.message,
     });
+    timings.saveUserMessage = performance.now() - stepStart;
+    stepStart = performance.now();
 
     // Load variable context
     const variableContext = await this.loadVariableContext(conversation.chatbotId);
+    timings.loadVariableContext = performance.now() - stepStart;
+    stepStart = performance.now();
 
     // Build context
     const context: AgentContext = {
@@ -669,12 +696,18 @@ export class AgentRunnerService {
     // Stream response using ADK executor
     let fullContent = "";
     let metadata: AgentResponse["metadata"];
+    let firstTokenTime: number | null = null;
 
     for await (const event of executor.processMessageStream({
       message: options.message,
       sessionId: options.conversationId,
       context,
     })) {
+      // Track time to first token
+      if (event.type === "delta" && !firstTokenTime) {
+        firstTokenTime = performance.now() - stepStart;
+      }
+
       yield event;
 
       if (event.type === "delta") {
@@ -685,6 +718,9 @@ export class AgentRunnerService {
         metadata = completeData.metadata;
       }
     }
+    timings.llmStreaming = performance.now() - stepStart;
+    timings.timeToFirstToken = firstTokenTime ?? timings.llmStreaming;
+    stepStart = performance.now();
 
     // Save assistant response
     if (fullContent) {
@@ -708,6 +744,19 @@ export class AgentRunnerService {
           updatedAt: new Date(),
         })
         .where(eq(conversations.id, options.conversationId));
+    }
+    timings.saveAssistantMessage = performance.now() - stepStart;
+    timings.total = performance.now() - startTotal;
+
+    // Print detailed timing report if profiler enabled
+    if (process.env.ENABLE_PROFILER === "true") {
+      console.log("\n[AgentRunner] Detailed Timing Breakdown:");
+      console.log("─".repeat(50));
+      for (const [key, value] of Object.entries(timings)) {
+        const pct = ((value / timings.total) * 100).toFixed(1);
+        console.log(`  ${key.padEnd(25)} ${value.toFixed(2).padStart(10)}ms (${pct.padStart(5)}%)`);
+      }
+      console.log("─".repeat(50));
     }
   }
 
@@ -777,6 +826,8 @@ export class AgentRunnerService {
    * Load variable values for a chatbot
    */
   private async loadVariableContext(chatbotId: string): Promise<VariableContext> {
+    const varSpan = profiler.startSpan("db_load_variables", "db", { chatbotId });
+
     // Get chatbot with its package to read variable definitions and values
     const chatbotData = await db
       .select({
@@ -791,6 +842,7 @@ export class AgentRunnerService {
 
     const chatbot = chatbotData[0];
     if (!chatbot) {
+      varSpan.end({ found: false });
       return createVariableContext([]);
     }
 
@@ -806,6 +858,7 @@ export class AgentRunnerService {
       dataType: pv.dataType,
     }));
 
+    varSpan.end({ found: true, variableCount: variableValues.length });
     return createVariableContext(variableValues);
   }
 

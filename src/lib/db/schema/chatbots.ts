@@ -39,6 +39,10 @@ export interface ChatbotSettings {
   widgetConfigGeneratedAt?: string; // ISO timestamp of last generation
 }
 
+// Type definition for model settings (dynamic per model)
+// Settings are defined by the model's settingsSchema in the ai_models table
+export type ModelSettings = Record<string, unknown>;
+
 // Type definition for agent list items (stored as JSONB array)
 export interface AgentListItem {
   agent_identifier: string; // Unique identifier within the package
@@ -49,8 +53,8 @@ export interface AgentListItem {
   avatar_url?: string; // Profile image URL
   color?: string; // Agent color for chat bubbles and avatar ring (hex format like #FF5733)
   default_system_prompt: string; // LLM system prompt (renamed from system_prompt)
-  default_model_id: string; // e.g., "gpt-4o-mini", "claude-3-sonnet" (renamed from model_id)
-  default_temperature: number; // 0-100 (renamed from temperature)
+  default_model_id: string; // e.g., "gpt-5-mini", "gemini-3-flash-preview" (model_id from ai_models table)
+  model_settings?: ModelSettings; // Dynamic settings based on model's settingsSchema
   knowledge_base_enabled?: boolean; // Whether this agent can access the knowledge base
   knowledge_categories?: string[]; // Category names for RAG filtering
   tools?: unknown[]; // Tool configurations
@@ -86,11 +90,11 @@ export const chatbotPackages = chatappSchema.table(
     bundleVersion: varchar("bundle_version", { length: 50 }).default("1.0.0"),
     bundleChecksum: varchar("bundle_checksum", { length: 64 }), // SHA-256 hash
 
-    // NOTE: defaultSystemPrompt, defaultModelId, defaultTemperature removed
+    // NOTE: defaultSystemPrompt, defaultModelId removed
     // These settings now exist ONLY within agentsList items as:
     // - default_system_prompt
     // - default_model_id
-    // - default_temperature
+    // - model_settings (dynamic settings based on model's settingsSchema)
 
     // Default Behavior (shared across all agents in the package)
     defaultBehavior: jsonb("default_behavior").default({}).notNull(),
@@ -161,7 +165,7 @@ export const chatbots = chatappSchema.table(
     status: agentStatusEnum("status").default("draft").notNull(),
 
     // Agents list - contains all agent configurations for this deployed chatbot
-    // Each item has: agent_identifier, name, default_system_prompt, default_model_id, default_temperature, knowledge_categories, etc.
+    // Each item has: agent_identifier, name, default_system_prompt, default_model_id, model_settings, knowledge_categories, etc.
     agentsList: jsonb("agents_list").$type<AgentListItem[]>().default([]).notNull(),
 
     // Behavior Settings

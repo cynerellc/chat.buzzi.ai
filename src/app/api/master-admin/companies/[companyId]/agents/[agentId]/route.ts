@@ -20,7 +20,7 @@ export interface AgentDetails {
   packageName: string;
   systemPrompt: string;
   modelId: string;
-  temperature: number;
+  modelSettings: Record<string, unknown>;
   behavior: Record<string, unknown>;
   status: string;
   escalationEnabled: boolean;
@@ -39,7 +39,7 @@ const agentListItemSchema = z.object({
   agent_type: z.enum(["worker", "supervisor"]),
   default_system_prompt: z.string(),
   default_model_id: z.string(),
-  default_temperature: z.number().min(0).max(100),
+  model_settings: z.record(z.string(), z.unknown()).optional(),
   knowledge_base_enabled: z.boolean().optional(),
   knowledge_categories: z.array(z.string()).optional(),
   tools: z.array(z.unknown()).optional(),
@@ -53,6 +53,9 @@ const updateAgentSchema = z.object({
   packageId: z.string().uuid().optional(),
   systemPrompt: z.string().optional(),
   modelId: z.string().optional(),
+  // modelSettings is the new preferred way to set model configuration
+  modelSettings: z.record(z.string(), z.unknown()).optional(),
+  // temperature is deprecated but accepted for backward compatibility (0-100 scale, converted to 0-1)
   temperature: z.number().int().min(0).max(100).optional(),
   behavior: z.record(z.string(), z.unknown()).optional(),
   status: z.enum(["draft", "active", "paused", "archived"]).optional(),
@@ -101,13 +104,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // Extract config from agentsList[0]
-    const agentsListData = (agentRow.agentsList as { default_system_prompt: string; default_model_id: string; default_temperature: number }[] | null) || [];
+    const agentsListData = (agentRow.agentsList as { default_system_prompt: string; default_model_id: string; model_settings?: Record<string, unknown> }[] | null) || [];
     const primaryAgent = agentsListData[0];
+    const modelSettings = primaryAgent?.model_settings ?? { temperature: 0.7 };
+    const temperatureValue = typeof modelSettings.temperature === "number" ? modelSettings.temperature : 0.7;
     const agent = {
       ...agentRow,
       systemPrompt: primaryAgent?.default_system_prompt || "",
-      modelId: primaryAgent?.default_model_id || "gpt-5-mini",
-      temperature: primaryAgent?.default_temperature ?? 70,
+      modelId: primaryAgent?.default_model_id || "gpt-5-mini-2025-08-07",
+      temperature: Math.round(temperatureValue * 100), // Backward compatible (0-100)
     };
 
     // H2: Parallelize conversation and message counts
@@ -138,7 +143,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       packageName: agent.packageName ?? "Unknown",
       systemPrompt: agent.systemPrompt,
       modelId: agent.modelId,
-      temperature: agent.temperature,
+      modelSettings: modelSettings,
       behavior: (agent.behavior as Record<string, unknown>) ?? {},
       status: agent.status,
       escalationEnabled: agent.escalationEnabled,
@@ -215,13 +220,47 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.packageId !== undefined) updateData.packageId = data.packageId;
-    if (data.systemPrompt !== undefined) updateData.systemPrompt = data.systemPrompt;
-    if (data.modelId !== undefined) updateData.modelId = data.modelId;
-    if (data.temperature !== undefined) updateData.temperature = data.temperature;
     if (data.behavior !== undefined) updateData.behavior = data.behavior;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.agentsList !== undefined) updateData.agentsList = data.agentsList;
     if (data.escalationEnabled !== undefined) updateData.escalationEnabled = data.escalationEnabled;
+
+    // Handle systemPrompt, modelId, and modelSettings by updating agentsList[0]
+    // This is needed because these fields are stored in the JSONB agentsList
+    if (data.systemPrompt !== undefined || data.modelId !== undefined || data.modelSettings !== undefined || data.temperature !== undefined) {
+      // First get the current agent to merge settings
+      const [currentAgent] = await db
+        .select({ agentsList: agents.agentsList })
+        .from(agents)
+        .where(eq(agents.id, agentId))
+        .limit(1);
+
+      const currentAgentsList = (currentAgent?.agentsList as AgentListItem[] | null) || [];
+      const primaryAgent = currentAgentsList[0];
+
+      if (primaryAgent) {
+        // Get current model settings
+        const currentSettings = primaryAgent.model_settings ?? { temperature: 0.7, max_tokens: 4096, top_p: 1 };
+
+        // Determine new model settings (modelSettings takes precedence over temperature)
+        let newModelSettings = currentSettings;
+        if (data.modelSettings !== undefined) {
+          newModelSettings = data.modelSettings;
+        } else if (data.temperature !== undefined) {
+          // Convert 0-100 to 0-1 for backward compatibility
+          newModelSettings = { ...currentSettings, temperature: data.temperature / 100 };
+        }
+
+        const updatedPrimaryAgent: AgentListItem = {
+          ...primaryAgent,
+          default_system_prompt: data.systemPrompt ?? primaryAgent.default_system_prompt,
+          default_model_id: data.modelId ?? primaryAgent.default_model_id,
+          model_settings: newModelSettings,
+        };
+
+        updateData.agentsList = [updatedPrimaryAgent, ...currentAgentsList.slice(1)];
+      }
+    }
 
     // Update agent
     const [updatedAgent] = await db

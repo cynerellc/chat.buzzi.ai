@@ -14,6 +14,7 @@
 
 // Import vector-based RAG service
 import { searchKnowledge } from "@/lib/knowledge";
+import { profiler } from "@/lib/profiler";
 
 import type { RAGConfig, RAGSource, ToolResult, AgentContext } from "../types";
 
@@ -64,6 +65,8 @@ export class RAGService {
       return [];
     }
 
+    const ragSpan = profiler.startSpan("rag_search", "rag");
+
     const {
       query,
       companyId,
@@ -75,6 +78,10 @@ export class RAGService {
 
     try {
       // Use vector-based semantic search via Qdrant
+      const vectorSpan = profiler.startSpan("rag_vector_search", "rag", {
+        queryLength: query.length,
+        limit,
+      });
       const vectorContext = await searchKnowledge(query, companyId, {
         limit,
         minScore: threshold,
@@ -82,6 +89,7 @@ export class RAGService {
         categories,
         searchFaqs: true,
       });
+      vectorSpan.end({ chunkCount: vectorContext.chunks.length, faqCount: vectorContext.faqs.length });
 
       // Convert vector results to RAGResult format
       const results: RAGResult[] = vectorContext.chunks.map((chunk) => ({
@@ -113,9 +121,12 @@ export class RAGService {
         });
       }
 
-      return results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
+      const sortedResults = results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
+      ragSpan.end({ resultCount: sortedResults.length });
+      return sortedResults;
     } catch (error) {
       console.error("RAG search error:", error);
+      ragSpan.end({ error: true });
       return [];
     }
   }

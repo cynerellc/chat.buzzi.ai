@@ -98,7 +98,6 @@ export interface WidgetConfigJson {
   streamDisplay: {
     showAgentSwitchNotification: boolean;
     showThinking: boolean;
-    showToolCalls: boolean;
     showInstantUpdates: boolean;
   };
 
@@ -167,7 +166,6 @@ export const WIDGET_CONFIG_DEFAULTS = {
   streamDisplay: {
     showAgentSwitchNotification: true,
     showThinking: false,
-    showToolCalls: false,
     showInstantUpdates: true,
   },
   multiAgent: {

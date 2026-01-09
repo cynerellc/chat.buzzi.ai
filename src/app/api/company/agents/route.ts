@@ -204,13 +204,16 @@ Your role is to assist customers with their questions and concerns.
 Be professional, friendly, and concise in your responses.
 If you cannot help with something, offer to connect the customer with a human agent.`;
 
+      // Convert backward-compatible temperature (0-100) to new format (0-1)
+      const temperatureValue = body.temperature !== undefined ? body.temperature / 100 : 0.7;
+
       agentsList = [{
         agent_identifier: "main",
         name: body.name,
         agent_type: "worker",
         default_system_prompt: systemPrompt,
-        default_model_id: body.modelId || "gpt-5-mini",
-        default_temperature: body.temperature ?? 70,
+        default_model_id: body.modelId || "gpt-5-mini-2025-08-07",
+        model_settings: { temperature: temperatureValue, max_tokens: 4096, top_p: 1 },
         knowledge_categories: body.knowledgeCategories || [],
         tools: [],
         sort_order: 0,
