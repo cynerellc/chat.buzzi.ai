@@ -818,25 +818,21 @@ export class AdkExecutor {
   }
 
   /**
-   * Build supervisor system prompt with routing guidance
+   * Build supervisor system prompt.
+   *
+   * ADK handles multi-agent routing natively using sub-agent descriptions.
+   * Each worker's description (set via getWorkerRoutingDescription()) includes:
+   * - routing_prompt (labeled "Duties" in UI)
+   * - designation (e.g., "Sales Specialist")
+   * - knowledge_categories (expertise areas)
+   *
+   * ADK uses these descriptions to determine when to delegate control.
+   * Removing manual routing instructions reduces token count and improves latency.
+   *
+   * @see getWorkerRoutingDescription() for description construction
    */
   private buildSupervisorSystemPrompt(): string {
-    const basePrompt = this.options.agentConfig.systemPrompt;
-    const workers = this.getWorkerAgents();
-
-    if (workers.length === 0) return basePrompt;
-
-    const routingSection = `
-
-## Multi-Agent Routing
-
-You are a supervisor agent that coordinates with specialized agents. Each agent has specific expertise:
-
-${workers.map((w) => `- **${w.name}** (${w.agent_identifier}): ${w.routing_prompt || w.designation || "General support"}`).join("\n")}
-
-When a customer's request matches an agent's specialty, delegate to them. Handle general greetings and simple queries yourself.`;
-
-    return basePrompt + routingSection;
+    return this.options.agentConfig.systemPrompt;
   }
 
   /**
