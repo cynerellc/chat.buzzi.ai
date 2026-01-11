@@ -26,7 +26,8 @@ export function createDedupKey(
 
   if (params) {
     const sortedParams = Object.entries(params)
-      .filter(([_, v]) => v !== undefined)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .filter(([_key, v]) => v !== undefined)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join("&");

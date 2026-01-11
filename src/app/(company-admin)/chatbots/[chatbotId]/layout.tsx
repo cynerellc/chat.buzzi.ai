@@ -13,7 +13,7 @@ import {
 
 import { SecondaryNav, type SecondaryNavItem, type SecondaryNavSubItem } from "@/components/shared";
 import { Skeleton, Badge } from "@/components/ui";
-import { useAgent } from "@/hooks/company";
+import { useChatbot } from "@/hooks/company";
 
 import { ChatbotContext } from "./chatbot-context";
 
@@ -31,7 +31,7 @@ const statusBadgeVariants: Record<string, "success" | "warning" | "default"> = {
 
 export default function ChatbotDetailsLayout({ children, params }: LayoutProps) {
   const { chatbotId } = use(params);
-  const { agent: chatbot, isLoading, mutate } = useAgent(chatbotId);
+  const { chatbot, isLoading, mutate } = useChatbot(chatbotId);
 
   // Build agent sub-items from chatbot's agentsList
   const agentSubItems: SecondaryNavSubItem[] = (chatbot?.agentsList ?? []).map((agent) => ({

@@ -38,7 +38,8 @@ export const TimePicker = forwardRef<HTMLInputElement, TimePickerProps>(
       errorMessage,
       isDisabled,
       className,
-      hourCycle = 24,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      hourCycle: _hourCycle = 24,
       granularity = "minute",
       minValue,
       maxValue,

@@ -8,7 +8,7 @@ import { ArrowLeft, ArrowRight, Lock, Variable } from "lucide-react";
 import { Button, Input, Select, Card, CardHeader, CardBody, Textarea, addToast } from "@/components/ui";
 import { PackageSelector } from "@/components/company-admin/agents/package-selector";
 import { useSetPageTitle } from "@/contexts/page-context";
-import { useAgentPackages, useCreateAgent } from "@/hooks/company";
+import { useChatbotPackages, useCreateChatbot } from "@/hooks/company";
 
 type Step = "package" | "details" | "variables";
 
@@ -30,8 +30,8 @@ export default function NewChatbotPage() {
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { packages, isLoading: packagesLoading } = useAgentPackages();
-  const { createAgent } = useCreateAgent();
+  const { packages, isLoading: packagesLoading } = useChatbotPackages();
+  const { createChatbot } = useCreateChatbot();
 
   // Get selected package and its variables
   const selectedPackage = useMemo(
@@ -119,7 +119,7 @@ export default function NewChatbotPage() {
     setIsSubmitting(true);
 
     try {
-      const result = await createAgent({
+      const result = await createChatbot({
         name: name.trim(),
         description: description.trim() || undefined,
         type,
@@ -128,7 +128,7 @@ export default function NewChatbotPage() {
       });
 
       addToast({ title: "Chatbot created successfully", color: "success" });
-      router.push(`/chatbots/${result.agent.id}`);
+      router.push(`/chatbots/${result.chatbot.id}`);
     } catch {
       addToast({ title: "Failed to create chatbot", color: "danger" });
     } finally {

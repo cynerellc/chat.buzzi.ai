@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Star,
-  StarOff,
   AlertCircle,
   RefreshCw,
   User,

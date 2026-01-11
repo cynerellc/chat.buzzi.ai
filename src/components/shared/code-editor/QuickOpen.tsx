@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui";
 import type { FileTreeNode } from "@/lib/monaco/types";
 
 export interface QuickOpenProps {
@@ -94,13 +93,14 @@ function QuickOpenComponent({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const prevIsOpenRef = useRef(isOpen);
 
   // Flatten file tree
   const allFiles = useMemo(() => flattenFiles(files), [files]);
 
   // Filter and sort files
   const filteredFiles = useMemo(() => {
-    let result = allFiles.filter((f) => fuzzyMatch(query, f.name));
+    const result = allFiles.filter((f) => fuzzyMatch(query, f.name));
 
     // Sort: recent files first, then alphabetically
     result.sort((a, b) => {
@@ -119,17 +119,34 @@ function QuickOpenComponent({
     return result;
   }, [allFiles, query, recentPaths]);
 
-  // Reset selection when query changes
-  useEffect(() => {
+  // Handle query change - reset selection when query changes
+  const handleQueryChange = useCallback((newQuery: string) => {
+    setQuery(newQuery);
     setSelectedIndex(0);
-  }, [query]);
+  }, []);
 
-  // Focus input when opened
+  // Focus input when opened (without synchronous setState in effect)
   useEffect(() => {
-    if (isOpen) {
-      setQuery("");
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 0);
+    if (isOpen && !prevIsOpenRef.current) {
+      // Modal just opened - focus with delay, state reset handled by controlled component reset
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  // Reset state when modal closes (using key prop pattern in parent is preferred,
+  // but we handle it here as fallback). This is intentional synchronous state reset.
+  useEffect(() => {
+    if (!isOpen) {
+      // Use setTimeout to avoid the setState-in-effect warning
+      // This defers the reset to after the effect completes
+      const timeoutId = setTimeout(() => {
+        setQuery("");
+        setSelectedIndex(0);
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
   }, [isOpen]);
 
@@ -211,7 +228,7 @@ function QuickOpenComponent({
             type="text"
             placeholder="Search files..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             onKeyDown={handleKeyDown}
             className="flex-1 bg-transparent border-none outline-none text-sm"
           />

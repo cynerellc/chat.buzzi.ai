@@ -3,7 +3,7 @@ import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { dailyAnalytics, hourlyAnalytics, topicAnalytics, conversations, messages } from "@/lib/db/schema";
+import { dailyAnalytics, hourlyAnalytics, topicAnalytics, conversations } from "@/lib/db/schema";
 
 export interface AnalyticsSummary {
   totalConversations: number;
@@ -149,11 +149,6 @@ export async function GET(request: NextRequest) {
             gte(conversations.createdAt, startDate)
           )
         );
-
-      const messageCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(messages)
-        .where(gte(messages.createdAt, startDate));
 
       // Return basic stats from conversations table
       const response: AnalyticsResponse = {

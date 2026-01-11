@@ -3,11 +3,9 @@
 import { format } from "date-fns";
 import {
   Bot,
-  ExternalLink,
   MessageSquare,
   MoreVertical,
   Package,
-  Plus,
   Search,
   Settings,
 } from "lucide-react";
@@ -83,7 +81,8 @@ export function CompanyAgents({ companyId }: CompanyAgentsProps) {
     router.push(`/admin/companies/${companyId}/agents/${agentId}`);
   };
 
-  const getAgentDropdownItems = (agentId: string): DropdownMenuItemData[] => [
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const getAgentDropdownItems = (_agentId: string): DropdownMenuItemData[] => [
     {
       key: "configure",
       label: "Configure Agent",

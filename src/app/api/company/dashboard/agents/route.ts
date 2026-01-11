@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, gte, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
@@ -21,6 +21,7 @@ export async function GET() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayISO = today.toISOString();
 
     // Get all agents for the company
     const companyAgentsRaw = await db
@@ -55,9 +56,9 @@ export async function GET() {
       const batchedStats = await db
         .select({
           chatbotId: conversations.chatbotId,
-          todayConversations: sql<number>`COUNT(*) FILTER (WHERE ${conversations.createdAt} >= ${today})`,
-          aiResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} = 'ai' AND ${conversations.resolvedAt} >= ${today})`,
-          totalResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} IS NOT NULL AND ${conversations.resolvedAt} >= ${today})`,
+          todayConversations: sql<number>`COUNT(*) FILTER (WHERE ${conversations.createdAt} >= ${todayISO}::timestamptz)`,
+          aiResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} = 'ai' AND ${conversations.resolvedAt} >= ${todayISO}::timestamptz)`,
+          totalResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} IS NOT NULL AND ${conversations.resolvedAt} >= ${todayISO}::timestamptz)`,
         })
         .from(conversations)
         .where(inArray(conversations.chatbotId, agentIds))

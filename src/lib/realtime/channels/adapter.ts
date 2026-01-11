@@ -101,7 +101,9 @@ export abstract class BaseChannelAdapter implements ChannelAdapter {
    * Default: no verification needed
    */
   handleVerification(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _searchParams: URLSearchParams,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _verifyToken: string
   ): Response | null {
     return null;
@@ -110,7 +112,12 @@ export abstract class BaseChannelAdapter implements ChannelAdapter {
   /**
    * Default: media download not supported
    */
-  async downloadMedia(_config: ChannelConfig, _mediaId: string): Promise<Buffer> {
+  async downloadMedia(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _config: ChannelConfig,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _mediaId: string
+  ): Promise<Buffer> {
     throw new Error(`Media download not supported for ${this.channel}`);
   }
 

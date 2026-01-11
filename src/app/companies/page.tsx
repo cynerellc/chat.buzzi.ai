@@ -131,7 +131,7 @@ export default function CompanySelectionPage() {
         throw new Error(data.error || "Failed to create company");
       }
 
-      const data = await response.json();
+      await response.json();
 
       // Close modal and redirect
       setShowCreateModal(false);

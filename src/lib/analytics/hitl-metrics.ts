@@ -86,18 +86,18 @@ export class HITLMetricsService {
     }>(sql`
       SELECT
         COUNT(*) as total,
-        COUNT(CASE WHEN status = 'escalated' OR EXISTS (
-          SELECT 1 FROM chatapp_escalations e WHERE e.conversation_id = c.id
+        COUNT(CASE WHEN EXISTS (
+          SELECT 1 FROM chatapp.escalations e WHERE e.conversation_id = c.id
         ) THEN 1 END) as escalated,
-        AVG(CASE WHEN status = 'escalated' THEN
-          (SELECT COUNT(*) FROM chatapp_messages m WHERE m.conversation_id = c.id AND m.created_at <
-           (SELECT MIN(e.created_at) FROM chatapp_escalations e WHERE e.conversation_id = c.id))
+        AVG(CASE WHEN EXISTS (SELECT 1 FROM chatapp.escalations e2 WHERE e2.conversation_id = c.id) THEN
+          (SELECT COUNT(*) FROM chatapp.messages m WHERE m.conversation_id = c.id AND m.created_at <
+           (SELECT MIN(e.created_at) FROM chatapp.escalations e WHERE e.conversation_id = c.id))
         END) as avg_messages_before,
-        AVG(CASE WHEN status = 'escalated' THEN
-          (SELECT COUNT(*) FROM chatapp_messages m WHERE m.conversation_id = c.id AND m.created_at >=
-           (SELECT MIN(e.created_at) FROM chatapp_escalations e WHERE e.conversation_id = c.id))
+        AVG(CASE WHEN EXISTS (SELECT 1 FROM chatapp.escalations e2 WHERE e2.conversation_id = c.id) THEN
+          (SELECT COUNT(*) FROM chatapp.messages m WHERE m.conversation_id = c.id AND m.created_at >=
+           (SELECT MIN(e.created_at) FROM chatapp.escalations e WHERE e.conversation_id = c.id))
         END) as avg_messages_after
-      FROM chatapp_conversations c
+      FROM chatapp.conversations c
       WHERE c.company_id = ${companyId}
         AND c.created_at >= ${startDate}
         AND c.created_at <= ${endDate}
@@ -109,7 +109,7 @@ export class HITLMetricsService {
       count: number;
     }>(sql`
       SELECT reason, COUNT(*) as count
-      FROM chatapp_escalations
+      FROM chatapp.escalations
       WHERE company_id = ${companyId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -125,12 +125,12 @@ export class HITLMetricsService {
       SELECT
         AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60) as avg_resolution_time,
         COUNT(CASE WHEN NOT EXISTS (
-          SELECT 1 FROM chatapp_escalations e2
+          SELECT 1 FROM chatapp.escalations e2
           WHERE e2.conversation_id = e.conversation_id
           AND e2.created_at > e.resolved_at
         ) THEN 1 END)::float / NULLIF(COUNT(*), 0) * 100 as fcr_rate,
         AVG(satisfaction_score) as avg_satisfaction
-      FROM chatapp_escalations e
+      FROM chatapp.escalations e
       WHERE company_id = ${companyId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -143,7 +143,7 @@ export class HITLMetricsService {
       count: number;
     }>(sql`
       SELECT EXTRACT(HOUR FROM created_at)::int as hour, COUNT(*) as count
-      FROM chatapp_escalations
+      FROM chatapp.escalations
       WHERE company_id = ${companyId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -157,7 +157,7 @@ export class HITLMetricsService {
       count: number;
     }>(sql`
       SELECT EXTRACT(DOW FROM created_at)::int as day, COUNT(*) as count
-      FROM chatapp_escalations
+      FROM chatapp.escalations
       WHERE company_id = ${companyId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -171,7 +171,7 @@ export class HITLMetricsService {
       count: number;
     }>(sql`
       SELECT assigned_agent_id as agent_id, COUNT(*) as count
-      FROM chatapp_escalations
+      FROM chatapp.escalations
       WHERE company_id = ${companyId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -186,15 +186,15 @@ export class HITLMetricsService {
     }>(sql`
       SELECT AVG(
         EXTRACT(EPOCH FROM (
-          (SELECT MIN(m2.created_at) FROM chatapp_messages m2
+          (SELECT MIN(m2.created_at) FROM chatapp.messages m2
            WHERE m2.conversation_id = m.conversation_id
            AND m2.sender_type = 'agent'
            AND m2.created_at > m.created_at)
           - m.created_at
         ))
       ) as avg_response_time
-      FROM chatapp_messages m
-      JOIN chatapp_conversations c ON m.conversation_id = c.id
+      FROM chatapp.messages m
+      JOIN chatapp.conversations c ON m.conversation_id = c.id
       WHERE c.company_id = ${companyId}
         AND m.sender_type = 'customer'
         AND m.created_at >= ${startDate}
@@ -273,8 +273,8 @@ export class HITLMetricsService {
         AVG(e.satisfaction_score) as avg_satisfaction,
         COUNT(*) as escalations_received,
         COUNT(CASE WHEN e.resolved_at IS NOT NULL THEN 1 END) as escalations_resolved
-      FROM chatapp_escalations e
-      JOIN chatapp_users u ON e.assigned_agent_id = u.id
+      FROM chatapp.escalations e
+      JOIN chatapp.users u ON e.assigned_agent_id = u.id
       WHERE e.company_id = ${companyId}
         AND e.assigned_agent_id = ${agentId}
         AND e.created_at >= ${startDate}
@@ -323,8 +323,8 @@ export class HITLMetricsService {
         COUNT(DISTINCT c.id) as total_conversations,
         COUNT(DISTINCT e.id) as escalations,
         AVG(EXTRACT(EPOCH FROM (e.resolved_at - e.created_at))/60) as avg_resolution_time
-      FROM chatapp_conversations c
-      LEFT JOIN chatapp_escalations e ON c.id = e.conversation_id
+      FROM chatapp.conversations c
+      LEFT JOIN chatapp.escalations e ON c.id = e.conversation_id
       WHERE c.company_id = ${companyId}
         AND c.created_at >= ${startDate}
         AND c.created_at <= ${endDate}
@@ -361,11 +361,11 @@ export class HITLMetricsService {
       SELECT
         reason,
         COUNT(*) as count,
-        (SELECT COUNT(*) FROM chatapp_escalations
+        (SELECT COUNT(*) FROM chatapp.escalations
          WHERE company_id = ${companyId}
          AND created_at >= ${startDate}
          AND created_at <= ${endDate}) as total
-      FROM chatapp_escalations
+      FROM chatapp.escalations
       WHERE company_id = ${companyId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -399,7 +399,7 @@ export class HITLMetricsService {
         EXTRACT(HOUR FROM created_at)::int as hour,
         COUNT(*) as count,
         AVG(EXTRACT(EPOCH FROM (assigned_at - created_at))) as avg_wait_time
-      FROM chatapp_escalations
+      FROM chatapp.escalations
       WHERE company_id = ${companyId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}

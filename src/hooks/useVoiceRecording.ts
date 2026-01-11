@@ -57,6 +57,9 @@ export function useVoiceRecording(
   const pendingStopRef = useRef(false);
   const mimeTypeRef = useRef<string>("audio/webm");
   const stopResolveRef = useRef<((blob: Blob | null) => void) | null>(null);
+  // Track audio energy samples for silence detection
+  const energySamplesRef = useRef<number[]>([]);
+  const isSilentRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -112,6 +115,8 @@ export function useVoiceRecording(
     setError(null);
     pendingStopRef.current = false;
     isCancelledRef.current = false;
+    energySamplesRef.current = [];
+    isSilentRef.current = false;
 
     // Request microphone permission
     let stream: MediaStream;
@@ -146,12 +151,17 @@ export function useVoiceRecording(
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
-      // Animation loop to get waveform data
+      // Animation loop to get waveform data and track energy for silence detection
       const updateAudioData = () => {
         if (!analyserRef.current) return;
         const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(dataArray);
         setAudioData(Array.from(dataArray));
+
+        // Calculate average energy for silence detection (0-255 scale)
+        const avgEnergy = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
+        energySamplesRef.current.push(avgEnergy);
+
         animationFrameRef.current = requestAnimationFrame(updateAudioData);
       };
       updateAudioData();
@@ -184,6 +194,26 @@ export function useVoiceRecording(
         stopResolveRef.current?.(null);
         stopResolveRef.current = null;
         return;
+      }
+
+      // Check for silence before returning blob
+      // Average energy threshold: ~5 on 0-255 scale indicates silence/noise only
+      const SILENCE_THRESHOLD = 5;
+      if (energySamplesRef.current.length > 0) {
+        const avgEnergy =
+          energySamplesRef.current.reduce((sum, val) => sum + val, 0) /
+          energySamplesRef.current.length;
+
+        if (avgEnergy < SILENCE_THRESHOLD) {
+          console.log(`[VoiceRecording] Silent audio detected (avgEnergy: ${avgEnergy.toFixed(2)})`);
+          isSilentRef.current = true;
+          const errorMsg = "No speech detected. Please speak clearly into the microphone.";
+          setError(errorMsg);
+          onError?.(errorMsg);
+          stopResolveRef.current?.(null);
+          stopResolveRef.current = null;
+          return;
+        }
       }
 
       // Create audio blob

@@ -7,7 +7,8 @@ import { Plus } from "lucide-react";
 import { Button, Tabs, type TabItem, addToast } from "@/components/ui";
 import { AgentsGrid } from "@/components/company-admin/agents/agents-grid";
 import { useSetPageTitle } from "@/contexts/page-context";
-import { useAgents } from "@/hooks/company";
+import { useChatbots } from "@/hooks/company";
+import { useAuth } from "@/hooks/useAuth";
 
 const STATUS_TABS: TabItem[] = [
   { key: "all", label: "All" },
@@ -18,14 +19,15 @@ const STATUS_TABS: TabItem[] = [
 
 export default function ChatbotsPage() {
   useSetPageTitle("Chatbots");
+  const { isMasterAdmin } = useAuth();
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const { agents: chatbots, isLoading, mutate } = useAgents(statusFilter);
+  const { chatbots, isLoading, mutate } = useChatbots(statusFilter);
 
   // H8: Wrap handlers with useCallback to prevent recreation on every render
   const handleDuplicate = useCallback(async (chatbotId: string) => {
     try {
-      const response = await fetch(`/api/company/agents/${chatbotId}/duplicate`, {
+      const response = await fetch(`/api/company/chatbots/${chatbotId}/duplicate`, {
         method: "POST",
       });
       if (!response.ok) throw new Error("Failed to duplicate chatbot");
@@ -38,7 +40,7 @@ export default function ChatbotsPage() {
 
   const handleDelete = useCallback(async (chatbotId: string) => {
     try {
-      const response = await fetch(`/api/company/agents/${chatbotId}`, {
+      const response = await fetch(`/api/company/chatbots/${chatbotId}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete chatbot");
@@ -54,7 +56,7 @@ export default function ChatbotsPage() {
     status: "active" | "paused"
   ) => {
     try {
-      const response = await fetch(`/api/company/agents/${chatbotId}`, {
+      const response = await fetch(`/api/company/chatbots/${chatbotId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -80,9 +82,11 @@ export default function ChatbotsPage() {
             Manage your AI chatbots and their configurations
           </p>
         </div>
-        <Button asChild leftIcon={Plus}>
-          <Link href="/chatbots/new">Create Chatbot</Link>
-        </Button>
+        {isMasterAdmin && (
+          <Button asChild leftIcon={Plus}>
+            <Link href="/chatbots/new">Create Chatbot</Link>
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -103,6 +107,7 @@ export default function ChatbotsPage() {
         onDelete={handleDelete}
         onStatusChange={handleStatusChange}
         basePath="/chatbots"
+        showCreateCard={isMasterAdmin}
       />
     </div>
   );

@@ -32,13 +32,8 @@ export async function GET() {
       .orderBy(desc(platformAnalytics.date))
       .limit(1);
 
-    // Get previous period for growth calculation (reserved for future use)
-    const [_previousAnalytics] = await db
-      .select()
-      .from(platformAnalytics)
-      .orderBy(desc(platformAnalytics.date))
-      .limit(1)
-      .offset(1);
+    // Note: Previous period data from platformAnalytics reserved for future use
+    // Growth calculations currently use dailyAnalytics aggregation below
 
     // Get counts from actual tables as fallback/current data
     const [companiesCount] = await db

@@ -27,6 +27,7 @@ export const widgetConfigs = chatappSchema.table(
     // Appearance
     theme: varchar("theme", { length: 20 }).default("light").notNull(), // light, dark, auto
     position: varchar("position", { length: 20 }).default("bottom-right").notNull(), // bottom-right, bottom-left
+    placement: varchar("placement", { length: 20 }).default("above-launcher").notNull(), // above-launcher, center-screen
     primaryColor: varchar("primary_color", { length: 7 }).default("#6437F3").notNull(),
     accentColor: varchar("accent_color", { length: 7 }).default("#2b3dd8").notNull(),
     userBubbleColor: varchar("user_bubble_color", { length: 7 }), // User message bubble color (defaults to primaryColor if null)

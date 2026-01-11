@@ -325,6 +325,7 @@ export class GeminiLlm extends BaseLlm {
   /**
    * Create a live connection (not supported for Gemini in this implementation)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async connect(_llmRequest: LlmRequest): Promise<BaseLlmConnection> {
     throw new Error("Live/streaming connections not supported for Gemini in this implementation");
   }

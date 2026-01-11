@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Save, Trash2, Users, User, Bot, Variable, ChevronDown, ChevronUp, Lock, Shield } from "lucide-react";
+import { Plus, Save, Trash2, Users, User, Bot, Variable, ChevronDown, ChevronUp, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState, useCallback } from "react";
 

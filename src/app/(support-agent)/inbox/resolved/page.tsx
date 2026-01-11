@@ -26,7 +26,7 @@ import {
   Select,
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow, format } from "date-fns";
+import { format } from "date-fns";
 
 // Types (same as inbox page)
 interface Conversation {

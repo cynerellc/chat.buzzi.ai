@@ -138,6 +138,7 @@ export class InstagramAdapter extends BaseChannelAdapter {
     config: ChannelConfig,
     recipientId: string,
     content: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _options?: SendOptions
   ): Promise<void> {
     const { accessToken, instagramAccountId } = config.credentials as {
@@ -170,7 +171,9 @@ export class InstagramAdapter extends BaseChannelAdapter {
     recipientId: string,
     mediaUrl: string,
     mediaType: "image" | "audio" | "video" | "document",
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _caption?: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _options?: SendOptions
   ): Promise<void> {
     const { accessToken, instagramAccountId } = config.credentials as {

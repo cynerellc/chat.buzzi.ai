@@ -1,7 +1,6 @@
 import useSWR from "swr";
 
-import type { CompanyAgentItem } from "@/app/api/master-admin/companies/[companyId]/agents/route";
-import type { AgentDetails } from "@/app/api/master-admin/companies/[companyId]/agents/[agentId]/route";
+import type { CompanyChatbotItem } from "@/app/api/master-admin/companies/[companyId]/chatbots/route";
 import type { AgentListItem } from "@/lib/db/schema/chatbots";
 
 const fetcher = async (url: string) => {
@@ -15,15 +14,29 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
-// Extended chatbot details that includes agentsList
-export interface ChatbotDetails extends AgentDetails {
-  agentsList: AgentListItem[];
+// Chatbot details with agents list
+export interface ChatbotDetails {
+  id: string;
+  name: string;
+  description: string | null;
+  packageId: string | null;
+  packageName: string;
+  systemPrompt: string;
+  modelId: string;
+  modelSettings: Record<string, unknown>;
+  behavior: Record<string, unknown>;
+  status: string;
   escalationEnabled: boolean;
+  conversationCount: number;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  agentsList: AgentListItem[];
 }
 
 // Hook for listing company chatbots
 export interface UseCompanyChatbotsReturn {
-  chatbots: CompanyAgentItem[];
+  chatbots: CompanyChatbotItem[];
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -31,8 +44,8 @@ export interface UseCompanyChatbotsReturn {
 }
 
 export function useCompanyChatbots(companyId: string | null): UseCompanyChatbotsReturn {
-  const { data, error, isLoading, mutate } = useSWR<{ agents: CompanyAgentItem[] }>(
-    companyId ? `/api/master-admin/companies/${companyId}/agents` : null,
+  const { data, error, isLoading, mutate } = useSWR<{ chatbots: CompanyChatbotItem[] }>(
+    companyId ? `/api/master-admin/companies/${companyId}/chatbots` : null,
     fetcher,
     {
       revalidateOnFocus: true,
@@ -40,7 +53,7 @@ export function useCompanyChatbots(companyId: string | null): UseCompanyChatbots
   );
 
   return {
-    chatbots: data?.agents ?? [],
+    chatbots: data?.chatbots ?? [],
     isLoading,
     isError: !!error,
     error: error ?? null,
@@ -63,7 +76,7 @@ export function useCompanyChatbot(
 ): UseCompanyChatbotReturn {
   const { data, error, isLoading, mutate } = useSWR<ChatbotDetails>(
     companyId && chatbotId
-      ? `/api/master-admin/companies/${companyId}/agents/${chatbotId}`
+      ? `/api/master-admin/companies/${companyId}/chatbots/${chatbotId}`
       : null,
     fetcher,
     {
@@ -92,7 +105,7 @@ export async function updateCompanyChatbot(
     behavior: Record<string, unknown>;
   }>
 ) {
-  const res = await fetch(`/api/master-admin/companies/${companyId}/agents/${chatbotId}`, {
+  const res = await fetch(`/api/master-admin/companies/${companyId}/chatbots/${chatbotId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -108,7 +121,7 @@ export async function updateCompanyChatbot(
 
 // Delete chatbot mutation
 export async function deleteCompanyChatbot(companyId: string, chatbotId: string) {
-  const res = await fetch(`/api/master-admin/companies/${companyId}/agents/${chatbotId}`, {
+  const res = await fetch(`/api/master-admin/companies/${companyId}/chatbots/${chatbotId}`, {
     method: "DELETE",
   });
 

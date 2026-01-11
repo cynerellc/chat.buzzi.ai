@@ -5,7 +5,7 @@
  * Use in Server Components to fetch dashboard data directly without HTTP overhead.
  */
 import { cache } from "react";
-import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -111,7 +111,7 @@ async function fetchDashboardStats(companyId: string): Promise<DashboardStats> {
       .where(
         and(
           eq(conversations.companyId, companyId),
-          sql`${conversations.status} IN ('active', 'waiting')`
+          sql`${conversations.status} IN ('active', 'waiting_human', 'with_human')`
         )
       ),
     db
@@ -120,9 +120,9 @@ async function fetchDashboardStats(companyId: string): Promise<DashboardStats> {
       .where(
         and(
           eq(conversations.companyId, companyId),
-          sql`${conversations.status} IN ('active', 'waiting')`,
+          sql`${conversations.status} IN ('active', 'waiting_human', 'with_human')`,
           gte(conversations.createdAt, yesterday),
-          sql`${conversations.createdAt} < ${today}`
+          lt(conversations.createdAt, today)
         )
       ),
     db
@@ -214,12 +214,14 @@ async function fetchAgentsOverview(companyId: string): Promise<AgentOverview[]> 
   let statsMap: Map<string, { todayConversations: number; aiResolved: number; totalResolved: number }> = new Map();
 
   if (agentIds.length > 0) {
+    // Convert Date to ISO string for proper PostgreSQL serialization
+    const todayIso = today.toISOString();
     const batchedStats = await db
       .select({
         chatbotId: conversations.chatbotId,
-        todayConversations: sql<number>`COUNT(*) FILTER (WHERE ${conversations.createdAt} >= ${today})`,
-        aiResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} = 'ai' AND ${conversations.resolvedAt} >= ${today})`,
-        totalResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} IS NOT NULL AND ${conversations.resolvedAt} >= ${today})`,
+        todayConversations: sql<number>`COUNT(*) FILTER (WHERE ${conversations.createdAt} >= ${todayIso}::timestamp)`.as('today_conversations'),
+        aiResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} = 'ai' AND ${conversations.resolvedAt} >= ${todayIso}::timestamp)`.as('ai_resolved'),
+        totalResolved: sql<number>`COUNT(*) FILTER (WHERE ${conversations.resolutionType} IS NOT NULL AND ${conversations.resolvedAt} >= ${todayIso}::timestamp)`.as('total_resolved'),
       })
       .from(conversations)
       .where(inArray(conversations.chatbotId, agentIds))
@@ -485,19 +487,39 @@ export const cachedGetUsageOverview = cache(async (companyId: string): Promise<U
  * This is the main entry point for the dashboard Server Component
  */
 export const cachedGetCompanyDashboardData = cache(async (companyId: string): Promise<CompanyDashboardData> => {
-  const [stats, agentsData, conversationsData, activities, usage] = await Promise.all([
-    cachedGetDashboardStats(companyId),
-    cachedGetAgentsOverview(companyId),
-    cachedGetRecentConversations(companyId, 5),
-    cachedGetActivityFeed(companyId, 10),
-    cachedGetUsageOverview(companyId),
-  ]);
+  try {
+    const [stats, agentsData, conversationsData, activities, usage] = await Promise.all([
+      cachedGetDashboardStats(companyId).catch((err) => {
+        console.error("[Dashboard] Stats fetch error:", err);
+        return { activeConversations: 0, activeConversationsChange: 0, aiResolutionRate: 0, aiResolutionChange: 0, humanEscalations: 0, humanEscalationsChange: 0, avgResponseTime: 0, avgResponseTimeChange: 0 } as DashboardStats;
+      }),
+      cachedGetAgentsOverview(companyId).catch((err) => {
+        console.error("[Dashboard] Agents overview fetch error:", err);
+        return [] as AgentOverview[];
+      }),
+      cachedGetRecentConversations(companyId, 5).catch((err) => {
+        console.error("[Dashboard] Recent conversations fetch error:", err);
+        return [] as RecentConversation[];
+      }),
+      cachedGetActivityFeed(companyId, 10).catch((err) => {
+        console.error("[Dashboard] Activity feed fetch error:", err);
+        return [] as ActivityItem[];
+      }),
+      cachedGetUsageOverview(companyId).catch((err) => {
+        console.error("[Dashboard] Usage overview fetch error:", err);
+        return { planName: "Free", usage: [] } as UsageOverview;
+      }),
+    ]);
 
-  return {
-    stats,
-    agents: agentsData,
-    conversations: conversationsData,
-    activities,
-    usage,
-  };
+    return {
+      stats,
+      agents: agentsData,
+      conversations: conversationsData,
+      activities,
+      usage,
+    };
+  } catch (error) {
+    console.error("[Dashboard] Unexpected error fetching dashboard data:", error);
+    throw error;
+  }
 });

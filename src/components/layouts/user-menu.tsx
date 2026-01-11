@@ -1,6 +1,7 @@
 "use client";
 
 import { LogOut, Settings, User } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 import { type Key } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -8,8 +9,33 @@ import { getRoleDisplayName } from "@/lib/auth/role-utils";
 
 import { Dropdown, UserAvatar, type DropdownMenuSectionData } from "../ui";
 
+/**
+ * Get the profile page URL based on the current route context
+ */
+function getProfileUrl(pathname: string, isMasterAdmin: boolean): string {
+  // Master admin routes
+  if (isMasterAdmin || pathname.startsWith("/admin")) {
+    return "/admin/profile";
+  }
+
+  // Support agent routes
+  if (
+    pathname.startsWith("/inbox") ||
+    pathname.startsWith("/customers") ||
+    pathname.startsWith("/responses") ||
+    pathname.startsWith("/agent-settings")
+  ) {
+    return "/inbox/profile";
+  }
+
+  // Default to company admin profile
+  return "/dashboard/profile";
+}
+
 export function UserMenu() {
   const { user, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
   if (!user) return null;
 
@@ -43,16 +69,18 @@ export function UserMenu() {
     },
   ];
 
+  const isMasterAdmin = user.role === "chatapp.master_admin";
+
   const handleAction = (key: Key) => {
     switch (key) {
       case "logout":
         logout();
         break;
       case "profile":
-        // Navigate to profile
+        router.push(getProfileUrl(pathname, isMasterAdmin));
         break;
       case "settings":
-        // Navigate to settings
+        // Navigate to settings (TODO: implement settings page)
         break;
     }
   };

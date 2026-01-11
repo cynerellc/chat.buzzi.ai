@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { AgentCard } from "./AgentCard";
 import { humanizeToolCall } from "../utils/tool-humanizer";
 import type { AgentInfo } from "./types";
 

@@ -5,7 +5,7 @@ import { Zap, ArrowRight, TrendingUp, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
-import { Badge, Button, Card, CardHeader, CardBody, Progress, Skeleton } from "@/components/ui";
+import { Button, Card, CardHeader, CardBody, Progress, Skeleton } from "@/components/ui";
 import type { UsageItem } from "@/hooks/company";
 
 interface UsageOverviewProps {

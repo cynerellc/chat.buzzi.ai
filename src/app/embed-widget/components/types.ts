@@ -23,7 +23,7 @@ export interface AgentInfo {
 
 export interface Message {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "human_agent";
   content: string;
   timestamp: Date;
   status?: "sending" | "sent" | "error";
@@ -45,6 +45,16 @@ export interface Message {
   audioUrl?: string;
   transcript?: string;
   duration?: number;
+  // Human escalation fields
+  isHumanWaiting?: boolean;
+  isHumanJoined?: boolean;
+  isHumanExited?: boolean;
+  humanAgentId?: string;
+  humanAgentName?: string;
+  humanAgentAvatarUrl?: string;
+  escalationReason?: string;
+  // Human agent message flag (for messages sent by support agents)
+  isFromHumanAgent?: boolean;
 }
 
 // ============================================================================
@@ -85,6 +95,7 @@ export interface ChatWindowConfig {
   agentBubbleColor?: string;
   borderRadius?: number;
   position?: "bottom-right" | "bottom-left";
+  placement?: "above-launcher" | "center-screen";
   title?: string;
   subtitle?: string;
   avatarUrl?: string;

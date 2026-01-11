@@ -434,7 +434,7 @@ export class OpenAILlm extends BaseLlm {
           const totalChars = messages.reduce((sum, m) => {
             if (typeof m.content === "string") return sum + m.content.length;
             if (Array.isArray(m.content)) {
-              return sum + m.content.reduce((s, p) => s + (typeof p === "string" ? p.length : JSON.stringify(p).length), 0);
+              return sum + (m.content as unknown[]).reduce((s: number, p) => s + (typeof p === "string" ? p.length : JSON.stringify(p).length), 0);
             }
             return sum;
           }, 0);
@@ -444,8 +444,9 @@ export class OpenAILlm extends BaseLlm {
           console.log(`  Messages: ${messages.length} total (${systemMessages.length} system, ${userMessages.length} user, ${assistantMessages.length} assistant, ${toolMessages.length} tool)`);
           console.log(`  Estimated input tokens: ~${estimatedTokens}`);
           console.log(`  Tools defined: ${tools?.length ?? 0}`);
-          if (systemMessages.length > 0 && typeof systemMessages[0].content === "string") {
-            console.log(`  System prompt length: ${systemMessages[0].content.length} chars`);
+          const firstSystemMsg = systemMessages[0];
+          if (firstSystemMsg && typeof firstSystemMsg.content === "string") {
+            console.log(`  System prompt length: ${firstSystemMsg.content.length} chars`);
           }
         }
 
@@ -467,7 +468,8 @@ export class OpenAILlm extends BaseLlm {
 
         // Track accumulated tool calls for streaming
         const accumulatedToolCalls: Map<number, OpenAIToolCall> = new Map();
-        let accumulatedContent = "";
+        // Accumulated content is tracked for potential future debugging use
+        let _accumulatedContent = "";
         let firstTokenReceived = false;
 
         for await (const chunk of streamResponse) {
@@ -482,7 +484,8 @@ export class OpenAILlm extends BaseLlm {
               console.log(`[OpenAILlm] First token received after ${(performance.now() - apiCallStart).toFixed(0)}ms`);
               firstTokenReceived = true;
             }
-            accumulatedContent += delta.content;
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _accumulatedContent += delta.content;
             yield buildLlmResponse(
               [{ text: delta.content }],
               true,
@@ -574,6 +577,7 @@ export class OpenAILlm extends BaseLlm {
   /**
    * Create a live connection (not supported for OpenAI)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async connect(_llmRequest: LlmRequest): Promise<BaseLlmConnection> {
     throw new Error("Live/streaming connections not supported for OpenAI in this implementation");
   }

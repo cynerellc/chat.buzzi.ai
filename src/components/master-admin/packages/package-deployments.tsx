@@ -6,7 +6,6 @@ import {
   Bot,
   Building2,
   Clock,
-  ExternalLink,
   RefreshCw,
   Rocket,
   Search,

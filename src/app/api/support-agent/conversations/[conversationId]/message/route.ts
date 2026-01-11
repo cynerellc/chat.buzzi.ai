@@ -10,6 +10,7 @@ import { conversations, messages } from "@/lib/db/schema/conversations";
 import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq } from "drizzle-orm";
 import { getSSEManager, getConversationChannel } from "@/lib/realtime";
+import { broadcastMessage } from "@/lib/supabase/client";
 
 interface RouteParams {
   conversationId: string;
@@ -84,6 +85,13 @@ export async function POST(
         userId: user.id,
         attachments: attachments ?? [],
         metadata: isNote ? { isInternalNote: true, eventType: "note" } : {},
+        agentDetails: isNote
+          ? { agentId: "system", agentType: "system", agentName: "System" }
+          : {
+              agentId: user.id,
+              agentType: "human",
+              agentName: user.name || user.email || "Support Agent",
+            },
       })
       .returning();
 
@@ -103,7 +111,7 @@ export async function POST(
         })
         .where(eq(conversations.id, conversationId));
 
-      // Publish to SSE channel for real-time updates
+      // Publish to SSE channel for widget real-time updates
       try {
         const sseManager = getSSEManager();
         const channel = getConversationChannel(conversationId);
@@ -121,6 +129,21 @@ export async function POST(
       } catch (sseError) {
         // SSE publish failure shouldn't fail the request
         console.warn("Failed to publish SSE event:", sseError);
+      }
+
+      // Broadcast to Supabase for admin pages real-time updates
+      try {
+        await broadcastMessage(conversationId, {
+          id: newMessage.id,
+          conversationId,
+          role: "human_agent",
+          content: content.trim(),
+          createdAt: newMessage.createdAt.toISOString(),
+          userId: user.id,
+          userName: user.name || undefined,
+        });
+      } catch (broadcastError) {
+        console.warn("Failed to broadcast message:", broadcastError);
       }
     }
 

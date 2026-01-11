@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "./schema";
+import type { ChatbotBehavior, AgentListItem } from "./schema/chatbots";
 
 // Seed script for development/testing
 async function seed() {
@@ -418,9 +419,9 @@ Guidelines:
         description: "Demo customer support agent",
         type: "support",
         status: "active",
-        behavior: supportPackage.defaultBehavior,
+        behavior: supportPackage.defaultBehavior as ChatbotBehavior,
         escalationEnabled: true,
-        agentsList: supportPackage.agentsList,
+        agentsList: supportPackage.agentsList as AgentListItem[],
       })
       .returning();
     const agent = agentResult[0];

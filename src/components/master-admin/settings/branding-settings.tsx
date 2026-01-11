@@ -1,8 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
 import {
-  ImagePlus,
   Palette,
   Type,
   Image,
@@ -12,7 +10,6 @@ import {
   Upload,
   Sparkles,
 } from "lucide-react";
-import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { Button, Card, CardHeader, CardBody, Input, Switch } from "@/components/ui";

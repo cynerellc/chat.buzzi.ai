@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button, ConfirmationDialog, Input, addToast } from "@/components/ui";
 import { useMonacoEditor } from "@/hooks/useMonacoEditor";
 import { getDefaultFileContent } from "@/lib/monaco/setup";
-import type { EditorPreferences } from "@/lib/monaco/types";
 
 import { MonacoEditor } from "./MonacoEditor";
 import { FileTree } from "./FileTree";

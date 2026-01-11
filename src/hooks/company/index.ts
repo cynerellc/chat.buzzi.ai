@@ -1,6 +1,6 @@
 // Company Hooks
 export * from "./useDashboard";
-export * from "./useAgents";
+export * from "./useChatbots";
 export * from "./useConversations";
 export * from "./useKnowledge";
 export * from "./useWidget";

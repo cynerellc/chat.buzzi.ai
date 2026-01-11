@@ -4,6 +4,8 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { conversations, messages, users } from "@/lib/db/schema";
+import { getSSEManager, getConversationChannel } from "@/lib/realtime";
+import { broadcastMessage } from "@/lib/supabase/client";
 
 export interface MessageItem {
   id: string;
@@ -173,6 +175,11 @@ export async function POST(
         type: "text",
         content: body.content.trim(),
         userId: user.id,
+        agentDetails: {
+          agentId: user.id,
+          agentType: "human",
+          agentName: user.name || user.email || "Admin",
+        },
       })
       .returning();
 
@@ -192,6 +199,43 @@ export async function POST(
           : {}),
       })
       .where(eq(conversations.id, conversationId));
+
+    // Publish to SSE channel for real-time updates to widget
+    if ((body.role === "human_agent" || !body.role) && newMessage) {
+      try {
+        const sseManager = getSSEManager();
+        const channel = getConversationChannel(conversationId);
+
+        sseManager.publish(channel, "notification", {
+          type: "new_message",
+          messageId: newMessage.id,
+          role: "human_agent",
+          content: body.content.trim(),
+          attachments: [],
+          userId: user.id,
+          userName: user.name,
+          createdAt: newMessage.createdAt.toISOString(),
+        });
+      } catch (sseError) {
+        // SSE publish failure shouldn't fail the request
+        console.warn("Failed to publish SSE event:", sseError);
+      }
+
+      // Broadcast to Supabase for admin pages real-time updates
+      try {
+        await broadcastMessage(conversationId, {
+          id: newMessage.id,
+          conversationId,
+          role: "human_agent",
+          content: body.content.trim(),
+          createdAt: newMessage.createdAt.toISOString(),
+          userId: user.id,
+          userName: user.name || undefined,
+        });
+      } catch (broadcastError) {
+        console.warn("Failed to broadcast message:", broadcastError);
+      }
+    }
 
     return NextResponse.json({ message: newMessage }, { status: 201 });
   } catch (error) {

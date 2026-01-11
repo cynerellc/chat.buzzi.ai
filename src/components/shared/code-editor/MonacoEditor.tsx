@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, memo } from "react";
+import { useRef, memo } from "react";
 import dynamic from "next/dynamic";
 import type { OnMount, OnChange } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";

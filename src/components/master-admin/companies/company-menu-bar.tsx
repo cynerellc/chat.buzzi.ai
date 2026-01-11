@@ -34,12 +34,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import type { CompanyAgentItem } from "@/app/api/master-admin/companies/[companyId]/agents/route";
+import type { CompanyChatbotItem } from "@/app/api/master-admin/companies/[companyId]/chatbots/route";
 import type { AgentListItem } from "@/lib/db/schema/chatbots";
 
 interface CompanyMenuBarProps {
   companyId: string;
-  chatbots: CompanyAgentItem[];
+  chatbots: CompanyChatbotItem[];
   companyName: string;
   className?: string;
 }
@@ -63,7 +63,7 @@ interface SubMenuItem {
   items?: SubMenuItem[];
 }
 
-function buildMenuItems(companyId: string, chatbots: CompanyAgentItem[]): MenuItem[] {
+function buildMenuItems(companyId: string, chatbots: CompanyChatbotItem[]): MenuItem[] {
   const basePath = `/admin/companies/${companyId}`;
 
   // Build chatbot menu items

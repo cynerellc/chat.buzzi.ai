@@ -17,13 +17,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
-import { AgentCard } from "./AgentCard";
 import { TransferBubble } from "./TransferBubble";
 import { ThinkingBubble, type ToolCallState } from "./ThinkingBubble";
-import { UserBubble } from "./UserBubble";
-import { AgentBubble } from "./AgentBubble";
-import { MessageInput } from "./MessageInput";
 import { VoiceMessageBubble } from "./VoiceMessageBubble";
+import { HumanWaitingBubble } from "./HumanWaitingBubble";
+import { HumanJoinedBubble, HumanExitedBubble } from "./HumanJoinedBubble";
 import type {
   AgentInfo,
   ChatWindowConfig,
@@ -33,6 +31,10 @@ import type {
   ThinkingState,
 } from "./types";
 import { getContrastTextColor } from "./types";
+import {
+  isRealtimeConfigured,
+  getSupabaseBrowserClient,
+} from "@/lib/supabase/realtime";
 
 // Re-export types for backwards compatibility
 export type { AgentInfo, ChatWindowConfig, ChatWindowProps } from "./types";
@@ -61,9 +63,11 @@ export function ChatWindow({
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isTyping, _setIsTyping] = useState(false);
   const [thinkingState, setThinkingState] = useState<ThinkingState | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isConnected, _setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [visibleAgents, setVisibleAgents] = useState<Set<string>>(new Set());
@@ -76,6 +80,14 @@ export function ChatWindow({
   const [preChatEmail, setPreChatEmail] = useState("");
   const [preChatSubmitted, setPreChatSubmitted] = useState(false);
   const [isInitializingSession, setIsInitializingSession] = useState(false);
+  // Human escalation state
+  const [isWaitingForHuman, setIsWaitingForHuman] = useState(false);
+  const [isWithHuman, setIsWithHuman] = useState(false);
+  const [currentHumanAgent, setCurrentHumanAgent] = useState<{
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -89,6 +101,9 @@ export function ChatWindow({
 
   // State for voice message sending
   const [isSendingVoice, setIsSendingVoice] = useState(false);
+  // State for PTT help message (shown when user clicks instead of holds)
+  const [showPttHelp, setShowPttHelp] = useState(false);
+  const pttHelpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Voice recording for push-to-talk
   const {
@@ -402,6 +417,158 @@ export function ChatWindow({
     };
   }, [session, isDemo]);
 
+  // Subscribe to conversation status changes via Supabase Realtime
+  // This handles cross-process events (human_joined, human_exited) that SSE can't deliver
+  useEffect(() => {
+    if (!session?.conversationId || isDemo) return;
+    if (!isRealtimeConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`conversation-status:${session.conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "chatapp",
+          table: "conversations",
+          filter: `id=eq.${session.conversationId}`,
+        },
+        (payload) => {
+          const newRecord = payload.new as { status?: string; assigned_user_id?: string } | null;
+          const newStatus = newRecord?.status;
+          const assignedUserId = newRecord?.assigned_user_id;
+
+          if (newStatus === "with_human" && !isWithHuman) {
+            // Human agent took over
+            setIsWaitingForHuman(false);
+            setIsWithHuman(true);
+            // Fetch agent details
+            if (assignedUserId) {
+              fetchAssignedAgentDetails(assignedUserId);
+            }
+          } else if (newStatus === "active" && isWithHuman) {
+            // Returned to AI
+            setIsWithHuman(false);
+            setCurrentHumanAgent(null);
+            // Add exited bubble
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `human-exited-${Date.now()}`,
+                role: "system" as const,
+                content: "",
+                timestamp: new Date(),
+                isHumanExited: true,
+                humanAgentName: currentHumanAgent?.name || "Support Agent",
+              },
+            ]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.conversationId, isDemo, isWithHuman, currentHumanAgent?.name]);
+
+  // Subscribe to new messages via Supabase Realtime
+  // This handles human agent messages that come from a different process
+  useEffect(() => {
+    if (!session?.conversationId || isDemo) return;
+    if (!isRealtimeConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`messages:${session.conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "chatapp",
+          table: "messages",
+          filter: `conversation_id=eq.${session.conversationId}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as {
+            id?: string;
+            role?: string;
+            content?: string;
+            created_at?: string;
+          } | null;
+          // Only handle human_agent messages (AI messages come via SSE stream)
+          if (newMsg?.role === "human_agent" && newMsg.id) {
+            const msgId = newMsg.id; // Capture to ensure type is string
+            const msgContent = newMsg.content || "";
+            const msgTimestamp = newMsg.created_at ? new Date(newMsg.created_at) : new Date();
+            setMessages((prev) => {
+              // Avoid duplicates
+              if (prev.some((m) => m.id === msgId)) return prev;
+              return [
+                ...prev,
+                {
+                  id: msgId,
+                  role: "assistant" as const,
+                  content: msgContent,
+                  timestamp: msgTimestamp,
+                  isFromHumanAgent: true,
+                  // Add human agent info for proper display with avatar/name
+                  humanAgentName: currentHumanAgent?.name || "Support Agent",
+                  humanAgentAvatarUrl: currentHumanAgent?.avatarUrl,
+                  agentName: currentHumanAgent?.name || "Support Agent",
+                  agentAvatarUrl: currentHumanAgent?.avatarUrl,
+                },
+              ];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.conversationId, isDemo, currentHumanAgent]);
+
+  // Fetch assigned agent details for displaying in HumanJoinedBubble
+  const fetchAssignedAgentDetails = async (userId: string) => {
+    if (!session) return;
+
+    try {
+      const res = await fetch(
+        `/api/widget/${session.sessionId}/agent-info?userId=${userId}`
+      );
+      if (res.ok) {
+        const { name, avatarUrl } = await res.json();
+        setCurrentHumanAgent({
+          id: userId,
+          name: name || "Support Agent",
+          avatarUrl,
+        });
+        // Add joined bubble
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => !m.isHumanWaiting);
+          return [
+            ...filtered,
+            {
+              id: `human-joined-${Date.now()}`,
+              role: "system" as const,
+              content: "",
+              timestamp: new Date(),
+              isHumanJoined: true,
+              humanAgentName: name || "Support Agent",
+              humanAgentAvatarUrl: avatarUrl,
+            },
+          ];
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to fetch agent details:", err);
+      setCurrentHumanAgent({ id: userId, name: "Support Agent" });
+    }
+  };
+
   // ============================================================================
   // API Functions
   // ============================================================================
@@ -664,11 +831,11 @@ export function ChatWindow({
     eventSourceRef.current = eventSource;
 
     eventSource.addEventListener("connected", () => {
-      setIsConnected(true);
+      _setIsConnected(true);
     });
 
     eventSource.addEventListener("thinking", (event) => {
-      setIsTyping(true);
+      _setIsTyping(true);
       // Always set thinkingState to show ThinkingBubble
       // Only include detailed text if showThinking is enabled
       try {
@@ -729,6 +896,38 @@ export function ChatWindow({
     eventSource.addEventListener("notification", (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Handle human agent messages (new_message from human_agent)
+        if (data.type === "new_message" && data.role === "human_agent") {
+          const messageId = data.messageId || `human-msg-${Date.now()}`;
+          const newMessage: Message = {
+            id: messageId,
+            role: "assistant", // Display as assistant-style bubble
+            content: data.content,
+            timestamp: new Date(data.createdAt || Date.now()),
+            status: "sent",
+            isFromHumanAgent: true,
+            humanAgentName: data.userName,
+            humanAgentId: data.userId,
+            // Add agentName/agentAvatarUrl for rendering compatibility
+            agentName: data.userName || "Support Agent",
+            agentAvatarUrl: data.avatarUrl || currentHumanAgent?.avatarUrl,
+          };
+
+          // Avoid duplicates
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === messageId)) return prev;
+            return [...prev, newMessage];
+          });
+
+          // Play notification sound if enabled
+          if (config?.playSoundOnMessage && messageAudioRef.current) {
+            messageAudioRef.current.play().catch(() => {});
+          }
+          return;
+        }
+
+        // Handle agent-to-agent transfer notifications
         if (data.message && data.targetAgentId) {
           // Check if the target agent is already visible (use ref for current value in callback)
           const isAgentAlreadyVisible = visibleAgentsRef.current.has(data.targetAgentId);
@@ -834,7 +1033,7 @@ export function ChatWindow({
 
     eventSource.addEventListener("complete", (event) => {
       const data = JSON.parse(event.data);
-      setIsTyping(false);
+      _setIsTyping(false);
       setThinkingState(null);
       setStreamingMessageId(null);
 
@@ -892,13 +1091,104 @@ export function ChatWindow({
     });
 
     eventSource.addEventListener("error", () => {
-      setIsTyping(false);
-      setIsConnected(false);
+      _setIsTyping(false);
+      _setIsConnected(false);
+    });
+
+    // Human escalation events (from escalation service via SSE)
+    eventSource.addEventListener("human_escalation", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setIsWaitingForHuman(true);
+        setThinkingState(null);
+        _setIsTyping(false);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `human-waiting-${Date.now()}`,
+            role: "system",
+            content: data.reason || "Connecting you with a human agent",
+            timestamp: new Date(),
+            isHumanWaiting: true,
+            previousAgentId: data.initiatingAgentId,
+            previousAgentName: data.initiatingAgentName,
+            escalationReason: data.reason,
+          },
+        ]);
+      } catch {
+        // Ignore parse errors
+      }
+    });
+
+    eventSource.addEventListener("human_joined", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setIsWaitingForHuman(false);
+        setIsWithHuman(true);
+        setCurrentHumanAgent({
+          id: data.humanAgentId,
+          name: data.humanAgentName,
+          avatarUrl: data.humanAgentAvatarUrl,
+        });
+
+        // Remove waiting bubble and add joined bubble
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => !m.isHumanWaiting);
+          return [
+            ...filtered,
+            {
+              id: `human-joined-${Date.now()}`,
+              role: "system",
+              content: `${data.humanAgentName} joined the conversation`,
+              timestamp: new Date(),
+              isHumanJoined: true,
+              humanAgentId: data.humanAgentId,
+              humanAgentName: data.humanAgentName,
+              humanAgentAvatarUrl: data.humanAgentAvatarUrl,
+            },
+          ];
+        });
+      } catch {
+        // Ignore parse errors
+      }
+    });
+
+    eventSource.addEventListener("human_exited", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setIsWithHuman(false);
+        const exitedAgent = currentHumanAgent;
+        setCurrentHumanAgent(null);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `human-exited-${Date.now()}`,
+            role: "system",
+            content: `${exitedAgent?.name || data.humanAgentName || "Support agent"} left the conversation`,
+            timestamp: new Date(),
+            isHumanExited: true,
+            humanAgentId: exitedAgent?.id || data.humanAgentId,
+            humanAgentName: exitedAgent?.name || data.humanAgentName,
+            humanAgentAvatarUrl: exitedAgent?.avatarUrl || data.humanAgentAvatarUrl,
+          },
+        ]);
+      } catch {
+        // Ignore parse errors
+      }
+    });
+
+    // Listen for escalation cancelled event (user cancelled waiting for human)
+    eventSource.addEventListener("escalation_cancelled", () => {
+      setIsWaitingForHuman(false);
+      // Remove waiting bubble from messages
+      setMessages((prev) => prev.filter((m) => !m.isHumanWaiting));
     });
 
     eventSource.onerror = () => {
       eventSource.close();
-      setIsConnected(false);
+      _setIsConnected(false);
       // Attempt to reconnect after 5 seconds
       setTimeout(() => {
         if (session) {
@@ -966,31 +1256,38 @@ export function ChatWindow({
 
       setMessages((prev) => [...prev, userMessage]);
       setInputValue("");
-      setIsTyping(true);
+      // Only show AI typing indicator if not in human handling mode
+      const isHumanHandling = isWaitingForHuman || isWithHuman;
+      if (!isHumanHandling) {
+        _setIsTyping(true);
+      }
       setIsSending(true);
       // Don't set thinkingState here - only set it when actual thinking/tool events arrive
       setThinkingState(null);
 
-      // Add placeholder for streaming response
+      // Add placeholder for streaming response (only if AI will respond)
       let currentActiveAgentId = activeAgentId;
       const getActiveAgent = () =>
         config?.agentsList?.find((a) => a.id === currentActiveAgentId);
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: responseId,
-          role: "assistant",
-          content: "",
-          timestamp: new Date(),
-          status: "sending",
-          agentId: currentActiveAgentId || undefined,
-          agentName: getActiveAgent()?.name,
-          agentAvatarUrl: getActiveAgent()?.avatarUrl,
-          agentColor: getActiveAgent()?.color,
-        },
-      ]);
-      setStreamingMessageId(responseId);
+      // Only add streaming placeholder if AI will respond (not during human handling)
+      if (!isHumanHandling) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: responseId,
+            role: "assistant",
+            content: "",
+            timestamp: new Date(),
+            status: "sending",
+            agentId: currentActiveAgentId || undefined,
+            agentName: getActiveAgent()?.name,
+            agentAvatarUrl: getActiveAgent()?.avatarUrl,
+            agentColor: getActiveAgent()?.color,
+          },
+        ]);
+        setStreamingMessageId(responseId);
+      }
 
       try {
         const response = await fetch(
@@ -1014,7 +1311,8 @@ export function ChatWindow({
 
         const decoder = new TextDecoder();
         let buffer = "";
-        let streamedContent = "";
+        // Track accumulated content for debugging (accumulated value unused after loop)
+        let _streamedContentDebug = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1052,7 +1350,7 @@ export function ChatWindow({
                     break;
 
                   case "thinking":
-                    setIsTyping(true);
+                    _setIsTyping(true);
                     // Only show ThinkingBubble for actual AI thinking, not status messages
                     // Status messages like "Generating response", "Initializing agent..."
                     // should just show the typing indicator
@@ -1186,17 +1484,100 @@ export function ChatWindow({
                     }
                     break;
 
+                  case "human_escalation":
+                    // Human escalation requested - show waiting bubble
+                    setIsWaitingForHuman(true);
+                    setThinkingState(null);
+                    _setIsTyping(false);
+
+                    // Remove the streaming placeholder and add the waiting bubble
+                    setMessages((prev) => {
+                      const streamingIdx = prev.findIndex((m) => m.id === responseId);
+                      const filteredMessages = streamingIdx !== -1
+                        ? [...prev.slice(0, streamingIdx), ...prev.slice(streamingIdx + 1)]
+                        : prev;
+
+                      return [
+                        ...filteredMessages,
+                        {
+                          id: `human-waiting-${Date.now()}`,
+                          role: "system",
+                          content: data.reason || "Connecting you with a human agent",
+                          timestamp: new Date(),
+                          isHumanWaiting: true,
+                          previousAgentId: data.initiatingAgentId,
+                          previousAgentName: data.initiatingAgentName,
+                          escalationReason: data.reason,
+                        },
+                      ];
+                    });
+                    break;
+
+                  case "human_joined":
+                    // Human agent joined the conversation
+                    setIsWaitingForHuman(false);
+                    setIsWithHuman(true);
+                    setCurrentHumanAgent({
+                      id: data.humanAgentId,
+                      name: data.humanAgentName,
+                      avatarUrl: data.humanAgentAvatarUrl,
+                    });
+
+                    // Remove waiting bubble and add joined bubble
+                    setMessages((prev) => {
+                      // Remove any waiting bubble
+                      const filtered = prev.filter((m) => !m.isHumanWaiting);
+
+                      return [
+                        ...filtered,
+                        {
+                          id: `human-joined-${Date.now()}`,
+                          role: "system",
+                          content: `${data.humanAgentName} joined the conversation`,
+                          timestamp: new Date(),
+                          isHumanJoined: true,
+                          humanAgentId: data.humanAgentId,
+                          humanAgentName: data.humanAgentName,
+                          humanAgentAvatarUrl: data.humanAgentAvatarUrl,
+                          previousAgentId: activeAgentId || undefined,
+                        },
+                      ];
+                    });
+                    break;
+
+                  case "human_exited":
+                    // Human agent left the conversation
+                    setIsWithHuman(false);
+                    const exitedAgent = currentHumanAgent;
+                    setCurrentHumanAgent(null);
+
+                    // Add exited bubble
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `human-exited-${Date.now()}`,
+                        role: "system",
+                        content: `${exitedAgent?.name || data.humanAgentName || "Support agent"} left the conversation`,
+                        timestamp: new Date(),
+                        isHumanExited: true,
+                        humanAgentId: exitedAgent?.id || data.humanAgentId,
+                        humanAgentName: exitedAgent?.name || data.humanAgentName,
+                        humanAgentAvatarUrl: exitedAgent?.avatarUrl || data.humanAgentAvatarUrl,
+                      },
+                    ]);
+                    break;
+
                   case "delta":
                     // Clear thinking state when content starts streaming
                     setThinkingState(null);
 
                     // Skip if instant updates disabled
                     if (config?.showInstantUpdates === false) {
-                      streamedContent += data.content;
+                      _streamedContentDebug += data.content;
                       break;
                     }
 
-                    streamedContent += data.content;
+                    _streamedContentDebug += data.content;
                     const deltaActiveAgent = getActiveAgent();
 
                     setMessages((prev) => {
@@ -1269,8 +1650,20 @@ export function ChatWindow({
                     }
                     break;
 
+                  case "human_handling":
+                    // Human is handling the conversation - clear AI typing indicators
+                    _setIsTyping(false);
+                    setIsSending(false);
+                    setThinkingState(null);
+                    // Remove the streaming placeholder message since AI won't respond
+                    setMessages((prev) =>
+                      prev.filter((m) => m.id !== responseId)
+                    );
+                    setStreamingMessageId(null);
+                    break;
+
                   case "done":
-                    setIsTyping(false);
+                    _setIsTyping(false);
                     setIsSending(false);
                     setStreamingMessageId(null);
                     setThinkingState(null);
@@ -1314,7 +1707,7 @@ export function ChatWindow({
                   case "error":
                     console.error("Stream error:", data);
                     setError(data.message || "Failed to process message");
-                    setIsTyping(false);
+                    _setIsTyping(false);
                     setIsSending(false);
                     setStreamingMessageId(null);
                     setThinkingState(null);
@@ -1329,7 +1722,7 @@ export function ChatWindow({
         }
 
         // Ensure final state is clean
-        setIsTyping(false);
+        _setIsTyping(false);
         setIsSending(false);
         setStreamingMessageId(null);
         setThinkingState(null);
@@ -1343,7 +1736,7 @@ export function ChatWindow({
         // Remove streaming placeholder
         setMessages((prev) => prev.filter((m) => m.id !== responseId));
         setError("Failed to send message");
-        setIsTyping(false);
+        _setIsTyping(false);
         setIsSending(false);
         setStreamingMessageId(null);
         setThinkingState(null);
@@ -1386,7 +1779,7 @@ export function ChatWindow({
       };
 
       setMessages((prev) => [...prev, userMessage]);
-      setIsTyping(true);
+      _setIsTyping(true);
       setIsSendingVoice(true);
       setThinkingState(null);
 
@@ -1438,7 +1831,8 @@ export function ChatWindow({
 
         const decoder = new TextDecoder();
         let buffer = "";
-        let streamedContent = "";
+        // Track accumulated content for debugging (accumulated value unused after loop)
+        let _streamedContentDebug = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1475,10 +1869,13 @@ export function ChatWindow({
                           : msg
                       )
                     );
+                    // Re-enable input after transcription complete
+                    // User can now type while waiting for LLM response
+                    setIsSendingVoice(false);
                     break;
 
                   case "thinking":
-                    setIsTyping(true);
+                    _setIsTyping(true);
                     const thinkingText = data.content || data.step;
                     const isStatusMessage =
                       thinkingText &&
@@ -1625,11 +2022,11 @@ export function ChatWindow({
                     setThinkingState(null);
 
                     if (config?.showInstantUpdates === false) {
-                      streamedContent += data.content;
+                      _streamedContentDebug += data.content;
                       break;
                     }
 
-                    streamedContent += data.content;
+                    _streamedContentDebug += data.content;
                     const deltaActiveAgent = getActiveAgent();
 
                     setMessages((prev) => {
@@ -1708,8 +2105,20 @@ export function ChatWindow({
                     }
                     break;
 
+                  case "human_handling":
+                    // Human is handling the conversation - clear typing indicators
+                    _setIsTyping(false);
+                    setIsSendingVoice(false);
+                    setThinkingState(null);
+                    // Remove the streaming placeholder message since AI won't respond
+                    setMessages((prev) =>
+                      prev.filter((m) => m.id !== responseId)
+                    );
+                    setStreamingMessageId(null);
+                    break;
+
                   case "done":
-                    setIsTyping(false);
+                    _setIsTyping(false);
                     setIsSendingVoice(false);
                     setStreamingMessageId(null);
                     setThinkingState(null);
@@ -1755,8 +2164,33 @@ export function ChatWindow({
 
                   case "error":
                     console.error("Voice stream error:", data);
-                    setError(data.message || "Failed to process voice message");
-                    setIsTyping(false);
+                    // Handle voice recording errors - show as agent message
+                    if (data.code === "SILENT_AUDIO" || data.code === "RECORDING_TOO_SHORT") {
+                      // Remove the pending voice message
+                      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+                      // Get active agent info for the message
+                      const errorActiveAgent =
+                        config?.agentsList?.find((a) => a.id === activeAgentId) ||
+                        config?.agentsList?.[0];
+                      // Replace streaming placeholder with error message from agent
+                      setMessages((prev) => [
+                        ...prev.filter((m) => m.id !== responseId),
+                        {
+                          id: `error-${Date.now()}`,
+                          role: "assistant",
+                          content: data.message,
+                          timestamp: new Date(),
+                          status: "sent",
+                          agentId: errorActiveAgent?.id,
+                          agentName: errorActiveAgent?.name,
+                          agentAvatarUrl: errorActiveAgent?.avatarUrl,
+                          agentColor: errorActiveAgent?.color,
+                        },
+                      ]);
+                    } else {
+                      setError(data.message || "Failed to process voice message");
+                    }
+                    _setIsTyping(false);
                     setIsSendingVoice(false);
                     setStreamingMessageId(null);
                     setThinkingState(null);
@@ -1771,7 +2205,7 @@ export function ChatWindow({
         }
 
         // Ensure final state is clean
-        setIsTyping(false);
+        _setIsTyping(false);
         setIsSendingVoice(false);
         setStreamingMessageId(null);
         setThinkingState(null);
@@ -1785,7 +2219,7 @@ export function ChatWindow({
         // Remove streaming placeholder
         setMessages((prev) => prev.filter((m) => m.id !== responseId));
         setError("Failed to send voice message");
-        setIsTyping(false);
+        _setIsTyping(false);
         setIsSendingVoice(false);
         setStreamingMessageId(null);
         setThinkingState(null);
@@ -1813,6 +2247,89 @@ export function ChatWindow({
       console.log("[Voice] Audio blob is empty");
     }
   }, [isRecording, isVoiceStarting, stopRecording, recordingDuration, handleSendVoiceMessage]);
+
+  // Handle PTT button click - show help message and start recording
+  const handlePttClick = useCallback(() => {
+    // If help is showing, hide it and toggle off
+    if (showPttHelp) {
+      setShowPttHelp(false);
+      if (pttHelpTimeoutRef.current) {
+        clearTimeout(pttHelpTimeoutRef.current);
+        pttHelpTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    // Show help message
+    setShowPttHelp(true);
+
+    // Clear any existing timeout
+    if (pttHelpTimeoutRef.current) {
+      clearTimeout(pttHelpTimeoutRef.current);
+    }
+
+    // Hide after 3 seconds
+    pttHelpTimeoutRef.current = setTimeout(() => {
+      setShowPttHelp(false);
+      pttHelpTimeoutRef.current = null;
+    }, 3000);
+
+    // Start recording
+    startRecording();
+  }, [showPttHelp, startRecording]);
+
+  // Handle cancel escalation - return to AI mode
+  const handleCancelEscalation = useCallback(async () => {
+    if (!session) {
+      console.error("Cancel escalation: No session available");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/widget/${session.sessionId}/cancel-escalation`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        setIsWaitingForHuman(false);
+        // Remove waiting bubble from messages
+        setMessages((prev) => prev.filter((m) => !m.isHumanWaiting));
+      } else {
+        // Log the error for debugging
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Cancel escalation failed:", response.status, errorData);
+
+        // If status check fails (e.g., conversation not in waiting_human state),
+        // still remove the waiting bubble from UI as a fallback
+        if (response.status === 400) {
+          setIsWaitingForHuman(false);
+          setMessages((prev) => prev.filter((m) => !m.isHumanWaiting));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to cancel escalation:", error);
+    }
+  }, [session]);
+
+  // Hide PTT help when recording actually starts
+  useEffect(() => {
+    if (isRecording && showPttHelp) {
+      setShowPttHelp(false);
+      if (pttHelpTimeoutRef.current) {
+        clearTimeout(pttHelpTimeoutRef.current);
+        pttHelpTimeoutRef.current = null;
+      }
+    }
+  }, [isRecording, showPttHelp]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pttHelpTimeoutRef.current) {
+        clearTimeout(pttHelpTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Keep visibleAgentsRef in sync for SSE callback
   useEffect(() => {
@@ -1851,7 +2368,32 @@ export function ChatWindow({
     }
   };
 
-  const handleClose = () => {
+  // Auto-resize textarea based on content (max 3 lines)
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = "auto";
+
+    // Calculate max height: 3 lines × 20px line-height + 16px padding (8px top + 8px bottom)
+    const lineHeight = 20;
+    const maxLines = 3;
+    const padding = 16;
+    const maxHeight = lineHeight * maxLines + padding;
+
+    // Set height to scrollHeight but cap at maxHeight
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${newHeight}px`;
+  }, []);
+
+  // Adjust textarea height when input value changes
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputValue, adjustTextareaHeight]);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleClose = () => {
     notifyParent("widget:close", {});
   };
 
@@ -1879,7 +2421,7 @@ export function ChatWindow({
     setActiveAgentId(null);
     setVisibleAgents(new Set());
     setThinkingState(null);
-    setIsTyping(false);
+    _setIsTyping(false);
     setIsSending(false);
     setStreamingMessageId(null);
     animatedAgentsRef.current = new Set();
@@ -2352,6 +2894,58 @@ export function ChatWindow({
                   </div>
                 );
               })}
+              {/* Render human agent if joined and agent list is enabled */}
+              {isWithHuman && currentHumanAgent && (
+                <div
+                  key={`human-${currentHumanAgent.id}`}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1 shrink-0 transition-opacity duration-300 ring-1 ring-inset",
+                    !showAvatar && "py-0.5"
+                  )}
+                  style={{
+                    animation: "widget-agent-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+                    backgroundColor: isDark ? "rgba(39,39,42,1)" : "white",
+                    borderRadius: "3px",
+                    ["--tw-ring-color" as string]: "#22c55e", // Green ring for human
+                  }}
+                >
+                  {showAvatar && (
+                    <div className="shrink-0">
+                      {currentHumanAgent.avatarUrl ? (
+                        <img
+                          src={currentHumanAgent.avatarUrl}
+                          alt={currentHumanAgent.name}
+                          className="h-6 w-6 rounded-full object-cover ring-2 ring-green-500"
+                        />
+                      ) : (
+                        <div className="h-6 w-6 rounded-full flex items-center justify-center bg-green-500 text-white font-medium text-[10px] ring-2 ring-green-500">
+                          {currentHumanAgent.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className={cn("min-w-0", !showAvatar && "text-center")}>
+                    <p
+                      className={cn(
+                        "text-xs font-medium truncate max-w-[80px]",
+                        isDark ? "text-zinc-300" : "text-gray-700"
+                      )}
+                    >
+                      {currentHumanAgent.name}
+                    </p>
+                    {showDesignation && (
+                      <p
+                        className={cn(
+                          "text-[10px] truncate max-w-[80px]",
+                          isDark ? "text-zinc-500" : "text-gray-500"
+                        )}
+                      >
+                        Support Agent
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         );
@@ -2394,6 +2988,60 @@ export function ChatWindow({
             );
           }
 
+          // Render human waiting bubble
+          if (message.isHumanWaiting) {
+            const initiatingAgent = message.previousAgentId
+              ? config?.agentsList?.find((a) => a.id === message.previousAgentId)
+              : undefined;
+
+            return (
+              <HumanWaitingBubble
+                key={message.id}
+                initiatingAgent={initiatingAgent}
+                isDark={isDark}
+                accentColor={accentColor}
+                onCancelEscalation={handleCancelEscalation}
+              />
+            );
+          }
+
+          // Render human joined bubble
+          if (message.isHumanJoined) {
+            const previousAgent = message.previousAgentId
+              ? config?.agentsList?.find((a) => a.id === message.previousAgentId)
+              : config?.agentsList?.[0];
+
+            return (
+              <HumanJoinedBubble
+                key={message.id}
+                humanAgent={{
+                  id: message.humanAgentId || "agent",
+                  name: message.humanAgentName || "Support Agent",
+                  avatarUrl: message.humanAgentAvatarUrl,
+                }}
+                previousAgent={previousAgent ? { name: previousAgent.name, avatarUrl: previousAgent.avatarUrl } : undefined}
+                isDark={isDark}
+                accentColor={accentColor}
+              />
+            );
+          }
+
+          // Render human exited bubble
+          if (message.isHumanExited) {
+            return (
+              <HumanExitedBubble
+                key={message.id}
+                humanAgent={{
+                  id: message.humanAgentId || "agent",
+                  name: message.humanAgentName || "Support Agent",
+                  avatarUrl: message.humanAgentAvatarUrl,
+                }}
+                isDark={isDark}
+                accentColor={accentColor}
+              />
+            );
+          }
+
           // Render other notification messages (non-transfer)
           if (message.isNotification) {
             return (
@@ -2429,8 +3077,16 @@ export function ChatWindow({
           }
 
           const isUser = message.role === "user";
+          // Show agent info for multi-agent AI messages OR human agent messages
           const showAgentInfo =
-            !isUser && config.isMultiAgent && message.agentName;
+            !isUser && (
+              (config.isMultiAgent && message.agentName) ||
+              (message.isFromHumanAgent && (message.agentName || message.humanAgentName))
+            );
+          // Get display values for human agent messages
+          const displayAgentName = message.agentName || message.humanAgentName || "Support Agent";
+          const displayAgentAvatarUrl = message.agentAvatarUrl || message.humanAgentAvatarUrl;
+          const displayAgentColor = message.isFromHumanAgent ? "#22c55e" : message.agentColor; // Green for human
 
           // Skip rendering the streaming placeholder when ThinkingBubble is shown
           const isStreamingPlaceholder =
@@ -2450,19 +3106,19 @@ export function ChatWindow({
                 {/* Agent avatar for assistant messages */}
                 {!isUser && showAgentInfo && (
                   <div className="shrink-0 pt-1">
-                    {message.agentAvatarUrl ? (
+                    {displayAgentAvatarUrl ? (
                       <img
-                        src={message.agentAvatarUrl}
-                        alt={message.agentName}
+                        src={displayAgentAvatarUrl}
+                        alt={displayAgentName}
                         className="h-7 w-7 rounded-full object-cover"
-                        style={message.agentColor ? { boxShadow: `0 0 0 2px ${message.agentColor}` } : undefined}
+                        style={displayAgentColor ? { boxShadow: `0 0 0 2px ${displayAgentColor}` } : undefined}
                       />
                     ) : (
                       <div
                         className="h-7 w-7 rounded-full flex items-center justify-center text-white font-medium text-xs"
-                        style={{ backgroundColor: message.agentColor || config.primaryColor }}
+                        style={{ backgroundColor: displayAgentColor || config.primaryColor }}
                       >
-                        {message.agentName?.charAt(0).toUpperCase()}
+                        {displayAgentName?.charAt(0).toUpperCase()}
                       </div>
                     )}
                   </div>
@@ -2476,7 +3132,7 @@ export function ChatWindow({
                         isDark ? "text-zinc-400" : "text-gray-500"
                       )}
                     >
-                      {message.agentName}
+                      {displayAgentName}
                     </p>
                   )}
                   {/* Voice message bubble */}
@@ -2647,12 +3303,23 @@ export function ChatWindow({
       >
         <div
           className={cn(
-            "flex items-end gap-2 rounded-2xl px-4 py-2 transition-all",
+            "relative flex items-end gap-2 rounded-2xl px-4 py-2 transition-all",
             isDark ? "bg-zinc-800" : "bg-gray-100",
             isFocused && "ring-2"
           )}
           style={isFocused ? { ["--tw-ring-color" as string]: config.primaryColor } : undefined}
         >
+          {/* PTT help message - shows when user clicks voice button without holding */}
+          {showPttHelp && (
+            <div
+              className={cn(
+                "absolute right-12 bottom-1/2 translate-y-1/2 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap z-10 shadow-sm",
+                isDark ? "bg-zinc-700 text-zinc-200" : "bg-white text-gray-600 border border-gray-200"
+              )}
+            >
+              Hold and speak
+            </div>
+          )}
           {/* Recording waveform - replaces textarea when recording */}
           {isRecording || isVoiceStarting ? (
             <>
@@ -2723,7 +3390,7 @@ export function ChatWindow({
             </>
           ) : (
             <>
-              {/* Text input */}
+              {/* Text input - auto-expands up to 3 lines */}
               <textarea
                 ref={inputRef}
                 value={inputValue}
@@ -2731,12 +3398,17 @@ export function ChatWindow({
                 onKeyDown={handleKeyDown}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
+                onPaste={() => {
+                  // Trigger resize after paste content is applied
+                  setTimeout(adjustTextareaHeight, 0);
+                }}
                 placeholder={config.placeholderText || "Type a message..."}
                 rows={1}
                 className={cn(
-                  "max-h-[4.5rem] flex-1 resize-none bg-transparent py-1 outline-none",
+                  "flex-1 resize-none bg-transparent overflow-y-auto",
                   isDark ? "placeholder:text-zinc-500" : "placeholder:text-gray-400"
                 )}
+                style={{ outline: "none", border: "none", boxShadow: "none", lineHeight: "20px", padding: "8px 0" }}
               />
               {/* Processing spinner / Voice button / Send button */}
               {isSending ? (
@@ -2750,7 +3422,7 @@ export function ChatWindow({
                 <button
                   type="submit"
                   className="rounded-full p-2 transition-colors text-white shrink-0"
-                  style={{ backgroundColor: accentColor }}
+                  style={{ backgroundColor: config.primaryColor }}
                   aria-label="Send message"
                 >
                   <svg
@@ -2768,10 +3440,10 @@ export function ChatWindow({
               ) : config.enableVoice && isVoiceSupported ? (
                 <button
                   type="button"
-                  onMouseDown={startRecording}
+                  onMouseDown={handlePttClick}
                   onMouseUp={handleVoiceRecordingStop}
                   onMouseLeave={handleVoiceRecordingStop}
-                  onTouchStart={startRecording}
+                  onTouchStart={handlePttClick}
                   onTouchEnd={handleVoiceRecordingStop}
                   className={cn(
                     "rounded-full p-2 transition-colors shrink-0",

@@ -19,8 +19,6 @@ import {
   searchFaqs,
   COLLECTIONS,
   type VectorPayload,
-  type FaqPayload,
-  type SearchHit,
 } from "./qdrant-client";
 import OpenAI from "openai";
 

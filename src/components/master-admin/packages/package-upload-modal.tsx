@@ -113,7 +113,8 @@ export function PackageUploadModal({
     return isValid;
   };
 
-  const validatePackage = async (file: File) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const validatePackage = async (_file: File) => {
     setStatus("validating");
     setProgress(20);
 

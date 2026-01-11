@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Clock,
   User,
@@ -21,10 +21,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import {
-  Badge,
   Button,
-  Card,
-  CardBody,
   Skeleton,
   Modal,
   ModalContent,

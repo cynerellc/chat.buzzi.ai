@@ -457,12 +457,20 @@ export class AgentRunnerService {
     const behavior = chatbot.behavior as { greeting?: string };
     const greeting = behavior?.greeting || "Hello! How can I help you today?";
 
+    // Get first agent from agentsList for greeting attribution
+    const firstAgent = chatbot.agentsList?.[0];
+
     // Save greeting as first message
     await db.insert(messagesTable).values({
       conversationId: conversation.id,
       role: "assistant",
       type: "text",
       content: greeting,
+      agentDetails: {
+        agentId: firstAgent?.agent_identifier || "main",
+        agentType: "ai",
+        agentName: firstAgent?.name || chatbot.name,
+      },
     });
 
     return {
@@ -574,6 +582,11 @@ export class AgentRunnerService {
         : undefined,
       sourceChunkIds: response.metadata?.sources?.map((s) => s.id) || [],
       toolCalls: response.metadata?.toolsUsed || [],
+      agentDetails: {
+        agentId: ((response.metadata as Record<string, unknown>)?.agentId as string) || "main",
+        agentType: "ai",
+        agentName: ((response.metadata as Record<string, unknown>)?.agentName as string) || "AI Assistant",
+      },
     });
 
     // Update conversation
@@ -632,6 +645,21 @@ export class AgentRunnerService {
       return;
     }
 
+    // Check if conversation is being handled by a human agent
+    if (conversation.status === "waiting_human" || conversation.status === "with_human") {
+      yield {
+        type: "human_handling",
+        data: {
+          status: conversation.status,
+          message: conversation.status === "waiting_human"
+            ? "Waiting for human agent..."
+            : "A human agent is handling your request.",
+        },
+        timestamp: Date.now(),
+      };
+      return;
+    }
+
     // Check if conversation is active
     if (conversation.status !== "active") {
       yield {
@@ -664,15 +692,8 @@ export class AgentRunnerService {
       return;
     }
 
-    // Save user message
-    await db.insert(messagesTable).values({
-      conversationId: options.conversationId,
-      role: "user",
-      type: "text",
-      content: options.message,
-    });
-    timings.saveUserMessage = performance.now() - stepStart;
-    stepStart = performance.now();
+    // NOTE: User message is saved by the caller (widget route handles this with more context)
+    // Do NOT save user message here to avoid duplicates
 
     // Load variable context
     const variableContext = await this.loadVariableContext(conversation.chatbotId);
@@ -694,8 +715,9 @@ export class AgentRunnerService {
     };
 
     // Stream response using ADK executor
-    let fullContent = "";
-    let metadata: AgentResponse["metadata"];
+    // Content and metadata are tracked for potential debugging/logging use
+    let _fullContent = "";
+    let _metadata: AgentResponse["metadata"];
     let firstTokenTime: number | null = null;
 
     for await (const event of executor.processMessageStream({
@@ -711,42 +733,20 @@ export class AgentRunnerService {
       yield event;
 
       if (event.type === "delta") {
-        fullContent += (event.data as { content: string }).content;
+        _fullContent += (event.data as { content: string }).content;
       } else if (event.type === "complete") {
         const completeData = event.data as { content: string; metadata: AgentResponse["metadata"] };
-        fullContent = completeData.content;
-        metadata = completeData.metadata;
+        _fullContent = completeData.content;
+        _metadata = completeData.metadata;
       }
     }
     timings.llmStreaming = performance.now() - stepStart;
     timings.timeToFirstToken = firstTokenTime ?? timings.llmStreaming;
-    stepStart = performance.now();
-
-    // Save assistant response
-    if (fullContent) {
-      await db.insert(messagesTable).values({
-        conversationId: options.conversationId,
-        role: "assistant",
-        type: "text",
-        content: fullContent,
-        tokenCount: metadata?.tokensUsed?.totalTokens,
-        processingTimeMs: metadata?.processingTimeMs ? Math.round(metadata.processingTimeMs) : undefined,
-      });
-
-      // Update conversation
-      await db
-        .update(conversations)
-        .set({
-          messageCount: conversation.messageCount + 2,
-          userMessageCount: conversation.userMessageCount + 1,
-          assistantMessageCount: conversation.assistantMessageCount + 1,
-          lastMessageAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(conversations.id, options.conversationId));
-    }
-    timings.saveAssistantMessage = performance.now() - stepStart;
     timings.total = performance.now() - startTotal;
+
+    // NOTE: Assistant message and conversation stats are saved by the caller
+    // (widget route handles this with more context including sourceChunkIds)
+    // Do NOT save assistant message here to avoid duplicates
 
     // Print detailed timing report if profiler enabled
     if (process.env.ENABLE_PROFILER === "true") {
@@ -809,6 +809,7 @@ export class AgentRunnerService {
    */
   async endConversation(
     conversationId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _resolution?: string
   ): Promise<void> {
     await db

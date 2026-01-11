@@ -6,7 +6,8 @@ let browserClient: SupabaseClient | null = null;
 
 /**
  * Get Supabase client for browser-side realtime subscriptions
- * Uses anon key (public) - requires RLS policies for security
+ * Uses anon key (public) - security is enforced via broadcast channels
+ * (only server can broadcast, clients can only subscribe)
  */
 export function getSupabaseBrowserClient(): SupabaseClient {
   if (browserClient) {
@@ -48,57 +49,81 @@ export function isRealtimeConfigured(): boolean {
   );
 }
 
-export interface RealtimeMessage {
+// ============================================================================
+// Broadcast Message Types
+// ============================================================================
+
+export interface BroadcastMessage {
   id: string;
-  conversation_id: string;
-  role: "user" | "assistant" | "system";
-  type: string;
+  conversationId: string;
+  role: "user" | "assistant" | "human_agent" | "system";
   content: string;
-  created_at: string;
-  token_count?: number;
+  createdAt: string;
+  userId?: string;
+  userName?: string;
 }
 
-export interface MessagePayload {
-  eventType: "INSERT" | "UPDATE" | "DELETE";
-  new: RealtimeMessage;
-  old: RealtimeMessage | null;
+export interface ConversationUpdate {
+  conversationId: string;
+  status: string;
+  [key: string]: unknown;
 }
 
-export type MessageCallback = (payload: MessagePayload) => void;
+export type MessageCallback = (message: BroadcastMessage) => void;
+export type ConversationUpdateCallback = (update: ConversationUpdate) => void;
+
+// ============================================================================
+// Broadcast Subscriptions (Secure - server controls what's broadcast)
+// ============================================================================
 
 /**
- * Subscribe to new messages in a conversation
- * For widget users, the sessionId is used for RLS filtering
+ * Subscribe to new messages in a conversation via broadcast
+ * Only receives messages that the server explicitly broadcasts
+ *
+ * @param conversationId - The conversation to subscribe to
+ * @param onMessage - Callback when a new message is received
  */
 export function subscribeToConversationMessages(
   conversationId: string,
-  sessionId: string,
   onMessage: MessageCallback
 ): RealtimeChannel {
   const supabase = getSupabaseBrowserClient();
 
-  // Create channel with session context for RLS
   const channel = supabase
-    .channel(`messages:${conversationId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "chatapp",
-        table: "messages",
-        filter: `conversation_id=eq.${conversationId}`,
-      },
-      (payload) => {
-        onMessage({
-          eventType: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
-          new: payload.new as RealtimeMessage,
-          old: payload.old as RealtimeMessage | null,
-        });
-      }
-    )
+    .channel(`conversation:${conversationId}`)
+    .on("broadcast", { event: "new_message" }, (payload) => {
+      onMessage(payload.payload as BroadcastMessage);
+    })
     .subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        console.log(`Subscribed to messages for conversation ${conversationId}`);
+        console.log(`[Realtime] Subscribed to conversation ${conversationId}`);
+      }
+    });
+
+  return channel;
+}
+
+/**
+ * Subscribe to conversation updates for a company via broadcast
+ * Receives updates when conversations change status (new, escalated, resolved, etc.)
+ *
+ * @param companyId - The company to subscribe to
+ * @param onUpdate - Callback when a conversation is updated
+ */
+export function subscribeToCompanyConversations(
+  companyId: string,
+  onUpdate: ConversationUpdateCallback
+): RealtimeChannel {
+  const supabase = getSupabaseBrowserClient();
+
+  const channel = supabase
+    .channel(`company:${companyId}`)
+    .on("broadcast", { event: "conversation_update" }, (payload) => {
+      onUpdate(payload.payload as ConversationUpdate);
+    })
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        console.log(`[Realtime] Subscribed to company ${companyId} updates`);
       }
     });
 
@@ -111,50 +136,6 @@ export function subscribeToConversationMessages(
 export async function unsubscribe(channel: RealtimeChannel): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   await supabase.removeChannel(channel);
-}
-
-/**
- * Subscribe to conversation status changes for a company
- * For support agents and company admins
- */
-export function subscribeToCompanyConversations(
-  companyId: string,
-  onUpdate: (payload: {
-    eventType: "INSERT" | "UPDATE" | "DELETE";
-    conversationId: string;
-    status: string;
-  }) => void
-): RealtimeChannel {
-  const supabase = getSupabaseBrowserClient();
-
-  const channel = supabase
-    .channel(`company-conversations:${companyId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "chatapp",
-        table: "conversations",
-        filter: `company_id=eq.${companyId}`,
-      },
-      (payload) => {
-        const record = payload.new as { id: string; status: string } | null;
-        if (record) {
-          onUpdate({
-            eventType: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
-            conversationId: record.id,
-            status: record.status,
-          });
-        }
-      }
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`Subscribed to conversations for company ${companyId}`);
-      }
-    });
-
-  return channel;
 }
 
 /**
@@ -171,3 +152,12 @@ export function subscribeToCompanyConversations(
  *   };
  * }, [conversationId, sessionId]);
  */
+
+/**
+ * Get the active company ID from cookie (client-side)
+ */
+export function getActiveCompanyIdFromCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/active_company_id=([^;]+)/);
+  return match?.[1] ?? null;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Filter, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 import { Button, Select, Badge, Input } from "@/components/ui";
 

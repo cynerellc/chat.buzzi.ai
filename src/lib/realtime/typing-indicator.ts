@@ -17,7 +17,6 @@ import { getSSEManager, getConversationChannel } from "./sse-manager";
 // ============================================================================
 
 const TYPING_TIMEOUT_MS = 5000; // Auto-stop after 5 seconds of inactivity
-const DEBOUNCE_MS = 500; // Debounce typing events
 
 // ============================================================================
 // Types

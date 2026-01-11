@@ -144,6 +144,11 @@ export async function POST(
         role: "system",
         type: "text",
         content: transferMessage,
+        agentDetails: {
+          agentId: "system",
+          agentType: "system",
+          agentName: "System",
+        },
       });
     }
 
@@ -177,8 +182,10 @@ export async function POST(
 
 // GET - List available agents for transfer
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<RouteParams> }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _request: NextRequest,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _context: { params: Promise<RouteParams> }
 ) {
   try {
     // Authenticate user and get company context

@@ -276,7 +276,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE endpoint to reset conversation
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function DELETE(request: NextRequest, _context: RouteParams) {
   try {
     await requireMasterAdmin();
 

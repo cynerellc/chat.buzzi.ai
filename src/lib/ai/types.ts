@@ -377,7 +377,9 @@ export type StreamEventType =
   | "delta"
   | "complete"
   | "error"
-  | "notification";
+  | "notification"
+  | "human_escalation"
+  | "human_handling";
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -444,13 +446,33 @@ export interface NotificationEvent extends StreamEvent {
   };
 }
 
+export interface HumanEscalationEvent extends StreamEvent {
+  type: "human_escalation";
+  data: {
+    reason?: string;
+    urgency?: string;
+    initiatingAgentId?: string;
+    initiatingAgentName?: string;
+  };
+}
+
+export interface HumanHandlingEvent extends StreamEvent {
+  type: "human_handling";
+  data: {
+    status: "waiting_human" | "with_human";
+    message: string;
+  };
+}
+
 export type AgentStreamEvent =
   | ThinkingEvent
   | ToolCallEvent
   | DeltaEvent
   | CompleteEvent
   | ErrorEvent
-  | NotificationEvent;
+  | NotificationEvent
+  | HumanEscalationEvent
+  | HumanHandlingEvent;
 
 // ============================================================================
 // Error Types

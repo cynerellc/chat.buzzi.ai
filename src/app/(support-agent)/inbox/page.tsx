@@ -213,12 +213,14 @@ export default function SupportAgentInbox() {
     switch (conversation.status) {
       case "active":
         return <Badge variant="success">Active</Badge>;
-      case "waiting":
+      case "waiting_human":
         return <Badge variant="warning">Waiting</Badge>;
-      case "escalated":
-        return <Badge variant="danger">Escalated</Badge>;
+      case "with_human":
+        return <Badge variant="info">With Agent</Badge>;
       case "resolved":
         return <Badge variant="default">Resolved</Badge>;
+      case "abandoned":
+        return <Badge variant="default">Abandoned</Badge>;
       default:
         return <Badge variant="default">{conversation.status}</Badge>;
     }

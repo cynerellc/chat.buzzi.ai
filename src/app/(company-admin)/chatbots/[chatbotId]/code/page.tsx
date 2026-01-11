@@ -157,7 +157,7 @@ export default function ChatbotCodePage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/company/agents/${chatbotId}/code`);
+      const response = await fetch(`/api/company/chatbots/${chatbotId}/code`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -210,7 +210,7 @@ export default function ChatbotCodePage() {
 
       try {
         const response = await fetch(
-          `/api/company/agents/${chatbotId}/code?path=${encodeURIComponent(path)}`
+          `/api/company/chatbots/${chatbotId}/code?path=${encodeURIComponent(path)}`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch file content");

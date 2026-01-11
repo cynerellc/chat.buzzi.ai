@@ -137,6 +137,13 @@ export const conversations = chatappSchema.table(
   ]
 );
 
+// Agent Details Type (for tracking message sender)
+export interface AgentDetails {
+  agentId: string;
+  agentType: "ai" | "human" | "system";
+  agentName: string;
+}
+
 // Messages Table
 export const messages = chatappSchema.table(
   "messages",
@@ -177,6 +184,9 @@ export const messages = chatappSchema.table(
 
     // Metadata
     metadata: jsonb("metadata").default({}),
+
+    // Agent information
+    agentDetails: jsonb("agent_details").$type<AgentDetails>(),
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -19,7 +19,8 @@ export default function MasterAdminConversationsPage() {
       title="Conversations"
       subtitle={`View conversations for ${company?.name || "company"}`}
       baseApiUrl={`/api/master-admin/companies/${companyId}/conversations`}
-      agentsApiUrl={`/api/master-admin/companies/${companyId}/agents`}
+      chatbotsApiUrl={`/api/master-admin/companies/${companyId}/chatbots`}
+      companyId={companyId}
       onConversationClick={handleConversationClick}
     />
   );

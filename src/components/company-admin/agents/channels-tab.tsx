@@ -5,7 +5,6 @@ import {
   Globe,
   MessageCircle,
   Send,
-  Smartphone,
   Instagram,
   Slack,
   MessageSquare,
@@ -24,11 +23,11 @@ import {
   Switch,
 } from "@/components/ui";
 
-import type { AgentDetail } from "@/hooks/company/useAgents";
+import type { ChatbotDetail } from "@/hooks/company/useChatbots";
 
 interface ChannelsTabProps {
-  agent: AgentDetail;
-  onSave: (data: Partial<AgentDetail>) => Promise<void>;
+  agent: ChatbotDetail;
+  onSave: (data: Partial<ChatbotDetail>) => Promise<void>;
   isSaving: boolean;
 }
 
@@ -124,7 +123,8 @@ const defaultChannels: ChannelConfig[] = [
   },
 ];
 
-export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function ChannelsTab({ agent: _agent, onSave: _onSave, isSaving }: ChannelsTabProps) {
   // Channels configuration is managed locally for now
   // TODO: Add dedicated channels table and API for persistent storage
   const [channels, setChannels] = useState<ChannelConfig[]>(() => defaultChannels);
@@ -153,7 +153,8 @@ export function ChannelsTab({ agent, onSave, isSaving }: ChannelsTabProps) {
   };
 
   const handleSaveChannel = async (channelId: string) => {
-    const config = channelConfigs[channelId];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _config = channelConfigs[channelId];
     // In a real implementation, this would validate and save the channel config
     setChannels((prev) =>
       prev.map((ch) =>

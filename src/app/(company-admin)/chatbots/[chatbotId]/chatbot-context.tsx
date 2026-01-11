@@ -2,10 +2,10 @@
 
 import { createContext, useContext } from "react";
 
-import type { AgentDetail } from "@/hooks/company";
+import type { ChatbotDetail } from "@/hooks/company";
 
 export interface ChatbotContextType {
-  chatbot: AgentDetail | null;
+  chatbot: ChatbotDetail | null;
   chatbotId: string;
   isLoading: boolean;
   refresh: () => void;

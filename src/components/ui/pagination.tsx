@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { forwardRef, type ButtonHTMLAttributes, type ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
-import { Button, type ButtonProps } from "./button";
+import { type ButtonProps } from "./button";
 
 const PaginationRoot = ({ className, ...props }: ComponentProps<"nav">) => (
   <nav
@@ -35,7 +35,8 @@ type PaginationLinkProps = {
 } & Pick<ButtonProps, "size"> &
   ButtonHTMLAttributes<HTMLButtonElement>;
 
-const PaginationLink = ({ className, isActive, size = "icon", ...props }: PaginationLinkProps) => (
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const PaginationLink = ({ className, isActive, size: _size = "icon", ...props }: PaginationLinkProps) => (
   <button
     aria-current={isActive ? "page" : undefined}
     className={cn(

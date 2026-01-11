@@ -14,6 +14,7 @@ interface WidgetConfig {
   primaryColor?: string;
   launcherIcon?: string;
   position?: "bottom-right" | "bottom-left";
+  placement?: "above-launcher" | "center-screen";
   borderRadius?: number;
   buttonSize?: number;
   launcherIconBorderRadius?: number;
@@ -33,6 +34,7 @@ function WidgetPreviewContent() {
     primaryColor: "#6437F3",
     launcherIcon: "chat",
     position: "bottom-right",
+    placement: "above-launcher",
     borderRadius: 16,
     buttonSize: 60,
     launcherIconBorderRadius: 50,
@@ -66,6 +68,7 @@ function WidgetPreviewContent() {
             primaryColor: data.config.primaryColor || "#6437F3",
             launcherIcon: data.config.launcherIcon || "chat",
             position: data.config.position || "bottom-right",
+            placement: data.config.placement || "above-launcher",
             borderRadius: data.config.borderRadius ?? 16,
             buttonSize: data.config.buttonSize ?? 60,
             launcherIconBorderRadius: data.config.launcherIconBorderRadius ?? 50,
@@ -93,6 +96,18 @@ function WidgetPreviewContent() {
 
     return () => clearTimeout(timer);
   }, [isConfigLoaded, config.autoOpen, config.autoOpenDelay, isOpen]);
+
+  // Listen for close messages from the iframe (embed widget)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "widget:close" || event.data?.type === "widget:minimize") {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   if (validationError) {
     return (
@@ -177,7 +192,28 @@ function WidgetPreviewContent() {
         Powered by <span className="font-medium text-white">Buzzi Chat</span>
       </footer>
 
-      {/* Widget */}
+      {/* Overlay for center-screen placement - does not close on click */}
+      {isOpen && config.placement === "center-screen" && (
+        <div className="fixed inset-0 bg-black/50 z-[999998] transition-opacity duration-200" />
+      )}
+
+      {/* Chat Window for center-screen placement */}
+      {isOpen && config.placement === "center-screen" && (
+        <div
+          className="fixed z-[999999] overflow-hidden shadow-2xl transition-all duration-200 md:w-[min(70vw,800px)] md:h-[min(70vh,700px)] md:max-w-[800px] md:max-h-[700px] md:min-w-[380px] md:min-h-[500px] w-full h-full top-0 left-0 md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2"
+          style={{
+            borderRadius: typeof window !== "undefined" && window.innerWidth > 768 ? `${config.borderRadius || 16}px` : 0,
+          }}
+        >
+          <iframe
+            src={`/embed-widget?agentId=${chatbotId}&companyId=${companyId}`}
+            className="w-full h-full border-none"
+            title="Chat Widget"
+          />
+        </div>
+      )}
+
+      {/* Widget launcher container */}
       <div
         className="fixed bottom-5 z-[999999]"
         style={{
@@ -185,8 +221,8 @@ function WidgetPreviewContent() {
           left: config.position === "bottom-left" ? "20px" : "auto",
         }}
       >
-        {/* Chat Window */}
-        {isOpen && (
+        {/* Chat Window for above-launcher placement */}
+        {isOpen && config.placement !== "center-screen" && (
           <div
             className="absolute w-[380px] h-[600px] max-h-[calc(100vh-120px)] overflow-hidden shadow-2xl transition-all duration-200"
             style={{

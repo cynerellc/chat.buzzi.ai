@@ -2,7 +2,8 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
 const ticketCreateToolBase = tool(
-  async ({ title, description, priority, category }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async ({ title, description: _description, priority, category }) => {
     // TODO: Implement actual ticketing system integration
     const ticketId = `TKT-${Date.now().toString(36).toUpperCase()}`;
     return `Support ticket created successfully!\n\n- Ticket ID: ${ticketId}\n- Title: ${title}\n- Priority: ${priority}\n- Category: ${category}\n\nOur technical team will review your issue and respond within 24 hours.`;

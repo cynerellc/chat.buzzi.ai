@@ -14,6 +14,7 @@ import { eq, and } from "drizzle-orm";
 const DEFAULT_CONFIG = {
   theme: "light" as const,
   position: "bottom-right" as const,
+  placement: "above-launcher" as const,
   primaryColor: "#007bff",
   borderRadius: 16,
   title: "Chat with us",
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
       ...(widgetConfig && {
         theme: widgetConfig.theme,
         position: widgetConfig.position,
+        placement: widgetConfig.placement,
         primaryColor: widgetConfig.primaryColor,
         accentColor: widgetConfig.accentColor,
         userBubbleColor: widgetConfig.userBubbleColor || undefined,

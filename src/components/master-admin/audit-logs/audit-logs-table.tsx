@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Badge, Button, Card, CardBody, Skeleton } from "@/components/ui";
+import { Button, Card, CardBody, Skeleton } from "@/components/ui";
 import type { AuditLogListItem } from "@/hooks/master-admin";
 
 interface AuditLogsTableProps {

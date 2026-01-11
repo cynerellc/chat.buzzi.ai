@@ -22,7 +22,12 @@ export type SSEEventType =
   | "presence"
   | "typing"
   | "connected"
-  | "heartbeat";
+  | "heartbeat"
+  | "human_escalation"
+  | "human_joined"
+  | "human_exited"
+  | "human_handling"
+  | "escalation_cancelled";
 
 export interface SSEEvent {
   type: SSEEventType;

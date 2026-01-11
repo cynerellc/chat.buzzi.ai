@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { Search, UserPlus, AlertCircle, Check, ArrowRight, Users, Circle } from "lucide-react";
-import { Button, Input, Avatar, Spinner, Textarea, Badge, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Skeleton } from "@/components/ui";
+import { Button, Input, Avatar, Textarea, Badge, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 interface Agent {
@@ -29,7 +29,8 @@ export function TransferModal({
   onTransfer,
   onTransferComplete,
   conversationId,
-  currentAgentId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  currentAgentId: _currentAgentId,
 }: TransferModalProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);

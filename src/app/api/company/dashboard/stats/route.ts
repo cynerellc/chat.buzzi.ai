@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, count, eq, gte, sql } from "drizzle-orm";
+import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
@@ -33,14 +33,14 @@ async function fetchCompanyDashboardStats(companyId: string): Promise<DashboardS
     totalResolvedToday,
     humanEscalationsToday,
   ] = await Promise.all([
-    // Active conversations (status = 'active' or 'waiting')
+    // Active conversations (status = 'active', 'waiting_human', or 'with_human')
     db
       .select({ count: count() })
       .from(conversations)
       .where(
         and(
           eq(conversations.companyId, companyId),
-          sql`${conversations.status} IN ('active', 'waiting')`
+          sql`${conversations.status} IN ('active', 'waiting_human', 'with_human')`
         )
       ),
     // Yesterday's active for comparison
@@ -50,9 +50,9 @@ async function fetchCompanyDashboardStats(companyId: string): Promise<DashboardS
       .where(
         and(
           eq(conversations.companyId, companyId),
-          sql`${conversations.status} IN ('active', 'waiting')`,
+          sql`${conversations.status} IN ('active', 'waiting_human', 'with_human')`,
           gte(conversations.createdAt, yesterday),
-          sql`${conversations.createdAt} < ${today}`
+          lt(conversations.createdAt, today)
         )
       ),
     // AI resolved conversations (today)

@@ -15,7 +15,8 @@ import { and, eq, or, sql } from "drizzle-orm";
 
 type AgentStatus = "online" | "busy" | "away" | "invisible" | "offline";
 
-export async function GET(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(_request: NextRequest) {
   try {
     const { user, company } = await requireSupportAgent();
 

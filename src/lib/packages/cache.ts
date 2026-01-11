@@ -11,11 +11,11 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { BuzziAgentPackage } from "@buzzi-ai/agent-sdk";
-import type {
-  MemoryCacheEntry,
-  DiskCacheManifest,
-  DiskCacheEntry,
-  PackageLoaderConfig,
+import {
+  type MemoryCacheEntry,
+  type DiskCacheManifest,
+  type DiskCacheEntry,
+  type PackageLoaderConfig,
   DEFAULT_CONFIG,
 } from "./types";
 
@@ -369,7 +369,7 @@ export class PackageCache {
   private diskCache: DiskCache;
 
   constructor(config: Partial<PackageLoaderConfig> = {}) {
-    const fullConfig = { ...require("./types").DEFAULT_CONFIG, ...config };
+    const fullConfig = { ...DEFAULT_CONFIG, ...config };
     this.memoryCache = new MemoryCache(fullConfig.memoryCacheTTL);
     this.diskCache = new DiskCache(fullConfig);
   }

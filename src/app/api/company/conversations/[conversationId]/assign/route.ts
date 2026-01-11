@@ -14,7 +14,7 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
-    const { user: currentUser, company } = await requireCompanyAdmin();
+    const { company } = await requireCompanyAdmin();
     const { conversationId } = await params;
 
     const body: AssignRequest = await request.json();

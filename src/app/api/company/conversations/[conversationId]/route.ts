@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { conversations, endUsers, agents, escalations, users } from "@/lib/db/schema";
+import { getSSEManager, getConversationChannel } from "@/lib/realtime";
 
 export interface ConversationDetail {
   id: string;
@@ -196,6 +197,10 @@ export async function GET(
 }
 
 interface UpdateConversationRequest {
+  // Action-based API (preferred, matches support-agent API)
+  action?: "takeOver" | "returnToAi" | "resolve";
+  data?: Record<string, unknown>;
+  // Legacy field-based API
   status?: "active" | "waiting_human" | "with_human" | "resolved" | "abandoned";
   subject?: string;
   assignedUserId?: string | null;
@@ -208,7 +213,7 @@ export async function PATCH(
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
-    const { company } = await requireCompanyAdmin();
+    const { company, user } = await requireCompanyAdmin();
     const { conversationId } = await params;
 
     if (!company) {
@@ -236,13 +241,116 @@ export async function PATCH(
       );
     }
 
-    // Build update object
+    // Handle action-based API (matches support-agent API)
+    if (body.action) {
+      switch (body.action) {
+        case "takeOver": {
+          // Update status to with_human and assign to current user
+          await db
+            .update(conversations)
+            .set({
+              status: "with_human",
+              assignedUserId: user.id,
+              updatedAt: new Date(),
+            })
+            .where(eq(conversations.id, conversationId));
+
+          // Emit SSE event for widget
+          try {
+            const sseManager = getSSEManager();
+            const channel = getConversationChannel(conversationId);
+            sseManager.publish(channel, "human_joined", {
+              humanAgentId: user.id,
+              humanAgentName: user.name || user.email,
+              humanAgentAvatarUrl: null,
+            });
+          } catch (sseError) {
+            console.warn("Failed to publish human_joined SSE event:", sseError);
+          }
+
+          // Get updated conversation
+          const [updated] = await db
+            .select()
+            .from(conversations)
+            .where(eq(conversations.id, conversationId))
+            .limit(1);
+
+          return NextResponse.json({ success: true, conversation: updated });
+        }
+
+        case "returnToAi": {
+          // Clear assignment and reset status to active
+          await db
+            .update(conversations)
+            .set({
+              status: "active",
+              assignedUserId: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(conversations.id, conversationId));
+
+          // Emit SSE event for widget
+          try {
+            const sseManager = getSSEManager();
+            const channel = getConversationChannel(conversationId);
+            sseManager.publish(channel, "human_exited", {
+              humanAgentId: user.id,
+              humanAgentName: user.name || user.email,
+            });
+          } catch (sseError) {
+            console.warn("Failed to publish human_exited SSE event:", sseError);
+          }
+
+          // Get updated conversation
+          const [updated] = await db
+            .select()
+            .from(conversations)
+            .where(eq(conversations.id, conversationId))
+            .limit(1);
+
+          return NextResponse.json({ success: true, conversation: updated });
+        }
+
+        case "resolve": {
+          const resolutionType = body.data?.resolutionType as string | undefined;
+
+          await db
+            .update(conversations)
+            .set({
+              status: "resolved",
+              resolutionType: (resolutionType as "ai" | "human" | "abandoned" | "escalated") ?? "human",
+              resolvedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(conversations.id, conversationId));
+
+          // Get updated conversation
+          const [updated] = await db
+            .select()
+            .from(conversations)
+            .where(eq(conversations.id, conversationId))
+            .limit(1);
+
+          return NextResponse.json({ success: true, conversation: updated });
+        }
+
+        default:
+          return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+      }
+    }
+
+    // Legacy field-based API (fallback)
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
     if (body.status !== undefined) {
       updateData.status = body.status;
+
+      // If taking over (with_human), assign to current user
+      if (body.status === "with_human") {
+        updateData.assignedUserId = user.id;
+      }
 
       // If resolving, set resolved timestamp
       if (body.status === "resolved") {
@@ -275,6 +383,37 @@ export async function PATCH(
       .set(updateData)
       .where(eq(conversations.id, conversationId))
       .returning();
+
+    // Emit SSE events for status changes to human handling states
+    if (body.status === "with_human") {
+      try {
+        const sseManager = getSSEManager();
+        const channel = getConversationChannel(conversationId);
+
+        sseManager.publish(channel, "human_joined", {
+          humanAgentId: user.id,
+          humanAgentName: user.name || user.email,
+          humanAgentAvatarUrl: null,
+        });
+      } catch (sseError) {
+        console.warn("Failed to publish human_joined SSE event:", sseError);
+      }
+    }
+
+    // Emit human_exited when returning to AI mode
+    if (body.status === "active") {
+      try {
+        const sseManager = getSSEManager();
+        const channel = getConversationChannel(conversationId);
+
+        sseManager.publish(channel, "human_exited", {
+          humanAgentId: user.id,
+          humanAgentName: user.name || user.email,
+        });
+      } catch (sseError) {
+        console.warn("Failed to publish human_exited SSE event:", sseError);
+      }
+    }
 
     return NextResponse.json({ conversation: updatedConversation });
   } catch (error) {

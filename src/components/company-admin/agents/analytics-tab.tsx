@@ -11,7 +11,7 @@ import {
   CardBody,
   Skeleton,
 } from "@/components/ui";
-import { useAgentAnalytics } from "@/hooks/company";
+import { useChatbotAnalytics } from "@/hooks/company";
 
 interface AnalyticsTabProps {
   agentId: string;
@@ -26,7 +26,7 @@ const DAYS_OPTIONS = [
 
 export function AnalyticsTab({ agentId }: AnalyticsTabProps) {
   const [days, setDays] = useState(7);
-  const { analytics, isLoading } = useAgentAnalytics(agentId, days);
+  const { analytics, isLoading } = useChatbotAnalytics(agentId, days);
 
   if (isLoading) {
     return (

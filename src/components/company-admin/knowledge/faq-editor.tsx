@@ -248,7 +248,8 @@ interface FAQListProps {
   isLoading?: boolean;
 }
 
-export function FAQList({ faqs, onEdit, onDelete, isLoading }: FAQListProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function FAQList({ faqs, onEdit, onDelete: _onDelete, isLoading }: FAQListProps) {
   if (isLoading) {
     return (
       <div className="space-y-3">

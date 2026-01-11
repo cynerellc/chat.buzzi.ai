@@ -15,7 +15,7 @@ import { db } from "@/lib/db";
 import { chatbotPackages } from "@/lib/db/schema/chatbots";
 import { eq } from "drizzle-orm";
 import type { BuzziAgentPackage } from "@buzzi-ai/agent-sdk";
-import { PackageCache, getPackageCache } from "./cache";
+import { getPackageCache } from "./cache";
 import type { CacheLevel, PackageLoaderStats } from "./types";
 
 /**
@@ -56,10 +56,10 @@ async function loadPackageFromFile(filePath: string): Promise<BuzziAgentPackage>
   const fileUrl = `file://${filePath}`;
 
   // Dynamic import the module
-  const module = await import(/* webpackIgnore: true */ fileUrl);
+  const loadedModule = await import(/* webpackIgnore: true */ fileUrl);
 
   // The package should be the default export
-  const pkg = module.default as BuzziAgentPackage;
+  const pkg = loadedModule.default as BuzziAgentPackage;
 
   if (!pkg || typeof pkg.getMetadata !== "function") {
     throw new Error(`Invalid package: missing getMetadata() method`);
@@ -137,7 +137,8 @@ async function getPackageMetadata(packageId: string): Promise<{
 export async function loadPackage(packageId: string): Promise<BuzziAgentPackage | null> {
   const startTime = performance.now();
   const cache = getPackageCache();
-  let loadedFrom: CacheLevel = "remote";
+  // Track where package was loaded from for debugging
+  let _loadedFrom: CacheLevel = "remote";
 
   try {
     // Step 1: Check memory cache
@@ -170,7 +171,8 @@ export async function loadPackage(packageId: string): Promise<BuzziAgentPackage 
           cache.setInMemory(packageId, pkg, diskEntry.checksum);
 
           stats.diskCacheHits++;
-          loadedFrom = "disk";
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          _loadedFrom = "disk";
           recordLoadTime(startTime);
           console.log(`[PackageLoader] Loaded ${packageId} from disk cache`);
           return pkg;
@@ -195,7 +197,6 @@ export async function loadPackage(packageId: string): Promise<BuzziAgentPackage 
     await cache.setInDisk(packageId, bundleCode, checksum);
 
     stats.remoteLoads++;
-    loadedFrom = "remote";
     recordLoadTime(startTime);
     console.log(`[PackageLoader] Loaded ${packageId} from remote storage`);
     return pkg;

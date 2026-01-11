@@ -282,10 +282,10 @@ export class RoutingService {
   async getQueuePosition(escalationId: string): Promise<number> {
     const result = await db.execute<{ position: number }>(sql`
       SELECT COUNT(*) + 1 as position
-      FROM chatapp_escalations
+      FROM chatapp.escalations
       WHERE status = 'pending'
         AND created_at < (
-          SELECT created_at FROM chatapp_escalations WHERE id = ${escalationId}
+          SELECT created_at FROM chatapp.escalations WHERE id = ${escalationId}
         )
     `);
 

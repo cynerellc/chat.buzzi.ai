@@ -17,7 +17,6 @@ import type {
   LLMMessage,
   LLMResponse,
   LLMToolCall,
-  LLMUsage,
   ToolDefinition,
 } from "../types";
 
@@ -29,7 +28,6 @@ import { LLMError } from "../types";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY_MS = 1000;
-const DEFAULT_TIMEOUT_MS = 60000;
 
 // Model context window limits (for token estimation)
 const MODEL_CONTEXT_LIMITS: Record<string, number> = {

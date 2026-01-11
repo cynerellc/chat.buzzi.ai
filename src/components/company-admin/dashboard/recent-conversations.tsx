@@ -5,7 +5,7 @@ import { MessageSquare, ChevronRight, CheckCircle, Clock, UserCheck, ArrowRight,
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
-import { Avatar, Badge, Button, Card, CardHeader, CardBody, Skeleton } from "@/components/ui";
+import { Avatar, Button, Card, CardHeader, CardBody, Skeleton } from "@/components/ui";
 import type { RecentConversation } from "@/hooks/company";
 
 interface RecentConversationsProps {
@@ -19,10 +19,12 @@ function getStatusConfig(status: string) {
       return { variant: "success" as const, label: "Active", icon: Clock, bg: "bg-success/10", text: "text-success" };
     case "resolved":
       return { variant: "default" as const, label: "Resolved", icon: CheckCircle, bg: "bg-muted", text: "text-muted-foreground" };
-    case "escalated":
-      return { variant: "warning" as const, label: "Escalated", icon: UserCheck, bg: "bg-warning/10", text: "text-warning" };
-    case "waiting":
+    case "with_human":
+      return { variant: "warning" as const, label: "With Agent", icon: UserCheck, bg: "bg-warning/10", text: "text-warning" };
+    case "waiting_human":
       return { variant: "info" as const, label: "Waiting", icon: Clock, bg: "bg-blue-500/10", text: "text-blue-500" };
+    case "abandoned":
+      return { variant: "default" as const, label: "Abandoned", icon: MessageSquare, bg: "bg-muted", text: "text-muted-foreground" };
     default:
       return { variant: "default" as const, label: status, icon: MessageSquare, bg: "bg-muted", text: "text-muted-foreground" };
   }

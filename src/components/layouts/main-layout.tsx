@@ -6,7 +6,7 @@ import { PageProvider, usePageTitle } from "@/contexts/page-context";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 
-import { Header, type HeaderProps } from "./header";
+import { Header } from "./header";
 import { MobileSidebar, Sidebar, useSidebar, type SidebarProps } from "./sidebar";
 
 export interface MainLayoutProps {

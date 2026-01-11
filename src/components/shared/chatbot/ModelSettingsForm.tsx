@@ -27,7 +27,8 @@ function getDefaultSettings(schema: ModelSettingsSchema): Record<string, unknown
 }
 
 function SettingField({
-  settingKey,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  settingKey: _settingKey,
   definition,
   value,
   onChange,

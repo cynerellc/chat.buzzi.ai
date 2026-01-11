@@ -40,7 +40,8 @@ BreadcrumbItem.displayName = "BreadcrumbItem";
 const BreadcrumbLink = forwardRef<
   HTMLAnchorElement,
   ComponentPropsWithoutRef<"a"> & { asChild?: boolean; href?: string }
->(({ asChild, className, href, ...props }, ref) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+>(({ asChild: _asChild, className, href, ...props }, ref) => {
   if (href) {
     return (
       <Link

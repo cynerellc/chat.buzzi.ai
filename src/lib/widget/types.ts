@@ -49,6 +49,7 @@ export interface WidgetConfigJson {
   appearance: {
     theme: "light" | "dark" | "auto";
     position: "bottom-right" | "bottom-left";
+    placement: "above-launcher" | "center-screen";
     primaryColor: string;
     accentColor: string;
     userBubbleColor?: string; // User message bubble color (defaults to primaryColor)
@@ -129,6 +130,7 @@ export const WIDGET_CONFIG_DEFAULTS = {
   appearance: {
     theme: "light" as const,
     position: "bottom-right" as const,
+    placement: "above-launcher" as const,
     primaryColor: "#6437F3",
     accentColor: "#2b3dd8",
     userBubbleColor: undefined as string | undefined, // Defaults to primaryColor when undefined

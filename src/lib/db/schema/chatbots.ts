@@ -62,6 +62,26 @@ export interface AgentListItem {
   sort_order?: number; // Display order
 }
 
+// Type definition for routing strategy
+export type EscalationRoutingRule = "round_robin" | "least_busy" | "preferred";
+
+// Type definition for chatbot behavior settings (stored as JSONB)
+export interface ChatbotBehavior {
+  greeting?: string;
+  fallbackMessage?: string;
+  collectEmail?: boolean;
+  collectName?: boolean;
+  workingHours?: unknown;
+  offlineMessage?: string;
+  // Escalation settings
+  maxTurnsBeforeEscalation?: number;
+  autoEscalateOnSentiment?: boolean;
+  sentimentThreshold?: number;
+  escalationRoutingRule?: EscalationRoutingRule;
+  escalationPreferredAgentId?: string;
+  escalationRules?: string[]; // Custom escalation rule prompts for AI interpretation
+}
+
 // Chatbot Packages Table (Master Admin templates - Pluggable Agent Framework)
 // Renamed from agent_packages
 export const chatbotPackages = chatappSchema.table(
@@ -170,6 +190,7 @@ export const chatbots = chatappSchema.table(
 
     // Behavior Settings
     behavior: jsonb("behavior")
+      .$type<ChatbotBehavior>()
       .default({
         greeting: "Hello! How can I help you today?",
         fallbackMessage: "I am sorry, I do not understand. Let me connect you with a human agent.",
@@ -180,6 +201,9 @@ export const chatbots = chatappSchema.table(
         collectName: true,
         workingHours: null,
         offlineMessage: "We are currently offline. Please leave a message and we will get back to you.",
+        escalationRoutingRule: "least_busy",
+        escalationPreferredAgentId: undefined,
+        escalationRules: [],
       })
       .notNull(),
 

@@ -44,7 +44,7 @@ export async function GET(
   try {
     const { conversationId } = await params;
 
-    const { user, company } = await requireSupportAgent();
+    const { company } = await requireSupportAgent();
 
     // Verify conversation exists and belongs to company
     const [conversation] = await db

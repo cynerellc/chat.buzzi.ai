@@ -4,7 +4,7 @@
  * Common job handlers for the background job queue.
  */
 
-import { type Job, type JobResult, registerJobHandler } from "./queue";
+import { registerJobHandler } from "./queue";
 
 // Job type constants
 export const JOB_TYPES = {

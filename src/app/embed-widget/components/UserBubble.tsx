@@ -29,7 +29,8 @@ export interface UserBubbleProps {
 
 export function UserBubble({
   message,
-  isDark,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isDark: _isDark,
   userBubbleColor,
   enableMarkdown = true,
   className,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Search,
   UserPlus,
@@ -22,12 +22,12 @@ import {
   Checkbox,
 } from "@/components/ui";
 
-import type { AgentDetail } from "@/hooks/company/useAgents";
+import type { ChatbotDetail } from "@/hooks/company/useChatbots";
 import { useKnowledgeCategories } from "@/hooks/company/useKnowledge";
 
 interface ToolsTabProps {
-  agent: AgentDetail;
-  onSave: (data: Partial<AgentDetail>) => Promise<void>;
+  agent: ChatbotDetail;
+  onSave: (data: Partial<ChatbotDetail>) => Promise<void>;
   isSaving: boolean;
 }
 

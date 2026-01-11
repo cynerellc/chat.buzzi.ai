@@ -37,45 +37,6 @@ export interface IntegrationsResponse {
   webhooks: WebhookItem[];
 }
 
-// Available integration types (for reference, not exported from route)
-const availableIntegrationTypes = [
-  {
-    type: "slack",
-    name: "Slack",
-    description: "Send notifications to Slack channels",
-    icon: "slack",
-    category: "communication",
-  },
-  {
-    type: "zapier",
-    name: "Zapier",
-    description: "Connect to thousands of apps via Zapier",
-    icon: "zapier",
-    category: "automation",
-  },
-  {
-    type: "salesforce",
-    name: "Salesforce",
-    description: "Sync customer data with Salesforce CRM",
-    icon: "salesforce",
-    category: "crm",
-  },
-  {
-    type: "hubspot",
-    name: "HubSpot",
-    description: "Integrate with HubSpot CRM and Marketing",
-    icon: "hubspot",
-    category: "crm",
-  },
-  {
-    type: "webhook",
-    name: "Custom Webhook",
-    description: "Send data to any HTTP endpoint",
-    icon: "webhook",
-    category: "custom",
-  },
-];
-
 export async function GET() {
   try {
     const { company } = await requireCompanyAdmin();

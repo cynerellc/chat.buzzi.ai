@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useSetPageTitle } from "@/contexts/page-context";
@@ -18,23 +18,29 @@ export default function CodeEditorPage({ params }: CodeEditorPageProps) {
   const [packageName, setPackageName] = useState<string>("Package");
   const [packageSlug, setPackageSlug] = useState<string>("");
 
-  // Fetch package info
-  const fetchPackageInfo = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/master-admin/packages/${packageId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPackageName(data.package?.name ?? "Package");
-        setPackageSlug(data.package?.slug ?? packageId);
-      }
-    } catch (err) {
-      console.error("Failed to fetch package info:", err);
-    }
-  }, [packageId]);
-
+  // Fetch package info on mount
   useEffect(() => {
+    let cancelled = false;
+
+    async function fetchPackageInfo() {
+      try {
+        const response = await fetch(`/api/master-admin/packages/${packageId}`);
+        if (response.ok && !cancelled) {
+          const data = await response.json();
+          setPackageName(data.package?.name ?? "Package");
+          setPackageSlug(data.package?.slug ?? packageId);
+        }
+      } catch (err) {
+        console.error("Failed to fetch package info:", err);
+      }
+    }
+
     fetchPackageInfo();
-  }, [fetchPackageInfo]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [packageId]);
 
   return (
     <CodeEditor

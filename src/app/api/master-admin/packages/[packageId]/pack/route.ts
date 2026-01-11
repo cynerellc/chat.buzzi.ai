@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { promises as fs } from "fs";
 import path from "path";
 import archiver from "archiver";
-import { Readable } from "stream";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";

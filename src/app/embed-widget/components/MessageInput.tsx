@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, FormEvent } from "react";
+import { useRef, useEffect, useCallback, useState, FormEvent } from "react";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -71,7 +71,7 @@ export function MessageInput({
   className,
 }: MessageInputProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const isFocusedRef = useRef(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -89,6 +89,29 @@ export function MessageInput({
     }
   };
 
+  // Auto-resize textarea based on content (max 3 lines)
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = "auto";
+
+    // Calculate line height (approximately 1.5rem = 24px per line)
+    const lineHeight = 24;
+    const maxLines = 3;
+    const maxHeight = lineHeight * maxLines;
+
+    // Set height to scrollHeight but cap at maxHeight
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${newHeight}px`;
+  }, []);
+
+  // Adjust textarea height when input value changes
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [value, adjustTextareaHeight]);
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -102,10 +125,10 @@ export function MessageInput({
         className={cn(
           "flex items-end gap-2 rounded-2xl px-4 py-2 transition-all",
           isDark ? "bg-zinc-800" : "bg-gray-100",
-          isFocusedRef.current && "ring-2"
+          isFocused && "ring-2"
         )}
         style={
-          isFocusedRef.current
+          isFocused
             ? { ["--tw-ring-color" as string]: primaryColor }
             : undefined
         }
@@ -185,24 +208,29 @@ export function MessageInput({
           </>
         ) : (
           <>
-            {/* Text input */}
+            {/* Text input - auto-expands up to 3 lines */}
             <textarea
               ref={inputRef}
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
               onFocus={() => {
-                isFocusedRef.current = true;
+                setIsFocused(true);
               }}
               onBlur={() => {
-                isFocusedRef.current = false;
+                setIsFocused(false);
+              }}
+              onPaste={() => {
+                // Trigger resize after paste content is applied
+                setTimeout(adjustTextareaHeight, 0);
               }}
               placeholder={placeholder}
               rows={1}
               className={cn(
-                "max-h-[4.5rem] flex-1 resize-none bg-transparent py-1 outline-none",
+                "flex-1 resize-none bg-transparent py-1 overflow-y-auto",
                 isDark ? "placeholder:text-zinc-500" : "placeholder:text-gray-400"
               )}
+              style={{ outline: "none", border: "none", boxShadow: "none", minHeight: "24px", maxHeight: "72px" }}
             />
             {/* Processing spinner / Voice button / Send button */}
             {isSending ? (

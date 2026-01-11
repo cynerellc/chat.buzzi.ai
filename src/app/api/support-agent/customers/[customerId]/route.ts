@@ -31,7 +31,7 @@ export async function GET(
   try {
     const { customerId } = await params;
 
-    const { user, company } = await requireSupportAgent();
+    const { company } = await requireSupportAgent();
 
     // Get customer
     const [customer] = await db
@@ -148,7 +148,7 @@ export async function PATCH(
   try {
     const { customerId } = await params;
 
-    const { user, company } = await requireSupportAgent();
+    const { company } = await requireSupportAgent();
 
     // Verify customer exists and belongs to company
     const [existing] = await db

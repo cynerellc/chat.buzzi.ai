@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, X, User, Clock, ShieldAlert } from "lucide-react";
+import { motion } from "framer-motion";
+import { X, User, Clock, ShieldAlert } from "lucide-react";
 import { useState, useEffect } from "react";
 
 import { cn } from "@/lib/utils";

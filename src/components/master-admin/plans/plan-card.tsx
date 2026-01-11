@@ -16,7 +16,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import type { PlanListItem } from "@/hooks/master-admin";
-import { Badge, Button, Card, type BadgeVariant } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 
 interface PlanCardProps {
   plan: PlanListItem;
@@ -25,8 +25,6 @@ interface PlanCardProps {
 }
 
 export function PlanCard({ plan, onEdit, isPopular }: PlanCardProps) {
-  const statusVariant: BadgeVariant = plan.isActive ? "success" : "default";
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

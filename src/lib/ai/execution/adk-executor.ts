@@ -897,6 +897,51 @@ export class AdkExecutor {
       // Track current agent for smart transfer notifications
       let currentAgentId: string | null = null;
 
+      // =========================================================================
+      // Early Escalation Detection
+      // Check if the user is explicitly requesting human assistance BEFORE
+      // running through multi-agent routing. This prevents routing loops and
+      // duplicate transfer notifications for clear escalation requests.
+      // =========================================================================
+      const escalationKeywords = [
+        /\b(talk|speak|chat)\s+(to|with)\s+(a\s+)?(real\s+)?(human|person|agent|representative|rep|somebody|someone)\b/i,
+        /\b(want|need|require|get)\s+(a\s+)?(human|real\s+person|real\s+agent|live\s+agent)\b/i,
+        /\bnot\s+(an?\s+)?ai\b/i,
+        /\breal\s+(human|person)\s+please\b/i,
+        /\bhuman\s+(agent|support|help)\s*(please)?\b/i,
+        /\bconnect\s+(me\s+)?(to|with)\s+(a\s+)?human\b/i,
+        /\btransfer\s+(me\s+)?(to\s+)?(a\s+)?human\b/i,
+        /\bescalate\s+(to\s+)?(a\s+)?human\b/i,
+      ];
+
+      const messageNormalized = options.message.toLowerCase();
+      const isExplicitEscalationRequest = escalationKeywords.some(pattern => pattern.test(messageNormalized));
+
+      if (isExplicitEscalationRequest) {
+        console.log(`[AdkExecutor] Detected explicit human escalation request: "${options.message.substring(0, 50)}..."`);
+
+        // Find the primary agent info for the escalation event
+        const agentsList = this.options.agentsListConfig || [];
+        const primaryAgent = agentsList.find((a) => a.agent_type === "supervisor") || agentsList[0];
+        const agentName = primaryAgent?.name || "Assistant";
+        const agentId = primaryAgent?.agent_identifier || "main";
+
+        // Emit human escalation event immediately - bypass multi-agent routing
+        yield {
+          type: "human_escalation",
+          data: {
+            reason: "Customer explicitly requested human assistance",
+            urgency: "high",
+            initiatingAgentId: agentId,
+            initiatingAgentName: agentName,
+          },
+          timestamp: Date.now(),
+        };
+
+        streamSpan.end({ earlyEscalation: true });
+        return; // Exit early - don't process through agents
+      }
+
       // Prepare user message
       // Use unknown cast to handle @google/genai version mismatch
       const newMessage = {
@@ -985,6 +1030,28 @@ export class AdkExecutor {
 
               // End tool profiling span
               profiler.getActiveSpan(`tool:${toolName}`)?.end();
+
+              // Check for human escalation request
+              if (toolName === "request_human_handover") {
+                const response = funcResp.response as { action?: string; reason?: string; urgency?: string } | undefined;
+                if (response?.action === "escalate") {
+                  // Emit human escalation event and signal to stop processing
+                  yield {
+                    type: "human_escalation",
+                    data: {
+                      reason: response.reason || "Customer requested human assistance",
+                      urgency: response.urgency || "medium",
+                      initiatingAgentId: currentAgentId || undefined,
+                      initiatingAgentName: currentAgentId
+                        ? this.options.agentsListConfig?.find((a) => a.agent_identifier === currentAgentId)?.name
+                        : undefined,
+                    },
+                    timestamp: Date.now(),
+                  };
+                  // Return early - don't continue processing after escalation
+                  return;
+                }
+              }
 
               // Look up custom notification message from tool definition
               const toolMessages = this.toolMessagesCache.get(toolName);

@@ -12,6 +12,7 @@ import { agents } from "@/lib/db/schema/chatbots";
 import { users } from "@/lib/db/schema/users";
 import { requireSupportAgent } from "@/lib/auth/guards";
 import { and, eq, desc } from "drizzle-orm";
+import { getSSEManager, getConversationChannel } from "@/lib/realtime";
 
 interface RouteParams {
   conversationId: string;
@@ -23,7 +24,7 @@ export async function GET(
 ) {
   try {
     const { conversationId } = await params;
-    const { user, company } = await requireSupportAgent();
+    const { company } = await requireSupportAgent();
 
     // Get conversation with related data
     const conversationResult = await db
@@ -214,7 +215,7 @@ export async function PATCH(
 
     const body = await request.json();
     const { action, data } = body as {
-      action: "resolve" | "star" | "unstar" | "addTag" | "removeTag" | "assign" | "unassign" | "returnToAi";
+      action: "resolve" | "star" | "unstar" | "addTag" | "removeTag" | "assign" | "unassign" | "returnToAi" | "takeOver";
       data?: Record<string, unknown>;
     };
 
@@ -253,6 +254,11 @@ export async function PATCH(
             type: "text",
             content: closingMessage,
             userId: user.id,
+            agentDetails: {
+              agentId: user.id,
+              agentType: "human",
+              agentName: user.name || user.email || "Support Agent",
+            },
           });
         }
 
@@ -413,7 +419,79 @@ export async function PATCH(
           role: "system",
           type: "text",
           content: "Conversation returned to AI assistant",
+          agentDetails: {
+            agentId: "system",
+            agentType: "system",
+            agentName: "System",
+          },
         });
+
+        // Emit SSE event for widget
+        try {
+          const sseManager = getSSEManager();
+          const channel = getConversationChannel(conversationId);
+          sseManager.publish(channel, "human_exited", {
+            humanAgentId: user.id,
+            humanAgentName: user.name || user.email,
+          });
+        } catch (sseError) {
+          console.warn("Failed to publish human_exited SSE event:", sseError);
+        }
+        break;
+      }
+
+      case "takeOver": {
+        // Update status to with_human and assign to current user
+        await db
+          .update(conversations)
+          .set({
+            status: "with_human",
+            assignedUserId: user.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(conversations.id, conversationId));
+
+        // Update escalation status
+        await db
+          .update(escalations)
+          .set({
+            status: "in_progress",
+            assignedUserId: user.id,
+            assignedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(escalations.conversationId, conversationId),
+              eq(escalations.status, "pending")
+            )
+          );
+
+        // Add system message
+        await db.insert(messages).values({
+          conversationId,
+          role: "system",
+          type: "text",
+          content: `${user.name || user.email} has joined the conversation`,
+          agentDetails: {
+            agentId: user.id,
+            agentType: "human",
+            agentName: user.name || user.email || "Support Agent",
+          },
+        });
+
+        // Emit SSE event for widget
+        try {
+          const sseManager = getSSEManager();
+          const channel = getConversationChannel(conversationId);
+          sseManager.publish(channel, "human_joined", {
+            humanAgentId: user.id,
+            humanAgentName: user.name || user.email,
+            humanAgentAvatarUrl: null,
+          });
+        } catch (sseError) {
+          console.warn("Failed to publish human_joined SSE event:", sseError);
+        }
         break;
       }
 

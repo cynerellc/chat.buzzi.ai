@@ -11,7 +11,6 @@ import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { knowledgeSources } from "@/lib/db/schema";
 import {
-  processKnowledgeFile,
   processKnowledgeUrl,
   processKnowledgeText,
 } from "@/lib/knowledge";

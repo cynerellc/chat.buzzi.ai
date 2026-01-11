@@ -30,8 +30,9 @@ import {
   setWidgetSessionCache,
   type CachedWidgetSession,
 } from "@/lib/redis/cache";
-import { uploadConversationFile } from "@/lib/supabase/client";
+import { uploadConversationFile, broadcastMessage } from "@/lib/supabase/client";
 import type { SendMessageRequest } from "@/lib/widget/types";
+import { createEscalation } from "@/lib/escalation/escalation-service";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -59,6 +60,119 @@ function isAllowedAudioType(mimeType: string): boolean {
   return ALLOWED_AUDIO_TYPE_PREFIXES.some(
     (allowed) => baseMimeType === allowed.toLowerCase()
   );
+}
+
+// Whisper verbose_json response types for silence detection
+interface WhisperSegment {
+  id: number;
+  start: number;
+  end: number;
+  text: string;
+  no_speech_prob: number;
+  avg_logprob: number;
+}
+
+interface WhisperVerboseResponse {
+  text: string;
+  segments: WhisperSegment[];
+}
+
+/**
+ * Known Whisper hallucination patterns on silent/noise audio
+ * These are common outputs when there's no real speech
+ */
+const HALLUCINATION_PATTERNS = [
+  /^[\s\.,!?…]+$/,                    // Only punctuation/whitespace
+  /^(bye\.?\s*)+$/i,                  // "Bye. Bye." variations
+  /^(hey\.?\s*)+$/i,                  // "Hey. Hey." variations
+  /^(this way\.?\s*)+$/i,             // "This way." variations
+  /^(thank(s| you).*watch)/i,         // "Thanks for watching"
+  /^(see you|goodbye|later)\.?$/i,    // Sign-off phrases
+  /^(eat|food|way|go)\.?\s*$/i,       // Random single words
+  /^\.+$/,                            // Just periods
+  /^\s*$/,                            // Empty/whitespace only
+];
+
+/**
+ * Check if Whisper transcription is likely a hallucination from silent/noise audio
+ * Uses multiple detection layers for robust filtering
+ */
+function isLikelySilentAudio(response: WhisperVerboseResponse): boolean {
+  // Layer 0: No segments or empty response
+  if (!response.segments || response.segments.length === 0) {
+    return true;
+  }
+
+  const text = response.text?.trim() || "";
+
+  // Layer 1: Empty or very short text (< 3 meaningful chars)
+  if (text.length < 3) {
+    return true;
+  }
+
+  // Layer 2: Known hallucination patterns
+  if (HALLUCINATION_PATTERNS.some((pattern) => pattern.test(text))) {
+    console.log(`[Whisper] Hallucination pattern detected: "${text}"`);
+    return true;
+  }
+
+  // Layer 3: Transcript quality heuristics (Unicode-aware)
+  // Use Unicode property escapes: \p{L} = any letter (Latin, CJK, Arabic, etc.), \p{N} = any number
+  // This properly handles non-English scripts like Chinese, Japanese, Korean, Arabic, Hebrew, etc.
+  const contentChars = text.replace(/[^\p{L}\p{N}]/gu, "").length;
+
+  // If too few actual content characters (letters/numbers in any script), likely garbage
+  if (contentChars < 3 && text.length < 20) {
+    console.log(
+      `[Whisper] Too few content characters (${contentChars}): "${text}"`
+    );
+    return true;
+  }
+
+  // Layer 4: Segment-based analysis with relaxed thresholds for non-English support
+  // Note: Whisper's confidence metrics are calibrated on English data, so non-English
+  // languages may have higher uncertainty even for valid speech
+  let silentSegmentCount = 0;
+  let totalNoSpeechProb = 0;
+
+  for (const seg of response.segments) {
+    totalNoSpeechProb += seg.no_speech_prob;
+
+    // Count as silent if EITHER condition is met (thresholds relaxed for non-English)
+    const highNoSpeechProb = seg.no_speech_prob > 0.75;  // Was 0.6
+    const lowConfidence = seg.avg_logprob < -1.0;        // Was -0.8
+
+    if (highNoSpeechProb || lowConfidence) {
+      silentSegmentCount++;
+    }
+  }
+
+  const avgNoSpeechProb = totalNoSpeechProb / response.segments.length;
+  const silentRatio = silentSegmentCount / response.segments.length;
+
+  // Log for debugging
+  console.log(
+    `[Whisper] Analysis: text="${text}", avgNoSpeechProb=${avgNoSpeechProb.toFixed(3)}, silentRatio=${silentRatio.toFixed(2)}`
+  );
+
+  // Silent if: very high average no_speech_prob OR most segments flagged
+  if (avgNoSpeechProb > 0.65) {  // Was 0.5
+    console.log(`[Whisper] High avg no_speech_prob: ${avgNoSpeechProb.toFixed(3)}`);
+    return true;
+  }
+
+  if (silentRatio > 0.6) {  // Was 0.5
+    console.log(`[Whisper] High silent segment ratio: ${silentRatio.toFixed(2)}`);
+    return true;
+  }
+
+  // Layer 5: Very short transcript + elevated no_speech_prob (stricter on length, more lenient on prob)
+  if (text.length < 10 && avgNoSpeechProb > 0.5) {  // Was length < 15, prob > 0.3
+    console.log(`[Whisper] Short text with elevated no_speech_prob`);
+    return true;
+  }
+
+  return false;
 }
 
 interface RouteParams {
@@ -94,7 +208,7 @@ function createStreamingTiming(requestId: string, sessionId: string): StreamingT
 }
 
 function addTimingSpan(timing: StreamingTiming, name: string, category: string, metadata?: Record<string, unknown>) {
-  const span = { name, category, startTime: performance.now(), metadata };
+  const span: StreamingTiming["spans"][number] = { name, category, startTime: performance.now(), metadata };
   timing.spans.push(span);
   return {
     end: (endMetadata?: Record<string, unknown>) => {
@@ -186,6 +300,9 @@ export async function POST(
     );
   }
 
+  // Check if conversation is being handled by a human or waiting for human
+  const isHumanHandling = conversation.status === "waiting_human" || conversation.status === "with_human";
+
   // Determine content type and parse accordingly
   const contentType = request.headers.get("content-type") ?? "";
   const isFormData = contentType.includes("multipart/form-data");
@@ -226,6 +343,70 @@ export async function POST(
       );
     }
 
+    // Pre-Whisper silence detection using file size heuristics
+    // This saves API costs by rejecting obviously silent audio before transcription
+    const silenceCheckOrigin = request.headers.get("origin");
+
+    // Check 1: Minimum duration (reject very short recordings)
+    if (duration < 1) {
+      console.log(`[Whisper] Pre-check: Recording too short (${duration}s)`);
+      const errorEncoder = new TextEncoder();
+      const errorStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            errorEncoder.encode(
+              formatSSE("error", {
+                message: "Recording too short. Please hold the button longer and speak clearly.",
+                code: "RECORDING_TOO_SHORT",
+              })
+            )
+          );
+          controller.close();
+        },
+      });
+      return new Response(errorStream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...(silenceCheckOrigin && { "Access-Control-Allow-Origin": silenceCheckOrigin }),
+        },
+      });
+    }
+
+    // Check 2: Bytes-per-second heuristic for silence detection
+    // Silent audio compresses extremely well in webm/opus format
+    // Speech: typically > 3KB/s, Silent: typically < 1KB/s
+    // Note: Non-English languages may compress differently, so we use a more lenient threshold
+    const bytesPerSecond = audioFile.size / duration;
+    if (bytesPerSecond < 1000 && duration >= 3) {
+      console.log(
+        `[Whisper] Pre-check: Likely silent audio (${bytesPerSecond.toFixed(0)} bytes/s for ${duration}s)`
+      );
+      const errorEncoder = new TextEncoder();
+      const errorStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            errorEncoder.encode(
+              formatSSE("error", {
+                message: "I couldn't detect any speech in your recording. Please speak clearly into the microphone.",
+                code: "SILENT_AUDIO",
+              })
+            )
+          );
+          controller.close();
+        },
+      });
+      return new Response(errorStream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...(silenceCheckOrigin && { "Access-Control-Allow-Origin": silenceCheckOrigin }),
+        },
+      });
+    }
+
     // Generate message ID early for file naming
     const messageId = crypto.randomUUID();
     const fileExtension = audioFile.name.split(".").pop() || "webm";
@@ -243,7 +424,7 @@ export async function POST(
     );
     uploadSpan.end();
 
-    // Transcribe audio using OpenAI Whisper
+    // Transcribe audio using OpenAI Whisper with verbose_json for silence detection
     const transcribeSpan = addTimingSpan(timing, "voice_transcription", "llm", {
       audioSize: audioFile.size,
       mimeType: audioFile.type,
@@ -252,13 +433,44 @@ export async function POST(
     const transcription = await openai.audio.transcriptions.create({
       file: transcribeFile,
       model: "whisper-1",
-      response_format: "text",
+      response_format: "verbose_json",
     });
     transcribeSpan.end();
 
-    const transcript = typeof transcription === "string"
-      ? transcription.trim()
-      : transcription;
+    // Cast to verbose response type for silence detection
+    const verboseResponse = transcription as unknown as WhisperVerboseResponse;
+
+    // Check for silence/noise (prevents Whisper hallucinations like "Thanks for watching")
+    if (isLikelySilentAudio(verboseResponse)) {
+      // Return SSE error stream without saving message to DB
+      const silentOrigin = request.headers.get("origin");
+      const errorEncoder = new TextEncoder();
+      const errorStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            errorEncoder.encode(
+              formatSSE("error", {
+                message: "I couldn't hear anything in your voice message. Please hold the microphone button and speak clearly.",
+                code: "SILENT_AUDIO",
+              })
+            )
+          );
+          controller.close();
+        },
+      });
+
+      return new Response(errorStream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...(silentOrigin && { "Access-Control-Allow-Origin": silentOrigin }),
+        },
+      });
+    }
+
+    // Extract transcript from verbose response
+    const transcript = verboseResponse.text?.trim() || "";
 
     messageContent = transcript;
     messageType = "audio";
@@ -307,6 +519,19 @@ export async function POST(
     return NextResponse.json({ error: "Failed to save message" }, { status: 500 });
   }
 
+  // Broadcast user message to admin pages via Supabase Realtime
+  try {
+    await broadcastMessage(conversationId, {
+      id: userMessage.id,
+      conversationId,
+      role: "user",
+      content: messageContent,
+      createdAt: userMessage.createdAt.toISOString(),
+    });
+  } catch (broadcastError) {
+    console.warn("Failed to broadcast user message:", broadcastError);
+  }
+
   // NOTE: Stats update is batched at the end of the request (after assistant message)
 
   // Create streaming response
@@ -333,6 +558,12 @@ export async function POST(
       const aiProcessingSpan = addTimingSpan(timing, "ai_agent_streaming", "llm");
       let fullContent = "";
       let metadata: Record<string, unknown> = {};
+      let escalationTriggered = false;
+      let escalationData: { reason?: string; urgency?: string; initiatingAgentId?: string; initiatingAgentName?: string } = {};
+
+      // Track agent info during streaming for agentDetails
+      let lastAgentId: string | null = null;
+      let lastAgentName: string | null = null;
 
       try {
         // Build ack event data
@@ -352,6 +583,37 @@ export async function POST(
         // Send acknowledgment with user message ID
         safeEnqueue(encoder.encode(formatSSE("ack", ackData)));
 
+        // Check if human is handling - skip AI processing
+        if (isHumanHandling) {
+          const statusMessage = conversation.status === "waiting_human"
+            ? "Please wait, a support agent will be with you shortly."
+            : "A support agent is handling your request.";
+
+          safeEnqueue(encoder.encode(formatSSE("human_handling", {
+            status: conversation.status,
+            message: statusMessage,
+          })));
+
+          // Update conversation message counts (user message was sent)
+          await db
+            .update(conversations)
+            .set({
+              messageCount: conversation.messageCount + 1,
+              userMessageCount: conversation.userMessageCount + 1,
+              lastMessageAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(conversations.id, conversationId));
+
+          aiProcessingSpan.end({ skipped: true, reason: "human_handling" });
+          printStreamingTimingReport(timing);
+          if (!controllerClosed) {
+            controllerClosed = true;
+            controller.close();
+          }
+          return;
+        }
+
         // Run AI agent with streaming (using transcribed text for voice messages)
         const runner = getAgentRunner();
 
@@ -359,8 +621,64 @@ export async function POST(
           conversationId,
           message: messageContent,
         })) {
+          // Check for human_escalation event from AI
+          if (event.type === "human_escalation") {
+            escalationTriggered = true;
+            escalationData = event.data as typeof escalationData;
+
+            // Create escalation record IMMEDIATELY before sending SSE event
+            // This ensures conversation status is "waiting_human" before widget shows the waiting bubble
+            try {
+              const { escalationId } = await createEscalation({
+                conversationId,
+                reason: escalationData.reason || "Customer requested human assistance",
+                triggerType: "explicit_request",
+                priority: escalationData.urgency === "high" ? "high" : "medium",
+                metadata: {
+                  initiatingAgentId: escalationData.initiatingAgentId,
+                  initiatingAgentName: escalationData.initiatingAgentName,
+                },
+              });
+
+              // Update cache with new status
+              try {
+                const cacheData: CachedWidgetSession = {
+                  conversationId,
+                  chatbotId: conversation.chatbotId,
+                  companyId: conversation.companyId,
+                  status: "waiting_human",
+                };
+                setWidgetSessionCache(sessionId, cacheData).catch(() => {});
+              } catch {
+                // Cache update is best-effort
+              }
+
+              // Forward the event to client (now that DB is updated)
+              safeEnqueue(encoder.encode(formatSSE("human_escalation", {
+                ...event.data,
+                escalationId,
+              })));
+            } catch (escalationError) {
+              console.error("Failed to create escalation:", escalationError);
+              // Still send the event but without escalationId
+              safeEnqueue(encoder.encode(formatSSE("human_escalation", event.data)));
+            }
+
+            // Don't continue processing - escalation breaks the loop
+            break;
+          }
+
           // Stream each event to the client (continue processing even if client disconnected)
           safeEnqueue(encoder.encode(formatSSE(event.type, event.data)));
+
+          // Capture agent info from notification events
+          if (event.type === "notification") {
+            const notificationData = event.data as { targetAgentId?: string; targetAgentName?: string };
+            if (notificationData.targetAgentId) {
+              lastAgentId = notificationData.targetAgentId;
+              lastAgentName = notificationData.targetAgentName || null;
+            }
+          }
 
           // Capture content for final message
           if (event.type === "delta") {
@@ -372,9 +690,14 @@ export async function POST(
             };
             fullContent = completeData.content;
             metadata = completeData.metadata ?? {};
+            // Also capture agent info from metadata if available
+            if (metadata.agentId && !lastAgentId) {
+              lastAgentId = metadata.agentId as string;
+              lastAgentName = (metadata.agentName as string) || null;
+            }
           }
         }
-        aiProcessingSpan.end({ contentLength: fullContent.length });
+        aiProcessingSpan.end({ contentLength: fullContent.length, escalationTriggered });
 
         // Save assistant message to database (always do this even if client disconnected)
         if (fullContent) {
@@ -401,6 +724,11 @@ export async function POST(
               sourceChunkIds: sourceIds,
               toolCalls: [],
               toolResults: [],
+              agentDetails: {
+                agentId: lastAgentId || "main",
+                agentType: "ai",
+                agentName: lastAgentName || "AI Assistant",
+              },
             })
             .returning();
 
@@ -428,6 +756,9 @@ export async function POST(
             )
           );
         }
+
+        // Note: Escalation is now created immediately when human_escalation event is detected
+        // (see the for-await loop above) to avoid race conditions with the Cancel button
 
         // Print timing report at the end of streaming
         printStreamingTimingReport(timing);

@@ -11,11 +11,11 @@ import {
 import { useState } from "react";
 
 import { ScrollArea, Badge } from "@/components/ui";
-import type { AgentDetail, AgentListItemConfig } from "@/hooks/company";
+import type { ChatbotDetail, ChatbotAgentConfig } from "@/hooks/company";
 
 interface TestConfigSidebarProps {
-  agent: AgentDetail;
-  agentConfig?: AgentListItemConfig;
+  agent: ChatbotDetail;
+  agentConfig?: ChatbotAgentConfig;
 }
 
 export function TestConfigSidebar({

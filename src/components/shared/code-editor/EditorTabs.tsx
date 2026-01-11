@@ -24,21 +24,22 @@ export interface EditorTabsProps {
   readOnly?: boolean;
 }
 
-function getFileIcon(filename: string) {
+// Render file icon inline to avoid creating components during render
+function FileIconComponent({ filename, size, className }: { filename: string; size: number; className?: string }) {
   const ext = filename.split(".").pop()?.toLowerCase();
   switch (ext) {
     case "ts":
     case "tsx":
     case "js":
     case "jsx":
-      return FileCode;
+      return <FileCode size={size} className={className} />;
     case "json":
-      return FileJson;
+      return <FileJson size={size} className={className} />;
     case "css":
     case "scss":
-      return FileType;
+      return <FileType size={size} className={className} />;
     default:
-      return FileText;
+      return <FileText size={size} className={className} />;
   }
 }
 
@@ -60,16 +61,17 @@ function TabItem({
   isActive,
   onSelect,
   onClose,
-  onCloseOthers,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onCloseOthers: _onCloseOthers,
   canClose,
 }: TabItemProps) {
-  const [showContextMenu, setShowContextMenu] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showContextMenu, _setShowContextMenu] = useState(false);
   const fileName = getFileName(tab.path);
-  const FileIcon = getFileIcon(fileName);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    setShowContextMenu(true);
+    _setShowContextMenu(true);
   }, []);
 
   const handleClose = useCallback(
@@ -92,7 +94,7 @@ function TabItem({
       onClick={onSelect}
       onContextMenu={handleContextMenu}
     >
-      <FileIcon size={14} className={isActive ? "text-primary" : ""} />
+      <FileIconComponent filename={fileName} size={14} className={isActive ? "text-primary" : ""} />
       <span className="max-w-32 truncate">{fileName}</span>
       {tab.isDirty && (
         <span className="w-2 h-2 rounded-full bg-warning flex-shrink-0" />

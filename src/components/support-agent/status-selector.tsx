@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Circle, ChevronDown, Clock, Headphones, Moon, Check, type LucideIcon } from "lucide-react";
-import { Dropdown, Button, Chip } from "@/components/ui";
+import { Dropdown, Button } from "@/components/ui";
 import type { DropdownMenuItemData } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -112,7 +112,7 @@ export function StatusSelector({
   };
 
   const currentConfig = STATUS_CONFIG[status];
-  const Icon = currentConfig.icon;
+  // Icon available from currentConfig.icon if needed
 
   const dropdownItems: DropdownMenuItemData[] = Object.entries(STATUS_CONFIG).map(
     ([key, config]) => ({
@@ -292,7 +292,8 @@ export function StatusSelectorFull({
           >
             {(Object.entries(STATUS_CONFIG) as [AgentStatus, StatusConfig][]).map(([key, config]) => {
               const isSelected = key === status;
-              const Icon = config.icon;
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const _Icon = config.icon;
 
               return (
                 <motion.button

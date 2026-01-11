@@ -14,7 +14,7 @@ import {
   ScrollArea,
   Spinner,
 } from "@/components/ui";
-import { useTestAgent } from "@/hooks/company";
+import { useTestChatbot } from "@/hooks/company";
 
 interface TestChatModalProps {
   isOpen: boolean;
@@ -41,7 +41,7 @@ export function TestChatModal({
   const [input, setInput] = useState("");
   const [debugMode, setDebugMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { testAgent, isTesting } = useTestAgent(agentId);
+  const { testChatbot, isTesting } = useTestChatbot(agentId);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -77,7 +77,7 @@ export function TestChatModal({
         content: m.content,
       }));
 
-      const response = await testAgent({
+      const response = await testChatbot({
         message: userMessage.content,
         conversationHistory,
       });

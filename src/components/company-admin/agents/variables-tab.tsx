@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Lock, Variable, Save, AlertCircle } from "lucide-react";
 
 import { Button, Card, CardHeader, CardBody, Input, addToast } from "@/components/ui";
-import type { AgentDetail, AgentVariableValue } from "@/hooks/company";
+import type { ChatbotDetail, ChatbotVariableValue } from "@/hooks/company";
 
 interface VariablesTabProps {
-  agent: AgentDetail;
-  onSave: (data: Partial<AgentDetail>) => Promise<void>;
+  agent: ChatbotDetail;
+  onSave: (data: Partial<ChatbotDetail>) => Promise<void>;
   isSaving: boolean;
 }
 
@@ -20,7 +20,7 @@ export function VariablesTab({ agent, onSave, isSaving }: VariablesTabProps) {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Get variable definitions from the agent's package or from variableValues
-  const variables: AgentVariableValue[] = agent.variableValues || [];
+  const variables: ChatbotVariableValue[] = agent.variableValues || [];
   const hasVariables = variables.length > 0;
 
   const updateValue = (name: string, value: string) => {
@@ -38,7 +38,7 @@ export function VariablesTab({ agent, onSave, isSaving }: VariablesTabProps) {
     }
 
     try {
-      await onSave({ variableValues: variableValues as unknown as AgentVariableValue[] });
+      await onSave({ variableValues: variableValues as unknown as ChatbotVariableValue[] });
       setHasChanges(false);
     } catch {
       // Error handling is done in the parent component

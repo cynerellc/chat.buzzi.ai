@@ -122,7 +122,8 @@ export class PushService {
     deviceInfo?: PushSubscription["deviceInfo"];
   }): Promise<PushSubscription> {
     // Check for existing subscription with same endpoint
-    for (const [id, sub] of this.subscriptions) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for (const [_id, sub] of this.subscriptions) {
       if (sub.endpoint === params.endpoint) {
         // Update existing subscription
         sub.userId = params.userId;
@@ -472,7 +473,8 @@ export class PushService {
    */
   private async sendAPNSPush(
     subscription: PushSubscription,
-    notification: PushNotification
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _notification: PushNotification
   ): Promise<DeliveryResult> {
     // APNS requires Apple Push Notification service certificates
     // This is a placeholder implementation

@@ -1,4 +1,11 @@
+import { useEffect, useRef } from "react";
 import useSWR from "swr";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import {
+  isRealtimeConfigured,
+  getSupabaseBrowserClient,
+  getActiveCompanyIdFromCookie,
+} from "@/lib/supabase/realtime";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -107,15 +114,52 @@ export function useAgentsOverview() {
 }
 
 /**
- * Hook to fetch recent conversations
+ * Hook to fetch recent conversations - uses Supabase realtime instead of polling
  */
 export function useRecentConversations(limit: number = 5) {
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
   const { data, error, isLoading, mutate } = useSWR<{
     conversations: RecentConversation[];
   }>(`/api/company/dashboard/conversations?limit=${limit}`, fetcher, {
-    refreshInterval: 15000, // Refresh every 15 seconds
-    revalidateOnFocus: false, // H12: Prevent duplicate fetches on tab focus
+    revalidateOnFocus: false,
   });
+
+  // Set up Supabase Realtime subscription for conversations
+  useEffect(() => {
+    const companyId = getActiveCompanyIdFromCookie();
+
+    if (!companyId || !isRealtimeConfigured()) {
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`dashboard-conversations:${companyId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "chatapp",
+          table: "conversations",
+          filter: `company_id=eq.${companyId}`,
+        },
+        () => {
+          // Revalidate when conversations change
+          mutate();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [mutate]);
 
   return {
     conversations: data?.conversations ?? [],

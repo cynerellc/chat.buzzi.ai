@@ -5,7 +5,6 @@ import {
   Zap,
   Bot,
   Key,
-  Cpu,
   Gauge,
   CheckCircle,
   XCircle,
@@ -15,7 +14,7 @@ import {
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
-import { Button, Card, CardHeader, CardBody, Input, RadioGroup, Radio, Select } from "@/components/ui";
+import { Button, Card, CardHeader, CardBody, Input, Select } from "@/components/ui";
 import type { AISettings as AISettingsType } from "@/lib/settings";
 import { testAIConnection } from "@/hooks/master-admin";
 
@@ -96,8 +95,6 @@ export function AISettings({ settings, onChange }: AISettingsProps) {
       setIsTesting(false);
     }
   };
-
-  const currentProvider = providerConfig[settings.defaultProvider];
 
   return (
     <div className="space-y-6">

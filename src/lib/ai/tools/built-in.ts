@@ -45,11 +45,13 @@ export const searchKnowledgeTool: RegisteredTool = {
   },
   execute: async (
     params: Record<string, unknown>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _context: AgentContext
   ): Promise<ToolResult> => {
     // This will be implemented by the RAG service
     // For now, return a placeholder that will be replaced at runtime
     const query = params.query as string;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _maxResults = (params.maxResults as number) || 5;
 
     // The actual implementation will be injected by the agent runner
@@ -157,6 +159,7 @@ export const getCurrentTimeTool: RegisteredTool = {
   },
   execute: async (
     params: Record<string, unknown>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _context: AgentContext
   ): Promise<ToolResult> => {
     try {
@@ -226,6 +229,7 @@ export const calculateTool: RegisteredTool = {
   },
   execute: async (
     params: Record<string, unknown>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _context: AgentContext
   ): Promise<ToolResult> => {
     try {

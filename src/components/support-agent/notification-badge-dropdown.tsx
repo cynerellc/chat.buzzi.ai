@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { Bell, MessageSquare, AlertCircle, CheckCircle, X, Settings, Inbox, ArrowRight } from "lucide-react";
-import { Button, Badge, Avatar, Separator, ScrollShadow, PopoverRoot, PopoverTrigger, PopoverContent, Skeleton } from "@/components/ui";
+import { Button, Avatar, ScrollShadow, PopoverRoot, PopoverTrigger, PopoverContent, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 

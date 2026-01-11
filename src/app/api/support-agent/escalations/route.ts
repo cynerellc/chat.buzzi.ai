@@ -6,12 +6,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { escalations, conversations, endUsers, messages } from "@/lib/db/schema/conversations";
+import { escalations, conversations, endUsers } from "@/lib/db/schema/conversations";
 import { agents } from "@/lib/db/schema/chatbots";
-import { users } from "@/lib/db/schema/users";
-import { eq, and, desc, asc, sql, or, isNull } from "drizzle-orm";
+import { eq, and, desc, asc, sql, isNull } from "drizzle-orm";
 import { requireSupportAgent } from "@/lib/auth/guards";
-import { getEscalationService, getAvailableAgents } from "@/lib/escalation";
 
 /**
  * GET /api/support-agent/escalations

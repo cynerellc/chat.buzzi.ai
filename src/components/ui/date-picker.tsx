@@ -7,7 +7,7 @@ import { DayPicker, type PropsBase, type PropsSingle } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
-import { Popover, PopoverContent, PopoverRoot, PopoverTrigger } from "./popover";
+import { PopoverContent, PopoverRoot, PopoverTrigger } from "./popover";
 import { Label } from "./input";
 
 // Calendar component using react-day-picker

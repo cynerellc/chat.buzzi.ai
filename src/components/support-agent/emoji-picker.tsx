@@ -164,7 +164,8 @@ export function EmojiPicker({
         {!searchQuery && (
           <div className="flex items-center gap-1 p-2 border-b border-divider overflow-x-auto">
             {Object.entries(categories).map(([key, category]) => {
-              const Icon = category.icon;
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const _CategoryIcon = category.icon;
               const isActive = activeCategory === key;
               const hasItems = key === "recent" ? recentEmojis.length > 0 : true;
 

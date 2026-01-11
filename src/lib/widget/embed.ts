@@ -404,6 +404,10 @@ class BuzziChatWidget implements ChatWidgetAPI {
     return this.loadedConfig?.appearance?.position ?? this.config.position ?? "bottom-right";
   }
 
+  private getPlacement(): string {
+    return this.loadedConfig?.appearance?.placement ?? "above-launcher";
+  }
+
   private getZIndex(): number {
     return this.loadedConfig?.appearance?.zIndex ?? 999999;
   }
@@ -490,22 +494,68 @@ class BuzziChatWidget implements ChatWidgetAPI {
     chatWindow.setAttribute("aria-label", "Chat window");
 
     const position = this.getPosition();
+    const placement = this.getPlacement();
     const borderRadius = this.getBorderRadius();
+    const isMobile = window.innerWidth <= 768;
+    const isCenterScreen = placement === "center-screen";
 
-    chatWindow.style.cssText = `
-      position: absolute;
-      bottom: 90px;
-      ${position === "bottom-left" ? "left: 20px" : "right: 20px"};
-      width: 380px;
-      height: 600px;
-      max-height: calc(100vh - 120px);
-      border-radius: ${Math.min(borderRadius, 24)}px;
-      overflow: hidden;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-      opacity: 0;
-      transform: translateY(20px) scale(0.95);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-    `;
+    if (isCenterScreen) {
+      if (isMobile) {
+        // Mobile: full screen
+        chatWindow.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100%;
+          height: 100%;
+          border-radius: 0;
+          overflow: hidden;
+          box-shadow: none;
+          opacity: 0;
+          transform: scale(0.95);
+          transition: opacity 0.2s ease, transform 0.2s ease;
+          z-index: ${this.getZIndex() + 1};
+        `;
+      } else {
+        // Desktop: centered at 70% of screen
+        chatWindow.style.cssText = `
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) scale(0.95);
+          width: min(70vw, 800px);
+          height: min(70vh, 700px);
+          max-width: 800px;
+          max-height: 700px;
+          min-width: 380px;
+          min-height: 500px;
+          border-radius: ${Math.min(borderRadius, 24)}px;
+          overflow: hidden;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          opacity: 0;
+          transition: opacity 0.2s ease, transform 0.2s ease;
+          z-index: ${this.getZIndex() + 1};
+        `;
+      }
+    } else {
+      // Above launcher (default)
+      chatWindow.style.cssText = `
+        position: absolute;
+        bottom: 90px;
+        ${position === "bottom-left" ? "left: 20px" : "right: 20px"};
+        width: 380px;
+        height: 600px;
+        max-height: calc(100vh - 120px);
+        border-radius: ${Math.min(borderRadius, 24)}px;
+        overflow: hidden;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      `;
+    }
 
     // Create iframe
     this.iframe = document.createElement("iframe");
@@ -535,6 +585,30 @@ class BuzziChatWidget implements ChatWidgetAPI {
 
     chatWindow.appendChild(this.iframe);
     return chatWindow;
+  }
+
+  private createOverlay(): HTMLDivElement {
+    const overlay = document.createElement("div");
+    overlay.id = "buzzi-chat-overlay";
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: ${this.getZIndex()};
+      cursor: pointer;
+    `;
+
+    // Close when clicking overlay
+    overlay.addEventListener("click", () => {
+      this.close();
+    });
+
+    return overlay;
   }
 
   private handleIframeMessage(event: MessageEvent): void {
@@ -589,17 +663,50 @@ class BuzziChatWidget implements ChatWidgetAPI {
   open(): void {
     if (!this.container) return;
 
-    let chatWindow = this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null;
+    const placement = this.getPlacement();
+    const isCenterScreen = placement === "center-screen";
+    const isMobile = window.innerWidth <= 768;
+
+    // Create and show overlay for center-screen mode
+    if (isCenterScreen) {
+      let overlay = document.querySelector("#buzzi-chat-overlay") as HTMLDivElement | null;
+      if (!overlay) {
+        overlay = this.createOverlay();
+        document.body.appendChild(overlay);
+      }
+      requestAnimationFrame(() => {
+        if (overlay) {
+          overlay.style.opacity = "1";
+        }
+      });
+    }
+
+    let chatWindow = isCenterScreen
+      ? (document.querySelector("#buzzi-chat-window") as HTMLDivElement | null)
+      : (this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null);
+
     if (!chatWindow) {
       chatWindow = this.createChatWindow();
-      this.container.appendChild(chatWindow);
+      if (isCenterScreen) {
+        document.body.appendChild(chatWindow);
+      } else {
+        this.container.appendChild(chatWindow);
+      }
     }
 
     // Show window with animation
     requestAnimationFrame(() => {
       if (chatWindow) {
         chatWindow.style.opacity = "1";
-        chatWindow.style.transform = "translateY(0) scale(1)";
+        if (isCenterScreen) {
+          if (isMobile) {
+            chatWindow.style.transform = "scale(1)";
+          } else {
+            chatWindow.style.transform = "translate(-50%, -50%) scale(1)";
+          }
+        } else {
+          chatWindow.style.transform = "translateY(0) scale(1)";
+        }
       }
     });
 
@@ -619,10 +726,33 @@ class BuzziChatWidget implements ChatWidgetAPI {
   close(): void {
     if (!this.container) return;
 
-    const chatWindow = this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null;
+    const placement = this.getPlacement();
+    const isCenterScreen = placement === "center-screen";
+    const isMobile = window.innerWidth <= 768;
+
+    // Hide overlay for center-screen mode
+    if (isCenterScreen) {
+      const overlay = document.querySelector("#buzzi-chat-overlay") as HTMLDivElement | null;
+      if (overlay) {
+        overlay.style.opacity = "0";
+      }
+    }
+
+    const chatWindow = isCenterScreen
+      ? (document.querySelector("#buzzi-chat-window") as HTMLDivElement | null)
+      : (this.container.querySelector("#buzzi-chat-window") as HTMLDivElement | null);
+
     if (chatWindow) {
       chatWindow.style.opacity = "0";
-      chatWindow.style.transform = "translateY(20px) scale(0.95)";
+      if (isCenterScreen) {
+        if (isMobile) {
+          chatWindow.style.transform = "scale(0.95)";
+        } else {
+          chatWindow.style.transform = "translate(-50%, -50%) scale(0.95)";
+        }
+      } else {
+        chatWindow.style.transform = "translateY(20px) scale(0.95)";
+      }
     }
 
     // Update launcher with correct icon
@@ -652,6 +782,18 @@ class BuzziChatWidget implements ChatWidgetAPI {
   }
 
   destroy(): void {
+    // Remove overlay if exists
+    const overlay = document.querySelector("#buzzi-chat-overlay");
+    if (overlay) {
+      document.body.removeChild(overlay);
+    }
+
+    // Remove center-screen chat window if exists (not in container)
+    const centerChatWindow = document.querySelector("#buzzi-chat-window");
+    if (centerChatWindow && centerChatWindow.parentElement === document.body) {
+      document.body.removeChild(centerChatWindow);
+    }
+
     if (this.container) {
       document.body.removeChild(this.container);
       this.container = null;

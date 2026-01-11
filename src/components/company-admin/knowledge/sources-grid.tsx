@@ -24,7 +24,6 @@ import {
   Button,
   Card,
   CardBody,
-  Badge,
   Dropdown,
   type DropdownMenuItemData,
   Skeleton,

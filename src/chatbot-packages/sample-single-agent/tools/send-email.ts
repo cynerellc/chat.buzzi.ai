@@ -18,7 +18,8 @@ import type { AgentContext } from "@/lib/ai/types";
  */
 export const createSendEmailTool = (context: AgentContext) => {
   const toolBase = tool(
-    async ({ to, subject, body }) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async ({ to, subject, body: _body }) => {
       // Access package variables for email configuration
       const host = context.variables.get("EMAIL_HOST");
       const port = context.variables.get("EMAIL_PORT");

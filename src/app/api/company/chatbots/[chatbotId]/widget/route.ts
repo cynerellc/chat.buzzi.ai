@@ -16,6 +16,7 @@ export interface WidgetConfigResponse {
   // Appearance
   theme: string;
   position: string;
+  placement: string;
   primaryColor: string;
   accentColor: string;
   userBubbleColor: string | null;
@@ -149,6 +150,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // Appearance
       theme: config.theme,
       position: config.position,
+      placement: config.placement,
       primaryColor: config.primaryColor,
       accentColor: config.accentColor,
       userBubbleColor: config.userBubbleColor,
@@ -217,6 +219,7 @@ interface UpdateWidgetConfigRequest {
   // Appearance
   theme?: string;
   position?: string;
+  placement?: string;
   primaryColor?: string;
   accentColor?: string;
   userBubbleColor?: string | null;
@@ -329,6 +332,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Appearance
     if (body.theme !== undefined) updateData.theme = body.theme;
     if (body.position !== undefined) updateData.position = body.position;
+    if (body.placement !== undefined) updateData.placement = body.placement;
     if (body.primaryColor !== undefined) updateData.primaryColor = body.primaryColor;
     if (body.accentColor !== undefined) updateData.accentColor = body.accentColor;
     if (body.userBubbleColor !== undefined) updateData.userBubbleColor = body.userBubbleColor;
@@ -408,6 +412,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       chatbotId: updatedConfig.chatbotId,
       theme: updatedConfig.theme,
       position: updatedConfig.position,
+      placement: updatedConfig.placement,
       primaryColor: updatedConfig.primaryColor,
       accentColor: updatedConfig.accentColor,
       userBubbleColor: updatedConfig.userBubbleColor,

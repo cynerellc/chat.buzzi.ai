@@ -259,7 +259,9 @@ export class SlackAdapter extends BaseChannelAdapter {
    * should use handleSlackChallenge instead
    */
   handleVerification(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _searchParams: URLSearchParams,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _verifyToken: string
   ): Response | null {
     // Slack doesn't use URL-based verification

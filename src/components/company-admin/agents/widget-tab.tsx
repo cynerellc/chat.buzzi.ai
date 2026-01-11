@@ -15,11 +15,11 @@ import {
   type Column,
 } from "@/components/ui";
 
-import type { AgentDetail } from "@/hooks/company/useAgents";
+import type { ChatbotDetail } from "@/hooks/company/useChatbots";
 
 interface WidgetTabProps {
-  agent: AgentDetail;
-  onSave: (data: Partial<AgentDetail>) => Promise<void>;
+  agent: ChatbotDetail;
+  onSave: (data: Partial<ChatbotDetail>) => Promise<void>;
   isSaving: boolean;
 }
 

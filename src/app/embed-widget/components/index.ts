@@ -29,6 +29,13 @@ export type { TransferBubbleProps } from "./TransferBubble";
 export { ThinkingBubble } from "./ThinkingBubble";
 export type { ThinkingBubbleProps, ToolCallState } from "./ThinkingBubble";
 
+// Human escalation bubble components
+export { HumanWaitingBubble } from "./HumanWaitingBubble";
+export type { HumanWaitingBubbleProps } from "./HumanWaitingBubble";
+
+export { HumanJoinedBubble, HumanExitedBubble } from "./HumanJoinedBubble";
+export type { HumanJoinedBubbleProps, HumanExitedBubbleProps, HumanAgentInfo } from "./HumanJoinedBubble";
+
 export { UserBubble } from "./UserBubble";
 export type { UserBubbleProps } from "./UserBubble";
 

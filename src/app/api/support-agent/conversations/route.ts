@@ -290,7 +290,7 @@ async function getAgentStats(companyId: string, userId: string) {
         eq(conversations.companyId, companyId),
         eq(conversations.resolvedBy, userId),
         eq(conversations.status, "resolved"),
-        sql`${conversations.resolvedAt} >= ${today}`
+        sql`${conversations.resolvedAt} >= ${today.toISOString()}`
       )
     );
 

@@ -332,6 +332,7 @@ describe("Database Schema", () => {
         isRead: false,
         readAt: null,
         metadata: {},
+        agentDetails: null,
         createdAt: new Date(),
       };
       expect(message).toBeDefined();

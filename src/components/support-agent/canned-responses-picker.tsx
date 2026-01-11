@@ -2,8 +2,8 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Search, MessageSquare, Hash, User, Building2, X, Sparkles, TrendingUp } from "lucide-react";
-import { Input, Badge, Spinner, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, Skeleton } from "@/components/ui";
+import { Search, MessageSquare, Hash, User, Building2, X, TrendingUp } from "lucide-react";
+import { Input, Badge, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 interface CannedResponse {
@@ -28,7 +28,8 @@ export function CannedResponsesPicker({
   isOpen,
   onClose,
   onSelect,
-  conversationId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  conversationId: _conversationId,
 }: CannedResponsesPickerProps) {
   const [responses, setResponses] = useState<CannedResponse[]>([]);
   const [loading, setLoading] = useState(true);

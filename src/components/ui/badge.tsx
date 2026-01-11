@@ -136,7 +136,8 @@ function mapColorToVariant(color?: ChipProps["color"]): BadgeVariant {
 
 export function Chip({
   color = "default",
-  chipVariant = "flat",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  chipVariant: _chipVariant = "flat",
   className,
   children,
   onClose,

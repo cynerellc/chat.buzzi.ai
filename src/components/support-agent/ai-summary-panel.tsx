@@ -16,10 +16,9 @@ import {
   Lightbulb,
   Target,
   ArrowRight,
-  Copy,
   Check,
 } from "lucide-react";
-import { Button, Card, CardHeader, CardBody, Badge, Spinner, Chip, Skeleton } from "@/components/ui";
+import { Button, Card, CardBody, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -108,7 +107,7 @@ export function AISummaryPanel({
       };
 
       setSummary(mockSummary);
-    } catch (err) {
+    } catch {
       setError("Failed to generate summary");
     } finally {
       setLoading(false);

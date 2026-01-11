@@ -18,6 +18,8 @@ import {
   ExternalLink,
   Upload,
   X,
+  UserCheck,
+  Plus,
 } from "lucide-react";
 import { ChatWindow } from "@/app/embed-widget/components/ChatWindow";
 import { Switch, Slider, Textarea, addToast, Modal, ModalContent, ModalHeader, ModalBody } from "@/components/ui";
@@ -47,6 +49,11 @@ const POSITION_OPTIONS = [
   { value: "bottom-left", label: "Bottom Left" },
 ];
 
+const PLACEMENT_OPTIONS = [
+  { value: "above-launcher", label: "Above launcher icon" },
+  { value: "center-screen", label: "Center screen" },
+];
+
 const LAUNCHER_ICONS = [
   { value: "chat", label: "Chat Bubble", Icon: MessageCircle },
   { value: "message", label: "Message", Icon: MessageSquare },
@@ -59,6 +66,7 @@ interface WidgetConfig {
   chatbotId: string;
   theme: string;
   position: string;
+  placement: string;
   primaryColor: string;
   accentColor: string;
   userBubbleColor: string | null;
@@ -110,16 +118,75 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
+// Chatbot type for escalation settings
+interface ChatbotData {
+  escalationEnabled?: boolean;
+  behavior?: {
+    maxTurnsBeforeEscalation?: number;
+    autoEscalateOnSentiment?: boolean;
+    sentimentThreshold?: number;
+    escalationRoutingRule?: "round_robin" | "least_busy" | "preferred";
+    escalationPreferredAgentId?: string;
+    escalationRules?: string[];
+  } | null;
+}
+
+// Support agent type for dropdown
+interface SupportAgent {
+  id: string;
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+  role: string;
+}
+
+// Routing rule options
+const ROUTING_RULE_OPTIONS = [
+  { value: "least_busy", label: "Least Busy (Recommended)" },
+  { value: "round_robin", label: "Round Robin" },
+  { value: "preferred", label: "Preferred Agent" },
+];
+
+// Escalation rule suggestions
+const ESCALATION_RULE_SUGGESTIONS = [
+  "When user expresses frustration or anger",
+  "When user explicitly requests a human agent",
+  "When user asks the same question 3 or more times",
+  "When conversation contains keywords: refund, cancel, lawsuit",
+  "When user mentions a complaint or legal action",
+  "When the AI agent cannot answer the question",
+  "When user has been waiting for more than 5 minutes",
+];
+
 interface WidgetSettingsProps {
   chatbotId: string;
   chatbotName?: string;
   companyId: string;
   apiUrl: string;
+  chatbotApiUrl?: string;
   isMultiAgent?: boolean;
+  chatbot?: ChatbotData | null;
+  onChatbotRefresh?: () => void;
 }
 
-export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMultiAgent = false }: WidgetSettingsProps) {
+export function WidgetSettings({
+  chatbotId,
+  chatbotName,
+  companyId,
+  apiUrl,
+  chatbotApiUrl,
+  isMultiAgent = false,
+  chatbot,
+  onChatbotRefresh,
+}: WidgetSettingsProps) {
   const { data, isLoading, mutate } = useSWR<{ config: WidgetConfig }>(apiUrl, fetcher);
+
+  // Fetch support agents for preferred agent dropdown
+  const { data: supportAgentsData } = useSWR<{ agents: SupportAgent[] }>(
+    "/api/company/support-agents",
+    fetcher
+  );
+  const supportAgents = supportAgentsData?.agents ?? [];
 
   const config = data?.config;
   const [copiedEmbed, setCopiedEmbed] = useState(false);
@@ -132,9 +199,25 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  // Escalation settings state
+  const [escalationFormData, setEscalationFormData] = useState({
+    escalationEnabled: false,
+    escalationRoutingRule: "least_busy" as "round_robin" | "least_busy" | "preferred",
+    escalationPreferredAgentId: "",
+    escalationRules: [] as string[],
+    maxTurnsBeforeEscalation: 5,
+    autoEscalateOnSentiment: false,
+    sentimentThreshold: 30,
+  });
+
+  // New escalation rule input state
+  const [newEscalationRule, setNewEscalationRule] = useState("");
+  const [showRuleSuggestions, setShowRuleSuggestions] = useState(false);
+
   const [formData, setFormData] = useState({
     theme: "light",
     position: "bottom-right",
+    placement: "above-launcher",
     primaryColor: "#6437F3",
     accentColor: "#2b3dd8",
     userBubbleColor: "",
@@ -184,6 +267,7 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
       setFormData({
         theme: config.theme,
         position: config.position,
+        placement: config.placement || "above-launcher",
         primaryColor: config.primaryColor,
         accentColor: config.accentColor,
         userBubbleColor: config.userBubbleColor || "",
@@ -230,15 +314,68 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
     }
   }, [config]);
 
+  // Sync escalation settings from chatbot prop
+  useEffect(() => {
+    if (chatbot) {
+      const behavior = chatbot.behavior;
+      setEscalationFormData({
+        escalationEnabled: chatbot.escalationEnabled ?? false,
+        escalationRoutingRule: behavior?.escalationRoutingRule ?? "least_busy",
+        escalationPreferredAgentId: behavior?.escalationPreferredAgentId ?? "",
+        escalationRules: behavior?.escalationRules ?? [],
+        maxTurnsBeforeEscalation: behavior?.maxTurnsBeforeEscalation ?? 5,
+        autoEscalateOnSentiment: behavior?.autoEscalateOnSentiment ?? false,
+        sentimentThreshold: behavior?.sentimentThreshold ?? 30,
+      });
+    }
+  }, [chatbot]);
+
   const updateField = <K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
 
+  const updateEscalationField = <K extends keyof typeof escalationFormData>(
+    key: K,
+    value: (typeof escalationFormData)[K]
+  ) => {
+    setEscalationFormData((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  // Add escalation rule
+  const addEscalationRule = (rule: string) => {
+    const trimmedRule = rule.trim();
+    if (trimmedRule && !escalationFormData.escalationRules.includes(trimmedRule)) {
+      updateEscalationField("escalationRules", [...escalationFormData.escalationRules, trimmedRule]);
+    }
+    setNewEscalationRule("");
+    setShowRuleSuggestions(false);
+  };
+
+  // Remove escalation rule
+  const removeEscalationRule = (ruleToRemove: string) => {
+    updateEscalationField(
+      "escalationRules",
+      escalationFormData.escalationRules.filter((rule) => rule !== ruleToRemove)
+    );
+  };
+
+  // Get filtered suggestions based on input
+  const filteredSuggestions = useMemo(() => {
+    const input = newEscalationRule.toLowerCase();
+    return ESCALATION_RULE_SUGGESTIONS.filter(
+      (suggestion) =>
+        suggestion.toLowerCase().includes(input) &&
+        !escalationFormData.escalationRules.includes(suggestion)
+    );
+  }, [newEscalationRule, escalationFormData.escalationRules]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(apiUrl, {
+      // Save widget config
+      const widgetResponse = await fetch(apiUrl, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -252,13 +389,41 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to save");
+      if (!widgetResponse.ok) throw new Error("Failed to save widget settings");
 
-      addToast({ title: "Widget settings saved", color: "success" });
+      // Save escalation settings if chatbotApiUrl is provided
+      if (chatbotApiUrl) {
+        const escalationResponse = await fetch(chatbotApiUrl, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            escalationEnabled: escalationFormData.escalationEnabled,
+            behavior: {
+              ...chatbot?.behavior,
+              maxTurnsBeforeEscalation: escalationFormData.maxTurnsBeforeEscalation,
+              autoEscalateOnSentiment: escalationFormData.autoEscalateOnSentiment,
+              sentimentThreshold: escalationFormData.sentimentThreshold,
+              escalationRoutingRule: escalationFormData.escalationRoutingRule,
+              escalationPreferredAgentId: escalationFormData.escalationPreferredAgentId || null,
+              escalationRules: escalationFormData.escalationRules,
+            },
+          }),
+        });
+
+        if (!escalationResponse.ok) throw new Error("Failed to save escalation settings");
+
+        // Refresh chatbot data
+        onChatbotRefresh?.();
+      }
+
+      addToast({ title: "Settings saved successfully", color: "success" });
       setHasChanges(false);
       mutate();
-    } catch {
-      addToast({ title: "Failed to save widget settings", color: "danger" });
+    } catch (error) {
+      addToast({
+        title: error instanceof Error ? error.message : "Failed to save settings",
+        color: "danger",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -302,6 +467,7 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
     agentBubbleColor: formData.agentBubbleColor || undefined,
     borderRadius: parseInt(formData.borderRadius, 10),
     position: formData.position as "bottom-right" | "bottom-left",
+    placement: formData.placement as "above-launcher" | "center-screen",
     title: formData.title,
     subtitle: formData.subtitle || undefined,
     welcomeMessage: formData.welcomeMessage,
@@ -478,6 +644,17 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
             onSelectionChange={(keys) => {
               const selected = Array.from(keys)[0];
               updateField("position", selected as string);
+            }}
+          />
+
+          <Select
+            label="Placement"
+            description="How the chat window appears on screen"
+            options={PLACEMENT_OPTIONS}
+            selectedKeys={new Set([formData.placement])}
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0];
+              updateField("placement", selected as string);
             }}
           />
 
@@ -978,6 +1155,216 @@ export function WidgetSettings({ chatbotId, chatbotName, companyId, apiUrl, isMu
               </div>
             </div>
           </div>
+        </div>
+      ),
+    },
+    {
+      key: "human-escalation",
+      label: "Human Escalation",
+      icon: UserCheck,
+      content: (
+        <div className="space-y-6 p-6">
+          {/* Enable Human Escalation */}
+          <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+            <div>
+              <span className="font-medium">Enable Human Escalation</span>
+              <p className="text-sm text-muted-foreground">
+                Allow conversations to be escalated to human agents
+              </p>
+            </div>
+            <Switch
+              isSelected={escalationFormData.escalationEnabled}
+              onValueChange={(v) => updateEscalationField("escalationEnabled", v)}
+            />
+          </div>
+
+          {escalationFormData.escalationEnabled && (
+            <>
+              {/* Routing Rules Section */}
+              <div className="border-t border-divider pt-6">
+                <h3 className="font-semibold mb-4">Routing Rules</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  How should escalations be routed to human agents?
+                </p>
+
+                <Select
+                  label="Routing Rule"
+                  options={ROUTING_RULE_OPTIONS}
+                  selectedKeys={new Set([escalationFormData.escalationRoutingRule])}
+                  onSelectionChange={(keys) => {
+                    const selected = Array.from(keys)[0] as "round_robin" | "least_busy" | "preferred";
+                    updateEscalationField("escalationRoutingRule", selected);
+                  }}
+                />
+
+                {escalationFormData.escalationRoutingRule === "preferred" && (
+                  <div className="mt-4">
+                    <Select
+                      label="Preferred Agent"
+                      description="Select the support agent to always route escalations to"
+                      options={supportAgents.map((agent) => ({
+                        value: agent.id,
+                        label: `${agent.name || agent.email} (${agent.role.replace("chatapp.", "")})`,
+                      }))}
+                      selectedKeys={
+                        escalationFormData.escalationPreferredAgentId
+                          ? new Set([escalationFormData.escalationPreferredAgentId])
+                          : new Set()
+                      }
+                      onSelectionChange={(keys) => {
+                        const selected = Array.from(keys)[0] as string;
+                        updateEscalationField("escalationPreferredAgentId", selected || "");
+                      }}
+                      placeholder="Select agent..."
+                    />
+                    {supportAgents.length === 0 && (
+                      <p className="text-sm text-warning-600 mt-2">
+                        No support agents found. Add team members with support agent or company admin roles.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Automatic Escalation Triggers */}
+              <div className="border-t border-divider pt-6">
+                <h3 className="font-semibold mb-4">Automatic Escalation Triggers</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configure when conversations should automatically escalate to human agents.
+                </p>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-sm font-medium">
+                      Escalate after {escalationFormData.maxTurnsBeforeEscalation} conversation turns
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Automatically escalate if the conversation exceeds this many exchanges
+                    </p>
+                    <Slider
+                      aria-label="Max turns before escalation"
+                      value={[escalationFormData.maxTurnsBeforeEscalation]}
+                      onValueChange={(v) => updateEscalationField("maxTurnsBeforeEscalation", v[0] ?? 5)}
+                      min={3}
+                      max={20}
+                      step={1}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                    <div>
+                      <span className="font-medium">Auto-escalate on negative sentiment</span>
+                      <p className="text-sm text-muted-foreground">
+                        Escalate when user expresses frustration or negative emotions
+                      </p>
+                    </div>
+                    <Switch
+                      isSelected={escalationFormData.autoEscalateOnSentiment}
+                      onValueChange={(v) => updateEscalationField("autoEscalateOnSentiment", v)}
+                    />
+                  </div>
+
+                  {escalationFormData.autoEscalateOnSentiment && (
+                    <div>
+                      <label className="text-sm font-medium">
+                        Sentiment threshold: {escalationFormData.sentimentThreshold}%
+                      </label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Escalate when negative sentiment score exceeds this threshold
+                      </p>
+                      <Slider
+                        aria-label="Sentiment threshold"
+                        value={[escalationFormData.sentimentThreshold]}
+                        onValueChange={(v) => updateEscalationField("sentimentThreshold", v[0] ?? 30)}
+                        min={10}
+                        max={80}
+                        step={5}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Custom Escalation Rules */}
+              <div className="border-t border-divider pt-6">
+                <h3 className="font-semibold mb-4">Custom Escalation Rules</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Define custom rules for when to escalate. The AI will interpret these rules during conversations.
+                </p>
+
+                {/* Current Rules */}
+                {escalationFormData.escalationRules.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    {escalationFormData.escalationRules.map((rule, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2"
+                      >
+                        <span className="text-sm">{rule}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeEscalationRule(rule)}
+                          className="text-muted-foreground hover:text-danger transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add New Rule */}
+                <div className="relative">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Type a rule or select from suggestions..."
+                      value={newEscalationRule}
+                      onValueChange={(v) => {
+                        setNewEscalationRule(v);
+                        setShowRuleSuggestions(true);
+                      }}
+                      onFocus={() => setShowRuleSuggestions(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newEscalationRule.trim()) {
+                          e.preventDefault();
+                          addEscalationRule(newEscalationRule);
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      onPress={() => addEscalationRule(newEscalationRule)}
+                      disabled={!newEscalationRule.trim()}
+                      startContent={<Plus size={16} />}
+                    >
+                      Add
+                    </Button>
+                  </div>
+
+                  {/* Suggestions Dropdown */}
+                  {showRuleSuggestions && filteredSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-divider rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                      {filteredSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => addEscalationRule(suggestion)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-muted-foreground mt-2">
+                  Press Enter or click Add to create a custom rule. Click suggestions to add them.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       ),
     },

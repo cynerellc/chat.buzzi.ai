@@ -1,7 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import useSWR from "swr";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import {
+  isRealtimeConfigured,
+  getSupabaseBrowserClient,
+  getActiveCompanyIdFromCookie,
+} from "@/lib/supabase/realtime";
 import {
   MessageSquare,
   Search,
@@ -65,7 +71,7 @@ interface Pagination {
   totalPages: number;
 }
 
-interface AgentItem {
+interface ChatbotItem {
   id: string;
   name: string;
 }
@@ -132,7 +138,8 @@ interface ConversationsPageProps {
   title?: string;
   subtitle?: string;
   baseApiUrl: string;
-  agentsApiUrl: string;
+  chatbotsApiUrl: string;
+  companyId?: string;
   onConversationClick: (conversationId: string) => void;
 }
 
@@ -140,7 +147,8 @@ export function ConversationsPage({
   title = "Conversations",
   subtitle = "View and manage customer conversations across all channels",
   baseApiUrl,
-  agentsApiUrl,
+  chatbotsApiUrl,
+  companyId,
   onConversationClick,
 }: ConversationsPageProps) {
   const [filters, setFilters] = useState<ConversationFilters>({
@@ -148,6 +156,7 @@ export function ConversationsPage({
     limit: 20,
   });
   const [searchValue, setSearchValue] = useState("");
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Build conversations URL with filters
   const conversationsUrl = useMemo(() => {
@@ -162,25 +171,62 @@ export function ConversationsPage({
     return queryString ? `${baseApiUrl}?${queryString}` : baseApiUrl;
   }, [baseApiUrl, filters]);
 
-  // Data fetching
-  const { data: conversationsData, isLoading } = useSWR<{
+  // Data fetching - no polling, using Supabase realtime instead
+  const { data: conversationsData, isLoading, mutate } = useSWR<{
     conversations: Conversation[];
     pagination: Pagination;
     statusCounts: Record<string, number>;
-  }>(conversationsUrl, fetcher, { refreshInterval: 30000 });
+  }>(conversationsUrl, fetcher);
 
-  const { data: agentsData } = useSWR<{
-    agents: AgentItem[];
-  }>(agentsApiUrl, fetcher);
+  // Set up Supabase Realtime subscription for conversations list
+  useEffect(() => {
+    // Use provided companyId or get from cookie for company-admin context
+    const activeCompanyId = companyId || getActiveCompanyIdFromCookie();
+
+    if (!activeCompanyId || !isRealtimeConfigured()) {
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`conversations-page:${activeCompanyId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "chatapp",
+          table: "conversations",
+          filter: `company_id=eq.${activeCompanyId}`,
+        },
+        () => {
+          // Revalidate when any conversation changes
+          mutate();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [companyId, mutate]);
+
+  const { data: chatbotsData } = useSWR<{
+    chatbots: ChatbotItem[];
+  }>(chatbotsApiUrl, fetcher);
 
   const conversations = conversationsData?.conversations ?? [];
   const pagination = conversationsData?.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 };
   const statusCounts = conversationsData?.statusCounts ?? {};
-  const agents = agentsData?.agents ?? [];
+  const chatbots = chatbotsData?.chatbots ?? [];
 
-  const agentOptions = [
-    { value: "all", label: "All Agents" },
-    ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
+  const chatbotOptions = [
+    { value: "all", label: "All Chatbots" },
+    ...chatbots.map((chatbot) => ({ value: chatbot.id, label: chatbot.name })),
   ];
 
   const handleFilterChange = (key: keyof ConversationFilters, value: string) => {
@@ -258,14 +304,14 @@ export function ConversationsPage({
             </div>
 
             <Select
-              options={agentOptions}
+              options={chatbotOptions}
               selectedKeys={new Set([filters.agentId || "all"])}
               onSelectionChange={(keys) => {
                 const selected = Array.from(keys)[0];
                 handleFilterChange("agentId", selected === "all" ? "" : (selected as string));
               }}
               className="w-[180px]"
-              placeholder="All Agents"
+              placeholder="All Chatbots"
             />
 
             <Select

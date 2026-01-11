@@ -276,7 +276,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
 }
 
 // DELETE endpoint to reset conversation
-export async function DELETE(request: NextRequest, context: RouteContext) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function DELETE(request: NextRequest, _context: RouteContext) {
   try {
     await requireCompanyAdmin();
 

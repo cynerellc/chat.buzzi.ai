@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
  * DELETE /api/master-admin/impersonation
  * End current impersonation session
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function DELETE(_request: NextRequest) {
   try {
     const impersonationSession = await getImpersonationSession();

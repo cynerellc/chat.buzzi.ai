@@ -3,7 +3,7 @@ import { and, eq, isNull, inArray } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { knowledgeSources, faqItems } from "@/lib/db/schema";
+import { knowledgeSources } from "@/lib/db/schema";
 import {
   getProcessingPipeline,
   processKnowledgeUrl,

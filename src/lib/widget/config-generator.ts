@@ -179,6 +179,7 @@ function buildWidgetConfigJson(
     appearance: {
       theme: (wc?.theme as "light" | "dark" | "auto") ?? WIDGET_CONFIG_DEFAULTS.appearance.theme,
       position: (wc?.position as "bottom-right" | "bottom-left") ?? WIDGET_CONFIG_DEFAULTS.appearance.position,
+      placement: (wc?.placement as "above-launcher" | "center-screen") ?? WIDGET_CONFIG_DEFAULTS.appearance.placement,
       primaryColor: wc?.primaryColor ?? WIDGET_CONFIG_DEFAULTS.appearance.primaryColor,
       accentColor: wc?.accentColor ?? WIDGET_CONFIG_DEFAULTS.appearance.accentColor,
       userBubbleColor: wc?.userBubbleColor ?? WIDGET_CONFIG_DEFAULTS.appearance.userBubbleColor,

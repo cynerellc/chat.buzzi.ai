@@ -2,6 +2,20 @@ import { createClient } from "@supabase/supabase-js";
 
 let supabaseClient: ReturnType<typeof createClient> | null = null;
 
+// ============================================================================
+// Realtime Broadcast Types
+// ============================================================================
+
+export interface BroadcastMessage {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant" | "human_agent" | "system";
+  content: string;
+  createdAt: string;
+  userId?: string;
+  userName?: string;
+}
+
 /**
  * Get Supabase client for server-side operations (uses service role key)
  */
@@ -197,4 +211,91 @@ export async function getConversationFileUrl(
   }
 
   return data.signedUrl;
+}
+
+// ============================================================================
+// Realtime Broadcast Functions (Server-side only)
+// ============================================================================
+
+/**
+ * Broadcast a new message to a conversation channel
+ * This is called from the server when a message is created
+ * Only users subscribed to this specific conversation will receive it
+ *
+ * @param conversationId - The conversation ID (channel identifier)
+ * @param message - The message to broadcast
+ */
+export async function broadcastMessage(
+  conversationId: string,
+  message: BroadcastMessage
+): Promise<void> {
+  try {
+    const supabase = getSupabaseClient();
+
+    const channel = supabase.channel(`conversation:${conversationId}`);
+
+    // Subscribe first to establish WebSocket connection, then send
+    await new Promise<void>((resolve) => {
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          resolve();
+        }
+      });
+    });
+
+    await channel.send({
+      type: "broadcast",
+      event: "new_message",
+      payload: message,
+    });
+
+    // Clean up channel after sending
+    await supabase.removeChannel(channel);
+  } catch (error) {
+    console.error("[Broadcast] Failed to broadcast message:", error);
+  }
+}
+
+/**
+ * Broadcast a conversation status change
+ * Used to notify admins when conversation status changes (e.g., new escalation)
+ *
+ * @param companyId - The company ID
+ * @param conversationId - The conversation ID
+ * @param status - The new status
+ */
+export async function broadcastConversationUpdate(
+  companyId: string,
+  conversationId: string,
+  status: string,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  try {
+    const supabase = getSupabaseClient();
+
+    const channel = supabase.channel(`company:${companyId}`);
+
+    // Subscribe first to establish WebSocket connection, then send
+    await new Promise<void>((resolve) => {
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          resolve();
+        }
+      });
+    });
+
+    await channel.send({
+      type: "broadcast",
+      event: "conversation_update",
+      payload: {
+        conversationId,
+        status,
+        ...metadata,
+      },
+    });
+
+    await supabase.removeChannel(channel);
+  } catch (error) {
+    console.error("[Broadcast] Failed to broadcast conversation update:", error);
+  }
 }

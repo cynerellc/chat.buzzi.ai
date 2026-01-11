@@ -8,9 +8,11 @@ import type { ConversationDetail } from "@/app/api/company/conversations/[conver
 import type { MessageItem } from "@/app/api/company/conversations/[conversationId]/messages/route";
 import {
   isRealtimeConfigured,
+  getSupabaseBrowserClient,
+  getActiveCompanyIdFromCookie,
   subscribeToConversationMessages,
   unsubscribe,
-  type MessagePayload,
+  type BroadcastMessage,
 } from "@/lib/supabase/realtime";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -72,14 +74,51 @@ function buildConversationsUrl(filters: ConversationFilters): string {
 }
 
 // Conversations List Hook
-export function useConversations(filters: ConversationFilters = {}) {
+export function useConversations(filters: ConversationFilters = {}, companyId?: string) {
   const url = buildConversationsUrl(filters);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const { data, error, isLoading, mutate } = useSWR<ConversationsResponse>(
     url,
-    fetcher,
-    { refreshInterval: 30000 } // Refresh every 30 seconds
+    fetcher
   );
+
+  // Set up Supabase Realtime subscription for conversations list
+  useEffect(() => {
+    // Use provided companyId or get from cookie for company-admin context
+    const activeCompanyId = companyId || getActiveCompanyIdFromCookie();
+
+    if (!activeCompanyId || !isRealtimeConfigured()) {
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`company-conversations:${activeCompanyId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "chatapp",
+          table: "conversations",
+          filter: `company_id=eq.${activeCompanyId}`,
+        },
+        () => {
+          // Revalidate the conversations list when any conversation changes
+          mutate();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [companyId, mutate]);
 
   return {
     conversations: data?.conversations ?? [],
@@ -93,11 +132,46 @@ export function useConversations(filters: ConversationFilters = {}) {
 
 // Single Conversation Detail Hook
 export function useConversation(conversationId: string | null) {
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
   const { data, error, isLoading, mutate } = useSWR<{ conversation: ConversationDetail }>(
     conversationId ? `/api/company/conversations/${conversationId}` : null,
-    fetcher,
-    { refreshInterval: 10000 } // Refresh every 10 seconds for active conversations
+    fetcher
   );
+
+  // Set up Supabase Realtime subscription for single conversation updates
+  useEffect(() => {
+    if (!conversationId || !isRealtimeConfigured()) {
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`conversation:${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "chatapp",
+          table: "conversations",
+          filter: `id=eq.${conversationId}`,
+        },
+        () => {
+          // Revalidate when conversation is updated (status change, etc.)
+          mutate();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [conversationId, mutate]);
 
   return {
     conversation: data?.conversation ?? null,
@@ -119,28 +193,20 @@ interface MessagesResponse {
 
 /**
  * Hook to fetch and subscribe to conversation messages
- * Uses Supabase Realtime when available, falls back to polling otherwise
+ * Uses Supabase Realtime broadcast for secure real-time updates
  *
  * @param conversationId - The conversation to fetch messages for
  * @param page - Page number for pagination
- * @param sessionId - Optional session ID for widget users (used for Realtime filtering)
  */
 export function useConversationMessages(
   conversationId: string | null,
-  page: number = 1,
-  sessionId?: string
+  page: number = 1
 ) {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const { data, error, isLoading, mutate } = useSWR<MessagesResponse>(
     conversationId ? `/api/company/conversations/${conversationId}/messages?page=${page}` : null,
-    fetcher,
-    {
-      // Use long polling interval when realtime is configured (as fallback only)
-      // Otherwise use 5 second polling
-      refreshInterval: isRealtimeConfigured() ? 60000 : 5000,
-      revalidateOnFocus: !isRealtimeConfigured(),
-    }
+    fetcher
   );
 
   // Set up Supabase Realtime subscription when available
@@ -149,44 +215,46 @@ export function useConversationMessages(
       return;
     }
 
-    // Subscribe to real-time message updates
+    // Subscribe to real-time message updates via broadcast
     const channel = subscribeToConversationMessages(
       conversationId,
-      sessionId ?? conversationId, // Use conversationId as fallback for session
-      (payload: MessagePayload) => {
-        if (payload.eventType === "INSERT") {
-          // Optimistically add new message
-          mutate(
-            (current) => {
-              if (!current) return current;
-              const newMessage: MessageItem = {
-                id: payload.new.id,
-                role: payload.new.role,
-                type: payload.new.type,
-                content: payload.new.content,
-                createdAt: payload.new.created_at,
-                tokenCount: payload.new.token_count ?? null,
-                attachments: [],
-                modelId: null,
-                processingTimeMs: null,
-                toolCalls: [],
-                toolResults: [],
-                sourceChunkIds: [],
-                isRead: false,
-                readAt: null,
-                user: null,
-              };
-              return {
-                ...current,
-                messages: [...current.messages, newMessage],
-              };
-            },
-            { revalidate: false }
-          );
-        } else if (payload.eventType === "UPDATE" || payload.eventType === "DELETE") {
-          // Revalidate on updates/deletes to get fresh data
-          mutate();
-        }
+      (message: BroadcastMessage) => {
+        // Add new message (only if it doesn't already exist)
+        mutate(
+          (current) => {
+            if (!current) return current;
+            // Check if message already exists to prevent duplicates
+            const messageExists = current.messages.some(
+              (msg) => msg.id === message.id
+            );
+            if (messageExists) return current;
+
+            const newMessage: MessageItem = {
+              id: message.id,
+              role: message.role,
+              type: "text",
+              content: message.content,
+              createdAt: message.createdAt,
+              tokenCount: null,
+              attachments: [],
+              modelId: null,
+              processingTimeMs: null,
+              toolCalls: [],
+              toolResults: [],
+              sourceChunkIds: [],
+              isRead: false,
+              readAt: null,
+              user: message.userName
+                ? { id: message.userId ?? "", name: message.userName, email: "" }
+                : null,
+            };
+            return {
+              ...current,
+              messages: [...current.messages, newMessage],
+            };
+          },
+          { revalidate: false }
+        );
       }
     );
 
@@ -199,10 +267,15 @@ export function useConversationMessages(
         channelRef.current = null;
       }
     };
-  }, [conversationId, sessionId, mutate]);
+  }, [conversationId, mutate]);
+
+  // Deduplicate messages by ID (handles race conditions between realtime and API fetch)
+  const deduplicatedMessages = data?.messages
+    ? Array.from(new Map(data.messages.map((m) => [m.id, m])).values())
+    : [];
 
   return {
-    messages: data?.messages ?? [],
+    messages: deduplicatedMessages,
     pagination: data?.pagination ?? { page: 1, limit: 50, hasMore: false },
     isLoading,
     isError: error,

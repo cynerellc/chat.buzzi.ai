@@ -1,4 +1,4 @@
-import { sql, desc, eq, and, gte, lte, or, ilike } from "drizzle-orm";
+import { desc, eq, and, gte, lte, or, ilike } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";

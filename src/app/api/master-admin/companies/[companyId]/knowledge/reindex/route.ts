@@ -4,7 +4,7 @@ import { and, eq, isNull, inArray } from "drizzle-orm";
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema/companies";
-import { knowledgeSources, faqItems } from "@/lib/db/schema";
+import { knowledgeSources } from "@/lib/db/schema";
 import {
   getProcessingPipeline,
   processKnowledgeUrl,

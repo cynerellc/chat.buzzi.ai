@@ -9,7 +9,7 @@ export interface CropData {
 }
 
 /**
- * Get the storage path for an avatar based on user role
+ * Get the storage path for an avatar based on user role (legacy - for preset avatars)
  */
 export function getAvatarStoragePath(
   isMasterAdmin: boolean,
@@ -23,6 +23,26 @@ export function getAvatarStoragePath(
     throw new Error("Company ID is required for company admin uploads");
   }
   return `public/companies/${companyId}/avatars/${fileName}`;
+}
+
+/**
+ * Get the storage path for user profile avatar uploads
+ * - Master admin: public/master-admin/{userId}/uploads/{fileName}
+ * - Company users: public/companies/{companyId}/uploads/{fileName}
+ */
+export function getUserAvatarStoragePath(
+  userId: string,
+  isMasterAdmin: boolean,
+  companyId: string | null,
+  fileName: string
+): string {
+  if (isMasterAdmin) {
+    return `public/master-admin/${userId}/uploads/${fileName}`;
+  }
+  if (!companyId) {
+    throw new Error("Company ID is required for company user uploads");
+  }
+  return `public/companies/${companyId}/uploads/${fileName}`;
 }
 
 /**
@@ -77,7 +97,7 @@ export async function processAvatar(
   if (circularCrop) {
     const circleRadius = maxSize / 2;
     const circleMask = Buffer.from(
-      `<svg width="${maxSize}" height="${maxSize}">
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${maxSize}" height="${maxSize}">
         <circle cx="${circleRadius}" cy="${circleRadius}" r="${circleRadius}" fill="white"/>
       </svg>`
     );
@@ -119,11 +139,11 @@ export function getExtensionFromMimeType(mimeType: string): string {
 }
 
 /**
- * Maximum allowed file size in bytes (5MB)
+ * Maximum allowed file size in bytes (20MB)
  */
-export const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+export const MAX_AVATAR_SIZE = 20 * 1024 * 1024;
 
 /**
  * Avatar dimensions
  */
-export const AVATAR_SIZE = 180;
+export const AVATAR_SIZE = 120;

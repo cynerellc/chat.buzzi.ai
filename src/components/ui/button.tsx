@@ -84,8 +84,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    const Comp = asChild ? Slot : "button";
-
     // Map color to variant if variant not explicitly set
     const resolvedVariant = variant ?? (color ? colorToVariantMap[color] : "default");
 

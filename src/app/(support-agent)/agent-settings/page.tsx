@@ -11,7 +11,6 @@ import {
   User,
   Mail,
   Phone,
-  RefreshCw,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Plus, BookOpen, Palette, UserPlus, ArrowRight } from "lucide-react";
+import { BookOpen, UserPlus, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
@@ -18,28 +18,12 @@ interface QuickAction {
 
 const actions: QuickAction[] = [
   {
-    label: "Create Agent",
-    description: "Build a new AI assistant",
-    href: "/agents/new",
-    icon: Plus,
-    gradient: "from-blue-500/20 to-blue-600/10",
-    iconBg: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  },
-  {
     label: "Add Knowledge",
     description: "Upload docs & FAQs",
     href: "/knowledge",
     icon: BookOpen,
     gradient: "from-emerald-500/20 to-emerald-600/10",
     iconBg: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  },
-  {
-    label: "Customize Widget",
-    description: "Style your chat widget",
-    href: "/widget",
-    icon: Palette,
-    gradient: "from-violet-500/20 to-violet-600/10",
-    iconBg: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
   },
   {
     label: "Invite Team",

@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { SupportAgentLayout } from "@/components/layouts";
 import { requireSupportAgent } from "@/lib/auth/guards";
 

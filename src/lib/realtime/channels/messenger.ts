@@ -156,7 +156,8 @@ export class MessengerAdapter extends BaseChannelAdapter {
     config: ChannelConfig,
     recipientId: string,
     content: string,
-    options?: SendOptions
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _options?: SendOptions
   ): Promise<void> {
     const { pageAccessToken } = config.credentials as { pageAccessToken: string };
 
@@ -186,7 +187,9 @@ export class MessengerAdapter extends BaseChannelAdapter {
     recipientId: string,
     mediaUrl: string,
     mediaType: "image" | "audio" | "video" | "document",
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _caption?: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _options?: SendOptions
   ): Promise<void> {
     const { pageAccessToken } = config.credentials as { pageAccessToken: string };
@@ -228,9 +231,7 @@ export class MessengerAdapter extends BaseChannelAdapter {
     }
   }
 
-  async downloadMedia(config: ChannelConfig, mediaUrl: string): Promise<Buffer> {
-    const { pageAccessToken } = config.credentials as { pageAccessToken: string };
-
+  async downloadMedia(_config: ChannelConfig, mediaUrl: string): Promise<Buffer> {
     // Messenger attachment URLs are already accessible
     const response = await fetch(mediaUrl);
 

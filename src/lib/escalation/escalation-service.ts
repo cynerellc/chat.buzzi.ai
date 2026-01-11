@@ -10,7 +10,7 @@
 
 import { db } from "@/lib/db";
 import { escalations, conversations, messages } from "@/lib/db/schema/conversations";
-import { agents } from "@/lib/db/schema/chatbots";
+import { agents, type ChatbotBehavior } from "@/lib/db/schema/chatbots";
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
   TriggerDetector,
@@ -20,10 +20,10 @@ import {
 } from "./triggers";
 import {
   RoutingService,
-  RoutingOptions,
   RoutingResult,
 } from "./routing";
-import { getSSEManager } from "@/lib/realtime/sse-manager";
+import { getSSEManager, getConversationChannel } from "@/lib/realtime/sse-manager";
+import { users } from "@/lib/db/schema/users";
 
 // Types
 export interface CreateEscalationOptions {
@@ -106,7 +106,8 @@ export class EscalationService {
       reason = "Escalated by system",
       triggerType = "manual",
       priority = "medium",
-      metadata,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      metadata: _metadata,
     } = options;
 
     // Get conversation details
@@ -174,12 +175,38 @@ export class EscalationService {
       })
       .where(eq(conversations.id, conversationId));
 
-    // Route the escalation
+    // Get chatbot settings for routing configuration
+    let routingStrategy: "round_robin" | "least_busy" | "preferred" = "least_busy";
+    let preferredAgentId: string | undefined;
+
+    if (conversation.agentId) {
+      const [chatbot] = await db
+        .select({
+          behavior: agents.behavior,
+        })
+        .from(agents)
+        .where(eq(agents.id, conversation.agentId))
+        .limit(1);
+
+      if (chatbot) {
+        const behavior = chatbot.behavior as ChatbotBehavior | null;
+        if (behavior?.escalationRoutingRule) {
+          routingStrategy = behavior.escalationRoutingRule;
+        }
+        if (behavior?.escalationPreferredAgentId) {
+          preferredAgentId = behavior.escalationPreferredAgentId;
+        }
+      }
+    }
+
+    // Route the escalation using chatbot-specific settings
     const routingResult = await this.routingService.routeEscalation(
       newEscalation.id,
       {
         companyId: conversation.companyId,
         priority,
+        strategy: routingStrategy,
+        preferredAgentId,
       }
     );
 
@@ -276,6 +303,9 @@ export class EscalationService {
       })
       .where(eq(conversations.id, escalation.conversationId));
 
+    // Notify widget that human agent joined
+    await this.notifyHumanJoined(escalation.conversationId, agentUserId);
+
     return { success: true };
   }
 
@@ -322,6 +352,11 @@ export class EscalationService {
           updatedAt: new Date(),
         })
         .where(eq(conversations.id, escalation.conversationId));
+
+      // Notify widget that human agent exited
+      if (escalation.assignedUserId) {
+        await this.notifyHumanExited(escalation.conversationId, escalation.assignedUserId);
+      }
     } else {
       await db
         .update(conversations)
@@ -414,7 +449,8 @@ export class EscalationService {
    */
   async getEscalationStats(
     companyId: string,
-    timeRange?: { start: Date; end: Date }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _timeRange?: { start: Date; end: Date }
   ): Promise<{
     total: number;
     pending: number;
@@ -434,8 +470,8 @@ export class EscalationService {
         AVG(EXTRACT(EPOCH FROM (e.assigned_at - e.created_at))) FILTER (WHERE e.assigned_at IS NOT NULL) as avg_response_time,
         AVG(EXTRACT(EPOCH FROM (e.resolved_at - e.created_at))) FILTER (WHERE e.resolved_at IS NOT NULL) as avg_resolution_time,
         COUNT(*) FILTER (WHERE e.returned_to_ai = true) as returned_to_ai_count
-      FROM chatapp_escalations e
-      INNER JOIN chatapp_conversations c ON e.conversation_id = c.id
+      FROM chatapp.escalations e
+      INNER JOIN chatapp.conversations c ON e.conversation_id = c.id
       WHERE c.company_id = ${companyId}
     `;
 
@@ -457,8 +493,8 @@ export class EscalationService {
       count: string;
     }>(sql`
       SELECT e.trigger_type, COUNT(*) as count
-      FROM chatapp_escalations e
-      INNER JOIN chatapp_conversations c ON e.conversation_id = c.id
+      FROM chatapp.escalations e
+      INNER JOIN chatapp.conversations c ON e.conversation_id = c.id
       WHERE c.company_id = ${companyId}
       GROUP BY e.trigger_type
     `);
@@ -610,6 +646,72 @@ export class EscalationService {
     } catch (error) {
       // Non-critical - log and continue
       console.error("Failed to send escalation notification:", error);
+    }
+  }
+
+  /**
+   * Notify widget that a human agent has joined the conversation
+   */
+  private async notifyHumanJoined(
+    conversationId: string,
+    agentUserId: string
+  ): Promise<void> {
+    try {
+      // Get agent info
+      const [agentInfo] = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(users)
+        .where(eq(users.id, agentUserId))
+        .limit(1);
+
+      const sseManager = getSSEManager();
+      const channel = getConversationChannel(conversationId);
+
+      sseManager.publish(channel, "human_joined", {
+        humanAgentId: agentUserId,
+        humanAgentName: agentInfo?.name || "Support Agent",
+        humanAgentAvatarUrl: agentInfo?.avatarUrl,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("Failed to send human_joined notification:", error);
+    }
+  }
+
+  /**
+   * Notify widget that a human agent has exited the conversation
+   */
+  private async notifyHumanExited(
+    conversationId: string,
+    agentUserId: string
+  ): Promise<void> {
+    try {
+      // Get agent info
+      const [agentInfo] = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(users)
+        .where(eq(users.id, agentUserId))
+        .limit(1);
+
+      const sseManager = getSSEManager();
+      const channel = getConversationChannel(conversationId);
+
+      sseManager.publish(channel, "human_exited", {
+        humanAgentId: agentUserId,
+        humanAgentName: agentInfo?.name || "Support Agent",
+        humanAgentAvatarUrl: agentInfo?.avatarUrl,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("Failed to send human_exited notification:", error);
     }
   }
 }

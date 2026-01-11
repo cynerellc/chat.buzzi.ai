@@ -263,6 +263,7 @@ export class EmbeddingService {
     return scored
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .map(({ embedding: _embedding, ...rest }) => rest);
   }
 

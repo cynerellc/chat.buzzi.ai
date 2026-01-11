@@ -8,7 +8,6 @@ import {
   Clock,
   CreditCard,
   FileText,
-  Filter,
   Key,
   LogIn,
   MessageSquare,

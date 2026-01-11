@@ -24,16 +24,15 @@ import {
   CardHeader,
   CardBody,
   CardFooter,
-  Badge,
   Dropdown,
   type DropdownMenuItemData,
   ConfirmationDialog,
 } from "@/components/ui";
 
-import type { AgentListItem } from "@/app/api/company/agents/route";
+import type { ChatbotListItem } from "@/app/api/company/chatbots/route";
 
 interface AgentCardProps {
-  agent: AgentListItem;
+  agent: ChatbotListItem;
   onDuplicate: (agentId: string) => void;
   onDelete: (agentId: string) => void;
   onStatusChange: (agentId: string, status: "active" | "paused") => void;
@@ -59,7 +58,7 @@ export const AgentCard = memo(function AgentCard({
   onDuplicate,
   onDelete,
   onStatusChange,
-  basePath = "/agents",
+  basePath = "/chatbots",
 }: AgentCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const defaultStatus = { label: "Draft", variant: "default" as const, dot: "bg-muted-foreground", bg: "bg-muted" };

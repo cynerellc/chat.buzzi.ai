@@ -7,12 +7,10 @@ import {
   User,
   Mail,
   Phone,
-  Globe,
   Calendar,
   MessageSquare,
   Clock,
   Star,
-  Tag,
   ExternalLink,
   MoreVertical,
   Edit2,
@@ -136,10 +134,10 @@ export default function CustomerProfilePage() {
     switch (status) {
       case "active":
         return <Badge variant="success">Active</Badge>;
-      case "waiting":
+      case "waiting_human":
         return <Badge variant="warning">Waiting</Badge>;
-      case "escalated":
-        return <Badge variant="danger">Escalated</Badge>;
+      case "with_human":
+        return <Badge variant="info">With Agent</Badge>;
       case "resolved":
         return <Badge variant="default">Resolved</Badge>;
       case "abandoned":

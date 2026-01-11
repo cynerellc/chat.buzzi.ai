@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cannedResponses } from "@/lib/db/schema/conversations";
 import { requireSupportAgent } from "@/lib/auth/guards";
-import { and, eq, or, isNull, desc, ilike, sql } from "drizzle-orm";
+import { and, eq, or, desc, ilike, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
 const createResponseSchema = z.object({

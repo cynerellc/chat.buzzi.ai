@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 import NextAuth from "next-auth";
 
 import { authConfig } from "@/lib/auth/auth.config";
@@ -24,6 +23,7 @@ const publicRoutePrefixes = [
   "/api/auth",
   "/api/widget",
   "/widget",
+  "/preview",
 ];
 
 // Routes that require master_admin role (prefix check)

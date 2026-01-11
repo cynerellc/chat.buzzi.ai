@@ -11,10 +11,10 @@ import {
 } from "@/components/ui";
 import { AgentCard } from "./agent-card";
 
-import type { AgentListItem } from "@/app/api/company/agents/route";
+import type { ChatbotListItem } from "@/app/api/company/chatbots/route";
 
 interface AgentsGridProps {
-  agents: AgentListItem[];
+  agents: ChatbotListItem[];
   isLoading: boolean;
   viewMode: "grid" | "list";
   onViewModeChange: (mode: "grid" | "list") => void;
@@ -22,6 +22,7 @@ interface AgentsGridProps {
   onDelete: (agentId: string) => void;
   onStatusChange: (agentId: string, status: "active" | "paused") => void;
   basePath?: string;
+  showCreateCard?: boolean;
 }
 
 export function AgentsGrid({
@@ -32,7 +33,8 @@ export function AgentsGrid({
   onDuplicate,
   onDelete,
   onStatusChange,
-  basePath = "/agents",
+  basePath = "/chatbots",
+  showCreateCard = true,
 }: AgentsGridProps) {
   if (isLoading) {
     return (
@@ -88,19 +90,21 @@ export function AgentsGrid({
       {viewMode === "grid" ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {/* Create New Agent Card */}
-          <Link href={`${basePath}/new`}>
-            <Card className="flex h-full min-h-[200px] cursor-pointer items-center justify-center border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
-              <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <Plus className="h-6 w-6 text-primary" />
-                </div>
-                <span className="font-medium">Create Agent</span>
-                <span className="text-sm text-muted-foreground">
-                  Add a new AI agent
-                </span>
-              </CardBody>
-            </Card>
-          </Link>
+          {showCreateCard && (
+            <Link href={`${basePath}/new`}>
+              <Card className="flex h-full min-h-[200px] cursor-pointer items-center justify-center border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
+                <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                    <Plus className="h-6 w-6 text-primary" />
+                  </div>
+                  <span className="font-medium">Create Agent</span>
+                  <span className="text-sm text-muted-foreground">
+                    Add a new AI agent
+                  </span>
+                </CardBody>
+              </Card>
+            </Link>
+          )}
 
           {/* Chatbot Cards */}
           {agents.map((agent) => (
@@ -120,9 +124,11 @@ export function AgentsGrid({
               <CardBody className="flex flex-col items-center gap-2 p-6 text-center">
                 <Bot className="h-12 w-12 text-muted-foreground" />
                 <p className="text-muted-foreground">No chatbots found</p>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`${basePath}/new`}>Create your first chatbot</Link>
-                </Button>
+                {showCreateCard && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`${basePath}/new`}>Create your first chatbot</Link>
+                  </Button>
+                )}
               </CardBody>
             </Card>
           )}
@@ -130,21 +136,23 @@ export function AgentsGrid({
       ) : (
         <div className="space-y-2">
           {/* Create New Chatbot Row */}
-          <Link href={`${basePath}/new`}>
-            <Card className="cursor-pointer border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
-              <CardBody className="flex items-center gap-4 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <Plus className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <span className="font-medium">Create Chatbot</span>
-                  <p className="text-sm text-muted-foreground">
-                    Add a new AI chatbot
-                  </p>
-                </div>
-              </CardBody>
-            </Card>
-          </Link>
+          {showCreateCard && (
+            <Link href={`${basePath}/new`}>
+              <Card className="cursor-pointer border-dashed border-2 transition-colors hover:border-primary hover:bg-muted">
+                <CardBody className="flex items-center gap-4 p-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <Plus className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <span className="font-medium">Create Chatbot</span>
+                    <p className="text-sm text-muted-foreground">
+                      Add a new AI chatbot
+                    </p>
+                  </div>
+                </CardBody>
+              </Card>
+            </Link>
+          )}
 
           {/* Chatbot List Rows */}
           {agents.map((agent) => (
@@ -173,9 +181,9 @@ export function AgentsGrid({
 // List view row component
 function AgentListRow({
   agent,
-  basePath = "/agents",
+  basePath = "/chatbots",
 }: {
-  agent: AgentListItem;
+  agent: ChatbotListItem;
   basePath?: string;
 }) {
   const statusColors = {

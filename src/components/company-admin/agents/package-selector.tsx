@@ -4,10 +4,10 @@ import { Headphones, ShoppingBag, HelpCircle, Sparkles } from "lucide-react";
 
 import { Card, CardBody, Skeleton, Chip } from "@/components/ui";
 
-import type { AgentPackageItem } from "@/app/api/company/agents/packages/route";
+import type { ChatbotPackageItem } from "@/app/api/company/chatbots/packages/route";
 
 interface PackageSelectorProps {
-  packages: AgentPackageItem[];
+  packages: ChatbotPackageItem[];
   isLoading: boolean;
   selectedPackageId: string | null;
   onSelect: (packageId: string | null) => void;

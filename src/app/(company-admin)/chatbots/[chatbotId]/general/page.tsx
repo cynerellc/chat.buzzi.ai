@@ -22,7 +22,7 @@ export default function ChatbotGeneralPage() {
   return (
     <GeneralSettings
       chatbot={chatbotData}
-      apiUrl={`/api/company/agents/${chatbotId}`}
+      apiUrl={`/api/company/chatbots/${chatbotId}`}
       onRefresh={refresh}
     />
   );

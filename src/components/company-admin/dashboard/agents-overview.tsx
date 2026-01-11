@@ -1,11 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Plus, Bot, MessageSquare, Sparkles, ArrowRight } from "lucide-react";
+import { Bot, MessageSquare, Sparkles, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
-import { Avatar, Badge, Button, Card, CardHeader, CardBody, Skeleton } from "@/components/ui";
+import { Avatar, Button, Card, CardHeader, CardBody, Skeleton } from "@/components/ui";
 import type { AgentOverview } from "@/hooks/company";
 
 interface AgentsOverviewProps {
@@ -28,7 +28,7 @@ function AgentCard({ agent, index }: { agent: AgentOverview; index: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
     >
-      <Link href={`/agents/${agent.id}`}>
+      <Link href={`/chatbots/${agent.id}`}>
         <Card className="group p-5 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 transition-all duration-300 cursor-pointer h-full">
           <div className="flex flex-col items-center text-center">
             <div className="relative mb-4">
@@ -86,30 +86,6 @@ function AgentCard({ agent, index }: { agent: AgentOverview; index: number }) {
   );
 }
 
-function CreateAgentCard({ index }: { index: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-    >
-      <Link href="/agents/new">
-        <Card className="group p-5 h-full flex flex-col items-center justify-center text-center border-dashed border-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 cursor-pointer min-h-[220px]">
-          <div className={cn(
-            "w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300",
-            "bg-gradient-to-br from-primary/15 to-primary/5",
-            "group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/20"
-          )}>
-            <Plus size={24} className="text-primary" />
-          </div>
-          <h4 className="font-semibold group-hover:text-primary transition-colors">Create Agent</h4>
-          <p className="text-sm text-muted-foreground mt-1">Add a new AI assistant</p>
-        </Card>
-      </Link>
-    </motion.div>
-  );
-}
-
 export function AgentsOverview({ agents, isLoading }: AgentsOverviewProps) {
   if (isLoading) {
     return (
@@ -136,11 +112,11 @@ export function AgentsOverview({ agents, isLoading }: AgentsOverviewProps) {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between w-full">
           <div>
-            <h3 className="font-semibold">Your Agents</h3>
+            <h3 className="font-semibold">Your Chatbots</h3>
             <p className="text-sm text-muted-foreground">AI assistants handling conversations</p>
           </div>
           <Button asChild variant="ghost" size="sm" className="group">
-            <Link href="/agents" className="flex items-center gap-1">
+            <Link href="/chatbots" className="flex items-center gap-1">
               Manage
               <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
@@ -152,7 +128,6 @@ export function AgentsOverview({ agents, isLoading }: AgentsOverviewProps) {
           {agents.map((agent, index) => (
             <AgentCard key={agent.id} agent={agent} index={index} />
           ))}
-          <CreateAgentCard index={agents.length} />
         </div>
       </CardBody>
     </Card>

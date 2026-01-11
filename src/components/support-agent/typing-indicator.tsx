@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export interface TypingIndicatorProps {
@@ -20,7 +21,8 @@ export function TypingIndicator({
   className,
   showLabel = true,
 }: TypingIndicatorProps) {
-  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [typingUsers, _setTypingUsers] = useState<TypingUser[]>([]);
 
   // Subscribe to typing events
   useEffect(() => {
@@ -88,7 +90,8 @@ export function useTypingStatus(conversationId: string) {
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
   const sendTypingStatus = useCallback(
-    async (typing: boolean) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async (_typing: boolean) => {
       try {
         // TODO: Implement actual API call
         // await fetch(`/api/support-agent/conversations/${conversationId}/typing`, {
@@ -147,7 +150,8 @@ export function useTypingStatus(conversationId: string) {
 
 // Typing indicator for chat bubble (shown inside message area)
 export function TypingBubble({
-  name,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  name: _name,
   className,
 }: {
   name?: string;

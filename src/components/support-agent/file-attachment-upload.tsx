@@ -74,7 +74,8 @@ const getFileType = (mimeType: string): "image" | "file" | "video" | "audio" => 
   return "file";
 };
 
-const formatFileSize = (bytes: number): string => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -320,7 +321,8 @@ export function FileAttachmentUpload({
               className="px-4 pb-4 space-y-2"
             >
               {uploads.map((upload) => {
-                const Icon = FILE_TYPE_ICONS.file as LucideIcon;
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const _Icon = FILE_TYPE_ICONS.file as LucideIcon;
                 return (
                   <motion.div
                     key={upload.id}

@@ -21,7 +21,7 @@ export default function AgentDetailPage({ params }: AgentPageProps) {
     <AgentDetailForm
       agent={agent}
       agentsList={agentsList}
-      apiUrl={`/api/company/agents/${chatbotId}`}
+      apiUrl={`/api/company/chatbots/${chatbotId}`}
       categoriesApiUrl="/api/company/knowledge/categories"
       onRefresh={refresh}
       showAISettings={false}

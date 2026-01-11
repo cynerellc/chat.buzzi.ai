@@ -18,7 +18,7 @@ export default function CompanyConversationsPage() {
       title="Conversations"
       subtitle="View and manage customer conversations across all channels"
       baseApiUrl="/api/company/conversations"
-      agentsApiUrl="/api/company/agents"
+      chatbotsApiUrl="/api/company/chatbots"
       onConversationClick={handleConversationClick}
     />
   );

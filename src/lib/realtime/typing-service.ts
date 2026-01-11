@@ -9,7 +9,7 @@
  * - Rate limiting to prevent spam
  */
 
-import { getSSEManager, getConversationChannel, getSupportAgentChannel } from "./sse-manager";
+import { getSSEManager, getConversationChannel } from "./sse-manager";
 
 // ============================================================================
 // Configuration

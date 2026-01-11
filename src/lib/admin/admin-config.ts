@@ -48,7 +48,7 @@ export function createCompanyAdminConfig(companyId: string): AdminConfig {
         ? `/api/company/chatbots/${chatbotId}${path.startsWith("/") ? path : `/${path}`}`
         : `/api/company/chatbots/${chatbotId}`,
 
-    buildAgentsApiUrl: (chatbotId: string) => `/api/company/agents/${chatbotId}`,
+    buildAgentsApiUrl: (chatbotId: string) => `/api/company/chatbots/${chatbotId}`,
 
     // Navigation URLs - company admin routes
     buildNavUrl: (path: string) => (path.startsWith("/") ? path : `/${path}`),

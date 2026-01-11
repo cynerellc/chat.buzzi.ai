@@ -49,14 +49,6 @@ export interface JobResult {
 
 export type JobHandler<T = Record<string, unknown>> = (job: Job<T>) => Promise<JobResult>;
 
-// Priority weights for sorting
-const PRIORITY_WEIGHTS: Record<JobPriority, number> = {
-  critical: 4,
-  high: 3,
-  normal: 2,
-  low: 1,
-};
-
 /**
  * Job Queue Service
  */
@@ -184,7 +176,8 @@ export class JobQueue {
   /**
    * Mark a job as completed
    */
-  async completeJob(jobId: string, result?: unknown): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async completeJob(jobId: string, _result?: unknown): Promise<void> {
     await db.execute(sql`
       UPDATE chatapp_jobs
       SET

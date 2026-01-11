@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { CompanyAdminLayout } from "@/components/layouts";
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 
