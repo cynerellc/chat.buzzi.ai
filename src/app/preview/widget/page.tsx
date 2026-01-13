@@ -60,7 +60,7 @@ function WidgetPreviewContent() {
   useEffect(() => {
     if (validationError || !chatbotId || !companyId) return;
 
-    fetch(`/api/widget/config?agentId=${chatbotId}&companyId=${companyId}`)
+    fetch(`/api/master-admin/companies/${companyId}/chatbots/${chatbotId}/preview-config`)
       .then((res) => res.json())
       .then((data) => {
         if (data.config) {
@@ -206,7 +206,7 @@ function WidgetPreviewContent() {
           }}
         >
           <iframe
-            src={`/embed-widget?agentId=${chatbotId}&companyId=${companyId}`}
+            src={`/embed-widget?chatbotId=${chatbotId}&companyId=${companyId}&preview=true`}
             className="w-full h-full border-none"
             title="Chat Widget"
           />
@@ -235,7 +235,7 @@ function WidgetPreviewContent() {
             }}
           >
             <iframe
-              src={`/embed-widget?agentId=${chatbotId}&companyId=${companyId}`}
+              src={`/embed-widget?chatbotId=${chatbotId}&companyId=${companyId}&preview=true`}
               className="w-full h-full border-none"
               title="Chat Widget"
             />

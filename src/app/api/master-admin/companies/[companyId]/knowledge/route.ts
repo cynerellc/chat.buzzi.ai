@@ -5,6 +5,8 @@ import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema/companies";
 import { knowledgeSources } from "@/lib/db/schema";
+import { triggerBackgroundIndexing } from "@/lib/knowledge/processing-pipeline";
+import { getSupabaseClient, STORAGE_BUCKET } from "@/lib/supabase/client";
 
 export interface KnowledgeSourceListItem {
   id: string;
@@ -139,6 +141,129 @@ export async function GET(request: NextRequest, context: RouteContext) {
     console.error("Error fetching knowledge sources:", error);
     return NextResponse.json(
       { error: "Failed to fetch knowledge sources" },
+      { status: 500 }
+    );
+  }
+}
+
+interface CreateKnowledgeSourceRequest {
+  name: string;
+  description?: string;
+  type: "file" | "url" | "text";
+  category?: string;
+  sourceConfig: {
+    // For file
+    fileName?: string;
+    fileType?: string;
+    fileSize?: number;
+    storagePath?: string;
+    // For url
+    url?: string;
+    crawlDepth?: number;
+    // For text
+    content?: string;
+  };
+}
+
+export async function POST(request: NextRequest, context: RouteContext) {
+  try {
+    await requireMasterAdmin();
+    const { companyId } = await context.params;
+
+    // Verify company exists
+    const [company] = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    const body: CreateKnowledgeSourceRequest = await request.json();
+
+    if (!body.name) {
+      return NextResponse.json(
+        { error: "Source name is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!body.type) {
+      return NextResponse.json(
+        { error: "Source type is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate source config based on type
+    if (body.type === "url" && !body.sourceConfig?.url) {
+      return NextResponse.json(
+        { error: "URL is required for URL sources" },
+        { status: 400 }
+      );
+    }
+
+    if (body.type === "text" && !body.sourceConfig?.content) {
+      return NextResponse.json(
+        { error: "Content is required for text sources" },
+        { status: 400 }
+      );
+    }
+
+    // Create the knowledge source
+    const [newSource] = await db
+      .insert(knowledgeSources)
+      .values({
+        companyId,
+        name: body.name,
+        description: body.description || null,
+        type: body.type,
+        category: body.category || null,
+        status: "pending",
+        sourceConfig: body.sourceConfig,
+      })
+      .returning();
+
+    if (!newSource) {
+      return NextResponse.json(
+        { error: "Failed to create knowledge source" },
+        { status: 500 }
+      );
+    }
+
+    // Trigger background indexing immediately
+    if (body.type === "file" && body.sourceConfig.storagePath) {
+      // For files, download from Supabase and trigger indexing
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .download(body.sourceConfig.storagePath);
+
+      if (!error && data) {
+        const buffer = Buffer.from(await data.arrayBuffer());
+        triggerBackgroundIndexing(newSource.id, "file", {
+          fileBuffer: buffer,
+          fileType: body.sourceConfig.fileType,
+          fileName: body.sourceConfig.fileName,
+        });
+      }
+    } else if (body.type === "url" && body.sourceConfig.url) {
+      triggerBackgroundIndexing(newSource.id, "url", {
+        url: body.sourceConfig.url,
+      });
+    } else if (body.type === "text" && body.sourceConfig.content) {
+      triggerBackgroundIndexing(newSource.id, "text", {
+        content: body.sourceConfig.content,
+      });
+    }
+
+    return NextResponse.json({ source: newSource }, { status: 201 });
+  } catch (error) {
+    console.error("Error creating knowledge source:", error);
+    return NextResponse.json(
+      { error: "Failed to create knowledge source" },
       { status: 500 }
     );
   }

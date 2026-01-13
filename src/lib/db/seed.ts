@@ -1,9 +1,13 @@
 import bcrypt from "bcryptjs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { config } from "dotenv";
 
 import * as schema from "./schema";
 import type { ChatbotBehavior, AgentListItem } from "./schema/chatbots";
+
+// Load environment variables
+config();
 
 // Seed script for development/testing
 async function seed() {
@@ -126,7 +130,239 @@ async function seed() {
       .returning();
     console.log(`   ✓ Created ${plans.length} subscription plans\n`);
 
-    // 2. Create Chatbot Packages (templates)
+    // 2. Create AI Models
+    console.log("🤖 Creating AI models...");
+    const models = await db
+      .insert(schema.aiModels)
+      .values([
+        // OpenAI Models
+        {
+          provider: "openai",
+          modelId: "gpt-5.2",
+          displayName: "GPT-5.2",
+          description: "OpenAI's flagship model for coding and agentic tasks",
+          inputLimit: 200000,
+          outputLimit: 16000,
+          inputPricePerMillion: "1.2500",
+          outputPricePerMillion: "10.0000",
+          settingsSchema: {
+            temperature: {
+              type: "slider",
+              min: 0,
+              max: 2,
+              step: 0.1,
+              default: 1,
+              label: "Temperature",
+              description: "Controls randomness in responses",
+            },
+            max_tokens: {
+              type: "number",
+              min: 1,
+              max: 16000,
+              default: 4096,
+              label: "Max Tokens",
+              description: "Maximum length of response",
+            },
+            top_p: {
+              type: "slider",
+              min: 0,
+              max: 1,
+              step: 0.05,
+              default: 1,
+              label: "Top P",
+              description: "Nucleus sampling parameter",
+            },
+          },
+          isActive: true,
+          isDefault: true,
+          sortOrder: 0,
+        },
+        {
+          provider: "openai",
+          modelId: "gpt-5-mini",
+          displayName: "GPT-5 Mini",
+          description: "Faster, cost-efficient version of GPT-5 for well-defined tasks",
+          inputLimit: 200000,
+          outputLimit: 16000,
+          inputPricePerMillion: "0.2500",
+          outputPricePerMillion: "2.0000",
+          settingsSchema: {
+            temperature: {
+              type: "slider",
+              min: 0,
+              max: 2,
+              step: 0.1,
+              default: 1,
+              label: "Temperature",
+              description: "Controls randomness in responses",
+            },
+            max_tokens: {
+              type: "number",
+              min: 1,
+              max: 16000,
+              default: 4096,
+              label: "Max Tokens",
+              description: "Maximum length of response",
+            },
+            top_p: {
+              type: "slider",
+              min: 0,
+              max: 1,
+              step: 0.05,
+              default: 1,
+              label: "Top P",
+              description: "Nucleus sampling parameter",
+            },
+          },
+          isActive: true,
+          isDefault: false,
+          sortOrder: 1,
+        },
+        {
+          provider: "openai",
+          modelId: "gpt-5-nano",
+          displayName: "GPT-5 Nano",
+          description: "Fastest, most cost-efficient GPT-5 for summarization and classification",
+          inputLimit: 128000,
+          outputLimit: 16000,
+          inputPricePerMillion: "0.0500",
+          outputPricePerMillion: "0.4000",
+          settingsSchema: {
+            temperature: {
+              type: "slider",
+              min: 0,
+              max: 2,
+              step: 0.1,
+              default: 1,
+              label: "Temperature",
+              description: "Controls randomness in responses",
+            },
+            max_tokens: {
+              type: "number",
+              min: 1,
+              max: 16000,
+              default: 4096,
+              label: "Max Tokens",
+              description: "Maximum length of response",
+            },
+            top_p: {
+              type: "slider",
+              min: 0,
+              max: 1,
+              step: 0.05,
+              default: 1,
+              label: "Top P",
+              description: "Nucleus sampling parameter",
+            },
+          },
+          isActive: true,
+          isDefault: false,
+          sortOrder: 2,
+        },
+        // Google Models
+        {
+          provider: "google",
+          modelId: "gemini-3-pro-preview",
+          displayName: "Gemini 3 Pro",
+          description: "Google's most advanced model for multimodal understanding and agentic tasks",
+          inputLimit: 1048576,
+          outputLimit: 65536,
+          inputPricePerMillion: "0.0000",
+          outputPricePerMillion: "0.0000",
+          settingsSchema: {
+            temperature: {
+              type: "slider",
+              min: 0,
+              max: 2,
+              step: 0.1,
+              default: 1.0,
+              label: "Temperature",
+              description: "Controls randomness in responses",
+            },
+            max_tokens: {
+              type: "number",
+              min: 1,
+              max: 65536,
+              default: 8192,
+              label: "Max Tokens",
+              description: "Maximum length of response",
+            },
+            top_p: {
+              type: "slider",
+              min: 0,
+              max: 1,
+              step: 0.05,
+              default: 0.95,
+              label: "Top P",
+              description: "Nucleus sampling parameter",
+            },
+            top_k: {
+              type: "number",
+              min: 1,
+              max: 100,
+              default: 40,
+              label: "Top K",
+              description: "Top-k sampling parameter",
+            },
+          },
+          isActive: true,
+          isDefault: false,
+          sortOrder: 10,
+        },
+        {
+          provider: "google",
+          modelId: "gemini-3-flash-preview",
+          displayName: "Gemini 3 Flash",
+          description: "Balanced model built for speed, scale, and frontier intelligence",
+          inputLimit: 1048576,
+          outputLimit: 65536,
+          inputPricePerMillion: "0.0000",
+          outputPricePerMillion: "0.0000",
+          settingsSchema: {
+            temperature: {
+              type: "slider",
+              min: 0,
+              max: 2,
+              step: 0.1,
+              default: 1.0,
+              label: "Temperature",
+              description: "Controls randomness in responses",
+            },
+            max_tokens: {
+              type: "number",
+              min: 1,
+              max: 65536,
+              default: 8192,
+              label: "Max Tokens",
+              description: "Maximum length of response",
+            },
+            top_p: {
+              type: "slider",
+              min: 0,
+              max: 1,
+              step: 0.05,
+              default: 0.95,
+              label: "Top P",
+              description: "Nucleus sampling parameter",
+            },
+            top_k: {
+              type: "number",
+              min: 1,
+              max: 100,
+              default: 40,
+              label: "Top K",
+              description: "Top-k sampling parameter",
+            },
+          },
+          isActive: true,
+          isDefault: false,
+          sortOrder: 11,
+        },
+      ])
+      .returning();
+    console.log(`   ✓ Created ${models.length} AI models\n`);
+
+    // 3. Create Chatbot Packages (templates)
     console.log("🤖 Creating chatbot packages...");
     const packages = await db
       .insert(schema.agentPackages)

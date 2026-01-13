@@ -63,7 +63,7 @@ export function CompanyAgents({ companyId }: CompanyAgentsProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data, isLoading, error } = useSWR<{ agents: CompanyAgent[] }>(
-    `/api/master-admin/companies/${companyId}/agents`,
+    `/api/master-admin/companies/${companyId}/chatbots`,
     fetcher
   );
 

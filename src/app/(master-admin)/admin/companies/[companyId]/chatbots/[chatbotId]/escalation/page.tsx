@@ -10,7 +10,7 @@ export default function ChatbotEscalationPage() {
   return (
     <EscalationSettings
       chatbot={chatbot}
-      apiUrl={`/api/master-admin/companies/${companyId}/agents/${chatbotId}`}
+      apiUrl={`/api/master-admin/companies/${companyId}/chatbots/${chatbotId}`}
       onRefresh={refresh}
     />
   );

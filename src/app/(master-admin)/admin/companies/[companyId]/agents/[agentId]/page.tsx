@@ -121,7 +121,7 @@ export default function AgentConfigurationPage({
     isLoading: agentLoading,
     mutate: refreshAgent,
   } = useSWR<AgentDetails>(
-    `/api/master-admin/companies/${companyId}/agents/${agentId}`,
+    `/api/master-admin/companies/${companyId}/chatbots/${agentId}`,
     fetcher
   );
 
@@ -155,7 +155,7 @@ export default function AgentConfigurationPage({
 
     try {
       const res = await fetch(
-        `/api/master-admin/companies/${companyId}/agents/${agentId}`,
+        `/api/master-admin/companies/${companyId}/chatbots/${agentId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -195,7 +195,7 @@ export default function AgentConfigurationPage({
 
     try {
       const res = await fetch(
-        `/api/master-admin/companies/${companyId}/agents/${agentId}`,
+        `/api/master-admin/companies/${companyId}/chatbots/${agentId}`,
         {
           method: "DELETE",
         }

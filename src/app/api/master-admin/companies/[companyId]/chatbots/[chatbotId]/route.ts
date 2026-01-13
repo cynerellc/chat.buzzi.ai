@@ -61,7 +61,31 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Chatbot not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ chatbot });
+    // Get the first agent for default system prompt and model settings
+    const agentsList = (chatbot.agentsList as AgentListItem[]) || [];
+    const firstAgent = agentsList[0];
+
+    // Transform to match ChatbotDetails interface
+    const chatbotDetails = {
+      id: chatbot.id,
+      name: chatbot.name,
+      description: chatbot.description,
+      packageId: chatbot.packageId,
+      packageName: "Unknown", // This should be joined from packages table if needed
+      systemPrompt: firstAgent?.default_system_prompt || "",
+      modelId: firstAgent?.default_model_id || "gpt-5-mini-2025-08-07",
+      modelSettings: firstAgent?.model_settings || { temperature: 0.7, max_tokens: 4096, top_p: 1 },
+      behavior: (chatbot.behavior as Record<string, unknown>) || {},
+      status: chatbot.status,
+      escalationEnabled: chatbot.escalationEnabled,
+      conversationCount: 0, // Would need to query conversations table
+      messageCount: 0, // Would need to query messages table
+      createdAt: chatbot.createdAt.toISOString(),
+      updatedAt: chatbot.updatedAt.toISOString(),
+      agentsList: agentsList,
+    };
+
+    return NextResponse.json({ chatbot: chatbotDetails });
   } catch (error) {
     console.error("Error fetching chatbot:", error);
     return NextResponse.json(

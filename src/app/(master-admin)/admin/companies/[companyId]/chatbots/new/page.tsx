@@ -130,7 +130,7 @@ export default function NewChatbotPage({ params }: NewChatbotPageProps) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/master-admin/companies/${companyId}/agents`, {
+      const response = await fetch(`/api/master-admin/companies/${companyId}/chatbots`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -148,7 +148,7 @@ export default function NewChatbotPage({ params }: NewChatbotPageProps) {
 
       const result = await response.json();
       addToast({ title: "Chatbot created successfully", color: "success" });
-      router.push(`/admin/companies/${companyId}/chatbots/${result.agent.id}/general`);
+      router.push(`/admin/companies/${companyId}/chatbots/${result.chatbot.id}/general`);
     } catch {
       addToast({ title: "Failed to create chatbot", color: "danger" });
     } finally {

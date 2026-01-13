@@ -201,8 +201,10 @@ export function ChatWindow({
 
     // Production mode: get config from URL params or props
     const params = new URLSearchParams(window.location.search);
-    const agentId = propAgentId || params.get("agentId");
+    // Support both agentId (legacy) and chatbotId parameters
+    const agentId = propAgentId || params.get("chatbotId") || params.get("agentId");
     const companyId = propCompanyId || params.get("companyId");
+    const isPreviewMode = params.get("preview") === "true";
     const theme = (params.get("theme") as ChatWindowConfig["theme"]) || "light";
     const primaryColor = params.get("primaryColor") || "#007bff";
     const customerStr = params.get("customer");
@@ -220,10 +222,11 @@ export function ChatWindow({
       theme,
       primaryColor,
       customer,
+      isPreview: isPreviewMode,
     };
 
     // Fetch full config from API
-    fetchConfig(agentId, companyId, initialConfig);
+    fetchConfig(agentId, companyId, initialConfig, isPreviewMode);
   }, [isDemo, configJson, propAgentId, propCompanyId]);
 
   // Scroll to bottom on new messages (only within the messages container, not the whole page)
@@ -576,93 +579,106 @@ export function ChatWindow({
   const fetchConfig = async (
     agentId: string,
     companyId: string,
-    initialConfig: ChatWindowConfig
+    initialConfig: ChatWindowConfig,
+    isPreview = false
   ) => {
     try {
-      // First, try to get config URL for pre-generated JSON
       let configData: ChatWindowConfig | null = null;
 
-      try {
-        const configUrlResponse = await fetch(
-          `/api/widget/config-url?chatbotId=${agentId}&companyId=${companyId}`
-        );
-
-        if (configUrlResponse.ok) {
-          const { configUrl } = await configUrlResponse.json();
-
-          if (configUrl) {
-            // Fetch the pre-generated JSON config from storage
-            const jsonResponse = await fetch(configUrl);
-
-            if (jsonResponse.ok) {
-              const jsonConfig = await jsonResponse.json();
-
-              // Transform WidgetConfigJson to internal ChatWindowConfig format
-              configData = {
-                agentId,
-                companyId,
-                // Appearance
-                theme: jsonConfig.appearance?.theme || "light",
-                primaryColor: jsonConfig.appearance?.primaryColor || "#007bff",
-                accentColor: jsonConfig.appearance?.accentColor,
-                borderRadius: jsonConfig.appearance?.borderRadius ?? 16,
-                position: jsonConfig.appearance?.position ?? "bottom-right",
-                // Branding
-                title: jsonConfig.branding?.title,
-                subtitle: jsonConfig.branding?.subtitle,
-                avatarUrl: jsonConfig.branding?.avatarUrl,
-                logoUrl: jsonConfig.branding?.logoUrl,
-                welcomeMessage: jsonConfig.branding?.welcomeMessage,
-                showBranding: jsonConfig.branding?.showBranding ?? true,
-                // Features
-                enableFileUpload: jsonConfig.features?.enableFileUpload ?? false,
-                enableEmoji: jsonConfig.features?.enableEmoji ?? true,
-                enableVoice: jsonConfig.features?.enableVoiceMessages ?? false,
-                enableTypingIndicator: true,
-                launcherIcon: jsonConfig.appearance?.launcherIcon,
-                isMultiAgent: jsonConfig.chatbot?.type === "multi_agent",
-                agentsList: jsonConfig.agents?.map((agent: { id: string; name: string; designation?: string; avatarUrl?: string; type?: string }) => ({
-                  id: agent.id,
-                  name: agent.name,
-                  designation: agent.designation,
-                  avatarUrl: agent.avatarUrl,
-                  type: agent.type,
-                })),
-                // Stream Display Options
-                showAgentSwitchNotification: jsonConfig.streamDisplay?.showAgentSwitchNotification ?? true,
-                showThinking: jsonConfig.streamDisplay?.showThinking ?? false,
-                showInstantUpdates: jsonConfig.streamDisplay?.showInstantUpdates ?? true,
-                // Multi-agent Display Options
-                showAgentListOnTop: jsonConfig.multiAgent?.showAgentListOnTop ?? true,
-                agentListMinCards: jsonConfig.multiAgent?.agentListMinCards ?? 3,
-                agentListingType: jsonConfig.multiAgent?.agentListingType ?? "detailed",
-                // Custom CSS
-                customCss: jsonConfig.customCss,
-                // Behavior
-                autoOpen: jsonConfig.behavior?.autoOpen ?? false,
-                autoOpenDelay: jsonConfig.behavior?.autoOpenDelay ?? 5,
-                playSoundOnMessage: jsonConfig.behavior?.playSoundOnMessage ?? true,
-                persistConversation: jsonConfig.behavior?.persistConversation ?? true,
-                // Pre-chat requirements
-                requireEmail: jsonConfig.features?.requireEmail ?? false,
-                requireName: jsonConfig.features?.requireName ?? false,
-              };
-            }
-          }
-        }
-      } catch {
-        // JSON config fetch failed, will fallback to API
-      }
-
-      // Fallback to original API if JSON config failed
-      if (!configData) {
+      // In preview mode, use the admin preview-config API directly
+      if (isPreview) {
         const response = await fetch(
-          `/api/widget/config?agentId=${agentId}&companyId=${companyId}`
+          `/api/master-admin/companies/${companyId}/chatbots/${agentId}/preview-config`
         );
 
         if (response.ok) {
           const data = await response.json();
           configData = { ...initialConfig, ...data.config };
+        }
+      } else {
+        // Production mode: try pre-generated JSON first
+        try {
+          const configUrlResponse = await fetch(
+            `/api/widget/config-url?chatbotId=${agentId}&companyId=${companyId}`
+          );
+
+          if (configUrlResponse.ok) {
+            const { configUrl } = await configUrlResponse.json();
+
+            if (configUrl) {
+              // Fetch the pre-generated JSON config from storage
+              const jsonResponse = await fetch(configUrl);
+
+              if (jsonResponse.ok) {
+                const jsonConfig = await jsonResponse.json();
+
+                // Transform WidgetConfigJson to internal ChatWindowConfig format
+                configData = {
+                  agentId,
+                  companyId,
+                  // Appearance
+                  theme: jsonConfig.appearance?.theme || "light",
+                  primaryColor: jsonConfig.appearance?.primaryColor || "#007bff",
+                  accentColor: jsonConfig.appearance?.accentColor,
+                  borderRadius: jsonConfig.appearance?.borderRadius ?? 16,
+                  position: jsonConfig.appearance?.position ?? "bottom-right",
+                  // Branding
+                  title: jsonConfig.branding?.title,
+                  subtitle: jsonConfig.branding?.subtitle,
+                  avatarUrl: jsonConfig.branding?.avatarUrl,
+                  logoUrl: jsonConfig.branding?.logoUrl,
+                  welcomeMessage: jsonConfig.branding?.welcomeMessage,
+                  showBranding: jsonConfig.branding?.showBranding ?? true,
+                  // Features
+                  enableFileUpload: jsonConfig.features?.enableFileUpload ?? false,
+                  enableEmoji: jsonConfig.features?.enableEmoji ?? true,
+                  enableVoice: jsonConfig.features?.enableVoiceMessages ?? false,
+                  enableTypingIndicator: true,
+                  launcherIcon: jsonConfig.appearance?.launcherIcon,
+                  isMultiAgent: jsonConfig.chatbot?.type === "multi_agent",
+                  agentsList: jsonConfig.agents?.map((agent: { id: string; name: string; designation?: string; avatarUrl?: string; type?: string }) => ({
+                    id: agent.id,
+                    name: agent.name,
+                    designation: agent.designation,
+                    avatarUrl: agent.avatarUrl,
+                    type: agent.type,
+                  })),
+                  // Stream Display Options
+                  showAgentSwitchNotification: jsonConfig.streamDisplay?.showAgentSwitchNotification ?? true,
+                  showThinking: jsonConfig.streamDisplay?.showThinking ?? false,
+                  showInstantUpdates: jsonConfig.streamDisplay?.showInstantUpdates ?? true,
+                  // Multi-agent Display Options
+                  showAgentListOnTop: jsonConfig.multiAgent?.showAgentListOnTop ?? true,
+                  agentListMinCards: jsonConfig.multiAgent?.agentListMinCards ?? 3,
+                  agentListingType: jsonConfig.multiAgent?.agentListingType ?? "detailed",
+                  // Custom CSS
+                  customCss: jsonConfig.customCss,
+                  // Behavior
+                  autoOpen: jsonConfig.behavior?.autoOpen ?? false,
+                  autoOpenDelay: jsonConfig.behavior?.autoOpenDelay ?? 5,
+                  playSoundOnMessage: jsonConfig.behavior?.playSoundOnMessage ?? true,
+                  persistConversation: jsonConfig.behavior?.persistConversation ?? true,
+                  // Pre-chat requirements
+                  requireEmail: jsonConfig.features?.requireEmail ?? false,
+                  requireName: jsonConfig.features?.requireName ?? false,
+                };
+              }
+            }
+          }
+        } catch {
+          // JSON config fetch failed, will fallback to API
+        }
+
+        // Fallback to original API if JSON config failed
+        if (!configData) {
+          const response = await fetch(
+            `/api/widget/config?agentId=${agentId}&companyId=${companyId}`
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            configData = { ...initialConfig, ...data.config };
+          }
         }
       }
 
@@ -707,7 +723,12 @@ export function ChatWindow({
     if (!config) return;
 
     try {
-      const response = await fetch("/api/widget/session", {
+      // Use preview session API for preview mode, regular API for production
+      const endpoint = config.isPreview
+        ? `/api/master-admin/companies/${config.companyId}/chatbots/${config.agentId}/preview-session`
+        : "/api/widget/session";
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

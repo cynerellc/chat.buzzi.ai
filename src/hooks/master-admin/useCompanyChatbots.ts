@@ -74,7 +74,7 @@ export function useCompanyChatbot(
   companyId: string | null,
   chatbotId: string | null
 ): UseCompanyChatbotReturn {
-  const { data, error, isLoading, mutate } = useSWR<ChatbotDetails>(
+  const { data, error, isLoading, mutate } = useSWR<{ chatbot: ChatbotDetails }>(
     companyId && chatbotId
       ? `/api/master-admin/companies/${companyId}/chatbots/${chatbotId}`
       : null,
@@ -85,7 +85,7 @@ export function useCompanyChatbot(
   );
 
   return {
-    chatbot: data ?? null,
+    chatbot: data?.chatbot ?? null,
     isLoading,
     isError: !!error,
     error: error ?? null,

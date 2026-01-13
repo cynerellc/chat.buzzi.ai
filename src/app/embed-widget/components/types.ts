@@ -139,6 +139,8 @@ export interface ChatWindowConfig {
   // Pre-chat requirements
   requireEmail?: boolean;
   requireName?: boolean;
+  // Preview mode (for admin testing with draft chatbots)
+  isPreview?: boolean;
 }
 
 // ============================================================================
