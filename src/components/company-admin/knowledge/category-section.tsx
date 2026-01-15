@@ -124,7 +124,8 @@ export function CategorySection({
   ];
 
   return (
-    <div className="border rounded-lg">
+    <div className="card-extended-corners border border-border bg-card">
+      <span className="corner-extensions" />
       {/* Category Header */}
       <div className="flex items-center justify-between p-3 bg-muted/50">
         <button
@@ -171,7 +172,7 @@ export function CategorySection({
               size="sm"
             />
             <div className="flex gap-2">
-              {activeTab === "sources" ? (
+              {activeTab === "sources" && sources.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -180,7 +181,8 @@ export function CategorySection({
                 >
                   Add Source
                 </Button>
-              ) : (
+              )}
+              {activeTab === "faqs" && faqs.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -197,11 +199,12 @@ export function CategorySection({
           {activeTab === "sources" && (
             <>
               {sources.length > 0 ? (
-                <div className="divide-y divide-divider border rounded-lg">
-                  {sources.map((source) => {
+                <div>
+                  {sources.map((source, index) => {
                     const status = statusConfig[source.status] ?? defaultStatus;
                     const StatusIcon = status.icon;
                     const TypeIcon = typeIcons[source.type] || FileText;
+                    const isLast = index === sources.length - 1;
 
                     const sourceDropdownItems: DropdownMenuItemData[] = [
                       { key: "view", label: "View Details", icon: Eye },
@@ -211,7 +214,7 @@ export function CategorySection({
                     return (
                       <div
                         key={source.id}
-                        className="p-4 hover:bg-muted/30 transition-colors"
+                        className={`py-4 hover:bg-muted/30 transition-colors ${!isLast ? "border-b border-border" : ""}`}
                       >
                         <div className="flex items-center gap-4">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -271,7 +274,7 @@ export function CategorySection({
                   })}
                 </div>
               ) : (
-                <div className="p-8 text-center border rounded-lg bg-muted/30">
+                <div className="py-8 text-center">
                   <FileText className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
                     No sources in this category
@@ -294,8 +297,9 @@ export function CategorySection({
           {activeTab === "faqs" && (
             <>
               {faqs.length > 0 ? (
-                <div className="divide-y divide-divider border rounded-lg">
-                  {faqs.map((faq) => {
+                <div>
+                  {faqs.map((faq, index) => {
+                    const isLast = index === faqs.length - 1;
                     const faqDropdownItems: DropdownMenuItemData[] = [
                       { key: "edit", label: "Edit", icon: Eye },
                       { key: "delete", label: "Delete", icon: Trash2, isDanger: true },
@@ -304,7 +308,7 @@ export function CategorySection({
                     return (
                       <div
                         key={faq.id}
-                        className="p-4 hover:bg-muted/30 transition-colors"
+                        className={`py-4 hover:bg-muted/30 transition-colors ${!isLast ? "border-b border-border" : ""}`}
                       >
                         <div className="flex items-start gap-4">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -348,7 +352,7 @@ export function CategorySection({
                   })}
                 </div>
               ) : (
-                <div className="p-8 text-center border rounded-lg bg-muted/30">
+                <div className="py-8 text-center">
                   <MessageSquareText className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
                     No FAQs in this category

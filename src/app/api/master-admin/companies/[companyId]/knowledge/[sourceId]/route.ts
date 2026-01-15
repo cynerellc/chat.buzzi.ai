@@ -11,6 +11,49 @@ interface RouteContext {
   params: Promise<{ companyId: string; sourceId: string }>;
 }
 
+export async function GET(request: NextRequest, context: RouteContext) {
+  try {
+    await requireMasterAdmin();
+    const { companyId, sourceId } = await context.params;
+
+    // Verify company exists
+    const [company] = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    // Get the source
+    const [source] = await db
+      .select()
+      .from(knowledgeSources)
+      .where(
+        and(
+          eq(knowledgeSources.id, sourceId),
+          eq(knowledgeSources.companyId, companyId),
+          isNull(knowledgeSources.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!source) {
+      return NextResponse.json({ error: "Knowledge source not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ source });
+  } catch (error) {
+    console.error("Error fetching knowledge source:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch knowledge source" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     await requireMasterAdmin();

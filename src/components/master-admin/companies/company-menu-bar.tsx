@@ -249,10 +249,11 @@ export function CompanyMenuBar({ companyId, chatbots, companyName, className }: 
   return (
     <nav
       className={cn(
-        "flex items-center gap-1 px-2 py-2 bg-muted/30 border border-border/40 rounded-lg mb-4 overflow-x-auto md:overflow-visible",
+        "card-extended-corners flex items-center gap-1 px-2 py-2 bg-muted/30 border border-border/40 mb-4 overflow-x-auto md:overflow-visible",
         className
       )}
     >
+      <span className="corner-extensions" />
       {menuItems.map((item) =>
         item.href && !item.items ? (
           <MenuBarLink key={item.key} item={item} isActive={pathname === item.href} />

@@ -6,9 +6,153 @@ import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema/companies";
 import { faqItems } from "@/lib/db/schema/knowledge";
 import { deleteFaq as deleteQdrantFaq } from "@/lib/knowledge/qdrant-client";
+import { getProcessingPipeline } from "@/lib/knowledge/processing-pipeline";
 
 interface RouteContext {
   params: Promise<{ companyId: string; faqId: string }>;
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  try {
+    await requireMasterAdmin();
+    const { companyId, faqId } = await context.params;
+
+    // Verify company exists
+    const [company] = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    const [faq] = await db
+      .select()
+      .from(faqItems)
+      .where(
+        and(
+          eq(faqItems.id, faqId),
+          eq(faqItems.companyId, companyId),
+          isNull(faqItems.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!faq) {
+      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ faq });
+  } catch (error) {
+    console.error("Error fetching FAQ:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch FAQ" },
+      { status: 500 }
+    );
+  }
+}
+
+interface UpdateFaqRequest {
+  question?: string;
+  answer?: string;
+  category?: string | null;
+  tags?: string[];
+  keywords?: string[];
+  priority?: number;
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  try {
+    await requireMasterAdmin();
+    const { companyId, faqId } = await context.params;
+
+    // Verify company exists
+    const [company] = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    const body: UpdateFaqRequest = await request.json();
+
+    // Verify FAQ belongs to company
+    const [existingFaq] = await db
+      .select({ id: faqItems.id })
+      .from(faqItems)
+      .where(
+        and(
+          eq(faqItems.id, faqId),
+          eq(faqItems.companyId, companyId),
+          isNull(faqItems.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!existingFaq) {
+      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
+    }
+
+    // Build update object
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+
+    if (body.question !== undefined) {
+      updateData.question = body.question.trim();
+    }
+
+    if (body.answer !== undefined) {
+      updateData.answer = body.answer.trim();
+    }
+
+    if (body.category !== undefined) {
+      updateData.category = body.category;
+    }
+
+    if (body.tags !== undefined) {
+      updateData.tags = body.tags;
+    }
+
+    if (body.keywords !== undefined) {
+      updateData.keywords = body.keywords;
+    }
+
+    if (body.priority !== undefined) {
+      updateData.priority = body.priority;
+    }
+
+    const [updatedFaq] = await db
+      .update(faqItems)
+      .set(updateData)
+      .where(eq(faqItems.id, faqId))
+      .returning();
+
+    // Re-index FAQ if question or answer changed
+    if (body.question !== undefined || body.answer !== undefined || body.category !== undefined) {
+      setImmediate(async () => {
+        try {
+          const pipeline = getProcessingPipeline();
+          await pipeline.processFaq(faqId, { useQdrant: true });
+        } catch (error) {
+          console.error(`Failed to re-index FAQ ${faqId} in Qdrant:`, error);
+        }
+      });
+    }
+
+    return NextResponse.json({ faq: updatedFaq });
+  } catch (error) {
+    console.error("Error updating FAQ:", error);
+    return NextResponse.json(
+      { error: "Failed to update FAQ" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(request: NextRequest, context: RouteContext) {

@@ -5,6 +5,7 @@ import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema/companies";
 import { faqItems } from "@/lib/db/schema/knowledge";
+import { getProcessingPipeline } from "@/lib/knowledge/processing-pipeline";
 
 export interface FaqListItem {
   id: string;
@@ -120,6 +121,87 @@ export async function GET(request: NextRequest, context: RouteContext) {
     console.error("Error fetching FAQs:", error);
     return NextResponse.json(
       { error: "Failed to fetch FAQs" },
+      { status: 500 }
+    );
+  }
+}
+
+interface CreateFaqRequest {
+  question: string;
+  answer: string;
+  category?: string;
+  tags?: string[];
+  keywords?: string[];
+  priority?: number;
+}
+
+export async function POST(request: NextRequest, context: RouteContext) {
+  try {
+    await requireMasterAdmin();
+    const { companyId } = await context.params;
+
+    // Verify company exists
+    const [company] = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    const body: CreateFaqRequest = await request.json();
+
+    if (!body.question?.trim()) {
+      return NextResponse.json(
+        { error: "Question is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!body.answer?.trim()) {
+      return NextResponse.json(
+        { error: "Answer is required" },
+        { status: 400 }
+      );
+    }
+
+    const [newFaq] = await db
+      .insert(faqItems)
+      .values({
+        companyId,
+        question: body.question.trim(),
+        answer: body.answer.trim(),
+        category: body.category || null,
+        tags: body.tags || [],
+        keywords: body.keywords || [],
+        priority: body.priority ?? 0,
+      })
+      .returning();
+
+    if (!newFaq) {
+      return NextResponse.json(
+        { error: "Failed to create FAQ" },
+        { status: 500 }
+      );
+    }
+
+    // Index FAQ in Qdrant for semantic search (async, don't wait)
+    setImmediate(async () => {
+      try {
+        const pipeline = getProcessingPipeline();
+        await pipeline.processFaq(newFaq.id, { useQdrant: true });
+      } catch (error) {
+        console.error(`Failed to index FAQ ${newFaq.id} in Qdrant:`, error);
+      }
+    });
+
+    return NextResponse.json({ faq: newFaq }, { status: 201 });
+  } catch (error) {
+    console.error("Error creating FAQ:", error);
+    return NextResponse.json(
+      { error: "Failed to create FAQ" },
       { status: 500 }
     );
   }

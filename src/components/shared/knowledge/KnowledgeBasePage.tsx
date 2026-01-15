@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 import {
@@ -213,6 +213,13 @@ export function KnowledgeBasePage({
   const sources = sourcesData?.sources ?? [];
   const faqs = faqsData?.faqs ?? [];
   const categories = categoriesData?.categories ?? [];
+
+  // Expand all categories by default when loaded
+  useEffect(() => {
+    if (categories.length > 0) {
+      setExpandedCategories(new Set([...categories.map(c => c.name), "uncategorized"]));
+    }
+  }, [categories]);
 
   // Group sources by category
   const sourcesByCategory = useMemo(() => {
@@ -449,44 +456,40 @@ export function KnowledgeBasePage({
 
       {/* Filters */}
       {hasContent && (
-        <Card>
-          <CardBody className="pt-6">
-            <div className="flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <Input
-                  placeholder="Search sources and FAQs..."
-                  value={searchValue}
-                  onValueChange={setSearchValue}
-                  startContent={
-                    <Search className="h-4 w-4 text-muted-foreground" />
-                  }
-                  isClearable
-                  onClear={() => setSearchValue("")}
-                />
-              </div>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex-1 min-w-[200px]">
+            <Input
+              placeholder="Search sources and FAQs..."
+              value={searchValue}
+              onValueChange={setSearchValue}
+              startContent={
+                <Search className="h-4 w-4 text-muted-foreground" />
+              }
+              isClearable
+              onClear={() => setSearchValue("")}
+            />
+          </div>
 
-              <Select
-                options={TYPE_OPTIONS}
-                selectedKeys={new Set([filters.type || "all"])}
-                onSelectionChange={(keys) => {
-                  const selected = Array.from(keys)[0];
-                  handleFilterChange("type", selected as string);
-                }}
-                className="w-[150px]"
-              />
+          <Select
+            options={TYPE_OPTIONS}
+            selectedKeys={new Set([filters.type || "all"])}
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0];
+              handleFilterChange("type", selected as string);
+            }}
+            className="w-[150px]"
+          />
 
-              <Select
-                options={STATUS_OPTIONS}
-                selectedKeys={new Set([filters.status || "all"])}
-                onSelectionChange={(keys) => {
-                  const selected = Array.from(keys)[0];
-                  handleFilterChange("status", selected as string);
-                }}
-                className="w-[150px]"
-              />
-            </div>
-          </CardBody>
-        </Card>
+          <Select
+            options={STATUS_OPTIONS}
+            selectedKeys={new Set([filters.status || "all"])}
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0];
+              handleFilterChange("status", selected as string);
+            }}
+            className="w-[150px]"
+          />
+        </div>
       )}
 
       {/* Category Sections */}
