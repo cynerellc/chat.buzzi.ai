@@ -13,6 +13,7 @@ import {
   CardBody,
   CardHeader,
   Input,
+  Slider,
   Switch,
   TagInput,
   Textarea,
@@ -31,6 +32,7 @@ interface AgentData {
   model_settings?: Record<string, unknown>;
   knowledge_base_enabled?: boolean | null;
   knowledge_categories?: string[] | null;
+  knowledge_threshold?: number | null;
 }
 
 interface CategoryWithCounts {
@@ -408,32 +410,52 @@ export function AgentDetailForm({
                 </div>
               )}
               {showKnowledgeCategories && (
-                <FormFieldWrapper
-                  label={showKnowledgeToggle ? "Knowledge Categories" : "Categories"}
-                  description="Select categories this agent can access (leave empty for all categories)"
-                >
-                  <TagInput
-                    value={editedAgent.knowledge_categories ?? []}
-                    onChange={(categories) =>
-                      setEditedAgent((prev) =>
-                        prev
-                          ? { ...prev, knowledge_categories: categories }
-                          : null
-                      )
-                    }
-                    suggestions={availableCategories}
-                    placeholder="Search or create categories..."
-                    isLoading={isCategoriesLoading}
-                    allowCreate={true}
-                  />
-                </FormFieldWrapper>
-              )}
-              {showKnowledgeToggle && (
-                <Card className="p-6 text-center bg-muted/30">
-                  <p className="text-muted-foreground text-sm">
-                    Tool configuration will be available in a future update.
-                  </p>
-                </Card>
+                <>
+                  <FormFieldWrapper
+                    label={showKnowledgeToggle ? "Knowledge Categories" : "Categories"}
+                    description="Select categories this agent can access (leave empty for all categories)"
+                  >
+                    <TagInput
+                      value={editedAgent.knowledge_categories ?? []}
+                      onChange={(categories) =>
+                        setEditedAgent((prev) =>
+                          prev
+                            ? { ...prev, knowledge_categories: categories }
+                            : null
+                        )
+                      }
+                      suggestions={availableCategories}
+                      placeholder="Search or create categories..."
+                      isLoading={isCategoriesLoading}
+                      allowCreate={true}
+                    />
+                  </FormFieldWrapper>
+
+                  <FormFieldWrapper
+                    label="Relevance Threshold"
+                    description="Minimum relevance score for knowledge search results. Lower values return more results but may include less relevant content."
+                  >
+                    <div className="space-y-2">
+                      <Slider
+                        value={[editedAgent.knowledge_threshold ?? 0.3]}
+                        onValueChange={([value]) =>
+                          setEditedAgent((prev) =>
+                            prev ? { ...prev, knowledge_threshold: value } : null
+                          )
+                        }
+                        min={0.05}
+                        max={0.95}
+                        step={0.05}
+                        showValue
+                        formatValue={(value) => value.toFixed(2)}
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>More Results (0.05)</span>
+                        <span>More Relevant (0.95)</span>
+                      </div>
+                    </div>
+                  </FormFieldWrapper>
+                </>
               )}
             </FormSection>
           </CardBody>

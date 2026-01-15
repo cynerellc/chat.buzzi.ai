@@ -23,7 +23,6 @@ export const users = chatappSchema.table(
     email: varchar("email", { length: 255 }).notNull().unique(),
     emailVerified: timestamp("email_verified"),
     name: varchar("name", { length: 255 }),
-    image: varchar("image", { length: 500 }),
     hashedPassword: varchar("hashed_password", { length: 255 }),
 
     // Platform fields - companyId removed, users now link to companies via company_permissions
@@ -32,10 +31,7 @@ export const users = chatappSchema.table(
 
     // Profile
     phone: varchar("phone", { length: 20 }),
-    avatarUrl: varchar("avatar_url", { length: 500 }),
-
-    // Permissions (fine-grained)
-    permissions: jsonb("permissions").default({}),
+    avatarUrl: text("avatar_url"),
 
     // Settings
     settings: jsonb("settings").default({}),
@@ -43,13 +39,8 @@ export const users = chatappSchema.table(
     // Active company - the company user is currently working in
     activeCompanyId: uuid("active_company_id"),
 
-    // Status
-    isActive: boolean("is_active").default(true).notNull(),
+    // Last login tracking
     lastLoginAt: timestamp("last_login_at"),
-
-    // Restrictions
-    ipAllowlist: jsonb("ip_allowlist").default([]),
-    accessExpiresAt: timestamp("access_expires_at"),
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),

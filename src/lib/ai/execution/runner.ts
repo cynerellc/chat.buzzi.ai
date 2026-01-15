@@ -364,6 +364,7 @@ export class AgentRunnerService {
         modelSettings: primaryAgent.model_settings ?? { temperature: 0.7 },
         knowledgeBaseEnabled: primaryKbEnabled,
         knowledgeCategories: primaryKbCategories,
+        knowledgeThreshold: primaryAgent.knowledge_threshold,
       },
       agentsListConfig: agentsList,
     };

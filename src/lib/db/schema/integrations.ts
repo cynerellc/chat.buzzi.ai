@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { chatbots } from "./chatbots";
+import { integrationAccounts } from "./calls";
 import { companies } from "./companies";
 import { chatappSchema, integrationStatusEnum, integrationTypeEnum, invitationStatusEnum } from "./enums";
 import { users } from "./users";
@@ -25,6 +26,10 @@ export const integrations = chatappSchema.table(
       .notNull()
       .references(() => chatbots.id, { onDelete: "cascade" }),
 
+    // Integration Account Reference (for unified credential management)
+    integrationAccountId: uuid("integration_account_id")
+      .references(() => integrationAccounts.id),
+
     // Integration Info
     type: integrationTypeEnum("type").notNull(),
     name: varchar("name", { length: 255 }).notNull(),
@@ -33,15 +38,6 @@ export const integrations = chatappSchema.table(
 
     // Configuration (encrypted sensitive data)
     config: jsonb("config").default({}).notNull(),
-
-    // OAuth tokens (if applicable)
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token"),
-    tokenExpiresAt: timestamp("token_expires_at"),
-
-    // Webhook URL (for incoming webhooks)
-    webhookUrl: varchar("webhook_url", { length: 500 }),
-    webhookSecret: varchar("webhook_secret", { length: 255 }),
 
     // Error tracking
     lastError: text("last_error"),
@@ -56,92 +52,7 @@ export const integrations = chatappSchema.table(
     index("integrations_chatbot_idx").on(table.chatbotId),
     index("integrations_type_idx").on(table.type),
     index("integrations_status_idx").on(table.status),
-  ]
-);
-
-// Webhooks Table (outgoing webhooks - per chatbot)
-export const webhooks = chatappSchema.table(
-  "webhooks",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    // Chatbot Reference (changed from companyId)
-    chatbotId: uuid("chatbot_id")
-      .notNull()
-      .references(() => chatbots.id, { onDelete: "cascade" }),
-
-    // Webhook Info
-    name: varchar("name", { length: 255 }).notNull(),
-    description: text("description"),
-    url: varchar("url", { length: 500 }).notNull(),
-    secret: varchar("secret", { length: 255 }),
-
-    // Events to trigger
-    events: jsonb("events").default([]).notNull(), // ['conversation.created', 'message.created', etc.]
-
-    // Status
-    isActive: boolean("is_active").default(true).notNull(),
-
-    // Headers to send
-    headers: jsonb("headers").default({}),
-
-    // Retry config
-    maxRetries: jsonb("max_retries").default(3),
-    retryDelaySeconds: jsonb("retry_delay_seconds").default(60),
-
-    // Stats
-    totalDeliveries: jsonb("total_deliveries").default(0),
-    successfulDeliveries: jsonb("successful_deliveries").default(0),
-    failedDeliveries: jsonb("failed_deliveries").default(0),
-    lastDeliveryAt: timestamp("last_delivery_at"),
-    lastDeliveryStatus: varchar("last_delivery_status", { length: 50 }),
-
-    // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("webhooks_chatbot_idx").on(table.chatbotId),
-    index("webhooks_active_idx").on(table.isActive),
-  ]
-);
-
-// Webhook Deliveries Table (delivery history)
-export const webhookDeliveries = chatappSchema.table(
-  "webhook_deliveries",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    // Webhook Reference
-    webhookId: uuid("webhook_id")
-      .notNull()
-      .references(() => webhooks.id, { onDelete: "cascade" }),
-
-    // Event Info
-    event: varchar("event", { length: 100 }).notNull(),
-    payload: jsonb("payload").notNull(),
-
-    // Delivery Status
-    status: varchar("status", { length: 50 }).notNull(), // pending, success, failed
-    statusCode: jsonb("status_code"),
-    responseBody: text("response_body"),
-    errorMessage: text("error_message"),
-
-    // Retry Info
-    attempt: jsonb("attempt").default(1).notNull(),
-    nextRetryAt: timestamp("next_retry_at"),
-
-    // Timing
-    deliveredAt: timestamp("delivered_at"),
-    durationMs: jsonb("duration_ms"),
-
-    // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("webhook_deliveries_webhook_idx").on(table.webhookId),
-    index("webhook_deliveries_status_idx").on(table.status),
-    index("webhook_deliveries_created_at_idx").on(table.createdAt),
+    index("integrations_account_idx").on(table.integrationAccountId),
   ]
 );
 
@@ -234,20 +145,9 @@ export const integrationsRelations = relations(integrations, ({ one }) => ({
     fields: [integrations.chatbotId],
     references: [chatbots.id],
   }),
-}));
-
-export const webhooksRelations = relations(webhooks, ({ one, many }) => ({
-  chatbot: one(chatbots, {
-    fields: [webhooks.chatbotId],
-    references: [chatbots.id],
-  }),
-  deliveries: many(webhookDeliveries),
-}));
-
-export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one }) => ({
-  webhook: one(webhooks, {
-    fields: [webhookDeliveries.webhookId],
-    references: [webhooks.id],
+  integrationAccount: one(integrationAccounts, {
+    fields: [integrations.integrationAccountId],
+    references: [integrationAccounts.id],
   }),
 }));
 
@@ -276,10 +176,6 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 // Types
 export type Integration = typeof integrations.$inferSelect;
 export type NewIntegration = typeof integrations.$inferInsert;
-export type Webhook = typeof webhooks.$inferSelect;
-export type NewWebhook = typeof webhooks.$inferInsert;
-export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
-export type NewWebhookDelivery = typeof webhookDeliveries.$inferInsert;
 export type Invitation = typeof invitations.$inferSelect;
 export type NewInvitation = typeof invitations.$inferInsert;
 export type AuditLog = typeof auditLogs.$inferSelect;

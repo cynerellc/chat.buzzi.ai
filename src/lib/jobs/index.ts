@@ -22,7 +22,6 @@ export {
   JOB_TYPES,
   registerDefaultHandlers,
   type SendEmailPayload,
-  type SendWebhookPayload,
   type ProcessKnowledgePayload,
   type GenerateReportPayload,
   type CleanupDataPayload,

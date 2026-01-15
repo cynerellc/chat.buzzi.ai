@@ -116,7 +116,7 @@ export async function requireCompanyAdminFor(companyId: string) {
  * Returns user AND company context
  */
 export async function requireCompanyAdmin(): Promise<{
-  user: { id: string; email: string; name: string | null; image: string | null; role: UserRole };
+  user: { id: string; email: string; name: string | null; avatarUrl: string | null; role: UserRole };
   company: Company;
   permissionRole: CompanyPermissionRole;
 }> {
@@ -185,7 +185,7 @@ export async function requireSupportAgentFor(companyId: string) {
  * Returns user AND company context
  */
 export async function requireSupportAgent(): Promise<{
-  user: { id: string; email: string; name: string | null; image: string | null; role: UserRole };
+  user: { id: string; email: string; name: string | null; avatarUrl: string | null; role: UserRole };
   company: Company;
   permissionRole: CompanyPermissionRole;
 }> {
@@ -252,7 +252,7 @@ export async function requireCompanyAccessFor(companyId: string) {
  * Require any access to active company (cookie-based)
  */
 export async function requireCompanyAccess(): Promise<{
-  user: { id: string; email: string; name: string | null; image: string | null; role: UserRole };
+  user: { id: string; email: string; name: string | null; avatarUrl: string | null; role: UserRole };
   company: Company;
   permissionRole: CompanyPermissionRole | null;
 }> {

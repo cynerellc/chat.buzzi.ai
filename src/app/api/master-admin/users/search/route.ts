@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         and(
           ne(users.role, "chatapp.master_admin"),
           ne(users.id, session.user.id),
-          eq(users.isActive, true),
+          eq(users.status, "active"),
           sql`${users.deletedAt} IS NULL`,
           or(
             ilike(users.email, `%${query}%`),

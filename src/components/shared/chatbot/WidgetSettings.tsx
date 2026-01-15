@@ -20,6 +20,7 @@ import {
   X,
   UserCheck,
   Plus,
+  Phone,
 } from "lucide-react";
 import { ChatWindow } from "@/app/embed-widget/components/ChatWindow";
 import { Switch, Slider, Textarea, addToast, Modal, ModalContent, ModalHeader, ModalBody } from "@/components/ui";
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui";
 import useSWR from "swr";
 import { ImageCropper, type CropData } from "@/components/shared/image-cropper";
+import type { CallWidgetConfig } from "@/lib/db/schema/chatbots";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Light" },
@@ -118,9 +120,16 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
-// Chatbot type for escalation settings
+// Chatbot type for escalation settings and call config
+// Note: widgetConfig uses unknown types to be compatible with various chatbot types
 interface ChatbotData {
   escalationEnabled?: boolean;
+  enabledChat?: boolean;
+  enabledCall?: boolean;
+  widgetConfig?: {
+    chat?: unknown;
+    call?: unknown;
+  };
   behavior?: {
     maxTurnsBeforeEscalation?: number;
     autoEscalateOnSentiment?: boolean;
@@ -192,6 +201,7 @@ export function WidgetSettings({
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [previewTab, setPreviewTab] = useState<"chat" | "call">("chat");
 
   // Logo upload state
   const [showCropperModal, setShowCropperModal] = useState(false);
@@ -213,6 +223,18 @@ export function WidgetSettings({
   // New escalation rule input state
   const [newEscalationRule, setNewEscalationRule] = useState("");
   const [showRuleSuggestions, setShowRuleSuggestions] = useState(false);
+
+  // Call widget settings state
+  const [callFormData, setCallFormData] = useState<CallWidgetConfig>({
+    enabled: true,
+    position: "bottom-right",
+    colors: { primary: "#6437F3", background: "#ffffff", text: "#333333" },
+    callButton: { style: "orb", size: 60, animation: true, label: "Call us" },
+    orb: { glowIntensity: 0.6, pulseSpeed: 2 },
+    callDialog: { width: 400, showVisualizer: true, visualizerStyle: "waveform", showTranscript: true },
+    controls: { showMuteButton: true, showEndCallButton: true },
+    branding: { showPoweredBy: true },
+  });
 
   const [formData, setFormData] = useState({
     theme: "light",
@@ -330,6 +352,23 @@ export function WidgetSettings({
     }
   }, [chatbot]);
 
+  // Sync call widget settings from chatbot prop
+  useEffect(() => {
+    if (chatbot?.widgetConfig?.call) {
+      const callConfig = chatbot.widgetConfig.call as CallWidgetConfig;
+      setCallFormData((prev) => ({
+        ...prev,
+        ...callConfig,
+        colors: { ...prev.colors, ...callConfig.colors },
+        callButton: { ...prev.callButton, ...callConfig.callButton },
+        orb: { ...prev.orb, ...callConfig.orb },
+        callDialog: { ...prev.callDialog, ...callConfig.callDialog },
+        controls: { ...prev.controls, ...callConfig.controls },
+        branding: { ...prev.branding, ...callConfig.branding },
+      }));
+    }
+  }, [chatbot?.widgetConfig?.call]);
+
   const updateField = <K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
@@ -340,6 +379,30 @@ export function WidgetSettings({
     value: (typeof escalationFormData)[K]
   ) => {
     setEscalationFormData((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  // Call widget update helpers
+  const updateCallField = <K extends keyof CallWidgetConfig>(
+    key: K,
+    value: CallWidgetConfig[K]
+  ) => {
+    setCallFormData((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  const updateCallNestedField = <
+    K extends keyof CallWidgetConfig,
+    NK extends keyof NonNullable<CallWidgetConfig[K]>
+  >(
+    key: K,
+    nestedKey: NK,
+    value: NonNullable<CallWidgetConfig[K]>[NK]
+  ) => {
+    setCallFormData((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] as object), [nestedKey]: value },
+    }));
     setHasChanges(true);
   };
 
@@ -391,26 +454,38 @@ export function WidgetSettings({
 
       if (!widgetResponse.ok) throw new Error("Failed to save widget settings");
 
-      // Save escalation settings if chatbotApiUrl is provided
+      // Save escalation and call widget settings if chatbotApiUrl is provided
       if (chatbotApiUrl) {
-        const escalationResponse = await fetch(chatbotApiUrl, {
+        // Build the update payload
+        const updatePayload: Record<string, unknown> = {
+          escalationEnabled: escalationFormData.escalationEnabled,
+          behavior: {
+            ...chatbot?.behavior,
+            maxTurnsBeforeEscalation: escalationFormData.maxTurnsBeforeEscalation,
+            autoEscalateOnSentiment: escalationFormData.autoEscalateOnSentiment,
+            sentimentThreshold: escalationFormData.sentimentThreshold,
+            escalationRoutingRule: escalationFormData.escalationRoutingRule,
+            escalationPreferredAgentId: escalationFormData.escalationPreferredAgentId || null,
+            escalationRules: escalationFormData.escalationRules,
+          },
+        };
+
+        // Include call widget config if call is enabled
+        if (chatbot?.enabledCall) {
+          const existingWidgetConfig = chatbot?.widgetConfig || { chat: {}, call: {} };
+          updatePayload.widgetConfig = {
+            chat: existingWidgetConfig.chat || {},
+            call: callFormData,
+          };
+        }
+
+        const chatbotResponse = await fetch(chatbotApiUrl, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            escalationEnabled: escalationFormData.escalationEnabled,
-            behavior: {
-              ...chatbot?.behavior,
-              maxTurnsBeforeEscalation: escalationFormData.maxTurnsBeforeEscalation,
-              autoEscalateOnSentiment: escalationFormData.autoEscalateOnSentiment,
-              sentimentThreshold: escalationFormData.sentimentThreshold,
-              escalationRoutingRule: escalationFormData.escalationRoutingRule,
-              escalationPreferredAgentId: escalationFormData.escalationPreferredAgentId || null,
-              escalationRules: escalationFormData.escalationRules,
-            },
-          }),
+          body: JSON.stringify(updatePayload),
         });
 
-        if (!escalationResponse.ok) throw new Error("Failed to save escalation settings");
+        if (!chatbotResponse.ok) throw new Error("Failed to save chatbot settings");
 
         // Refresh chatbot data
         onChatbotRefresh?.();
@@ -1615,6 +1690,305 @@ export function WidgetSettings({
         </div>
       ),
     },
+    // Voice Widget tab - only show when call is enabled
+    ...(chatbot?.enabledCall
+      ? [
+          {
+            key: "voice-widget",
+            label: "Voice Widget",
+            icon: Phone,
+            content: (
+              <div className="space-y-6 p-6">
+                {/* Enable Call Button */}
+                <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                  <div>
+                    <span className="font-medium">Show Call Button</span>
+                    <p className="text-sm text-muted-foreground">
+                      Display a call button on the widget for voice conversations
+                    </p>
+                  </div>
+                  <Switch
+                    isSelected={callFormData.enabled ?? true}
+                    onValueChange={(v) => updateCallField("enabled", v)}
+                  />
+                </div>
+
+                {callFormData.enabled && (
+                  <>
+                    {/* Button Style Section */}
+                    <div className="border-t border-divider pt-6">
+                      <h3 className="font-semibold mb-4">Button Style</h3>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium block mb-2">Button Style</label>
+                          <div className="flex gap-3">
+                            <div
+                              onClick={() => updateCallNestedField("callButton", "style", "orb")}
+                              className={`cursor-pointer rounded-lg border-2 p-4 flex-1 transition-all ${
+                                callFormData.callButton?.style === "orb"
+                                  ? "border-primary bg-primary/5"
+                                  : "border-divider hover:border-primary/50"
+                              }`}
+                            >
+                              <p className="font-medium text-sm">Orb</p>
+                              <p className="text-xs text-muted-foreground">Circular glowing button</p>
+                            </div>
+                            <div
+                              onClick={() => updateCallNestedField("callButton", "style", "pill")}
+                              className={`cursor-pointer rounded-lg border-2 p-4 flex-1 transition-all ${
+                                callFormData.callButton?.style === "pill"
+                                  ? "border-primary bg-primary/5"
+                                  : "border-divider hover:border-primary/50"
+                              }`}
+                            >
+                              <p className="font-medium text-sm">Pill</p>
+                              <p className="text-xs text-muted-foreground">Rounded rectangular button</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium">
+                            Button Size: {callFormData.callButton?.size || 60}px
+                          </label>
+                          <Slider
+                            aria-label="Call button size"
+                            value={[callFormData.callButton?.size || 60]}
+                            onValueChange={(v) => updateCallNestedField("callButton", "size", v[0])}
+                            min={40}
+                            max={80}
+                            step={4}
+                            className="mt-2"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                          <div>
+                            <span className="font-medium">Animation</span>
+                            <p className="text-sm text-muted-foreground">
+                              Enable button animation effects
+                            </p>
+                          </div>
+                          <Switch
+                            isSelected={callFormData.callButton?.animation ?? true}
+                            onValueChange={(v) => updateCallNestedField("callButton", "animation", v)}
+                          />
+                        </div>
+
+                        <Input
+                          label="Button Label"
+                          placeholder="Call us"
+                          value={callFormData.callButton?.label || ""}
+                          onValueChange={(v) => updateCallNestedField("callButton", "label", v)}
+                          description="Text shown on the call button (pill style only)"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Colors Section */}
+                    <div className="border-t border-divider pt-6">
+                      <h3 className="font-semibold mb-4">Colors</h3>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium block mb-2">Primary Color</label>
+                          <div className="flex items-center gap-3">
+                            <label
+                              className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                              style={{ backgroundColor: callFormData.colors?.primary || "#6437F3" }}
+                            >
+                              <input
+                                type="color"
+                                value={callFormData.colors?.primary || "#6437F3"}
+                                onChange={(e) => updateCallNestedField("colors", "primary", e.target.value)}
+                                className="opacity-0 w-0 h-0"
+                              />
+                            </label>
+                            <Input
+                              value={callFormData.colors?.primary || "#6437F3"}
+                              onValueChange={(v) => updateCallNestedField("colors", "primary", v)}
+                              className="w-28 font-mono text-sm"
+                              maxLength={7}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium block mb-2">Background Color</label>
+                          <div className="flex items-center gap-3">
+                            <label
+                              className="w-10 h-10 rounded-lg border border-divider cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                              style={{ backgroundColor: callFormData.colors?.background || "#ffffff" }}
+                            >
+                              <input
+                                type="color"
+                                value={callFormData.colors?.background || "#ffffff"}
+                                onChange={(e) => updateCallNestedField("colors", "background", e.target.value)}
+                                className="opacity-0 w-0 h-0"
+                              />
+                            </label>
+                            <Input
+                              value={callFormData.colors?.background || "#ffffff"}
+                              onValueChange={(v) => updateCallNestedField("colors", "background", v)}
+                              className="w-28 font-mono text-sm"
+                              maxLength={7}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Orb Settings - only for orb style */}
+                    {callFormData.callButton?.style === "orb" && (
+                      <div className="border-t border-divider pt-6">
+                        <h3 className="font-semibold mb-4">Orb Settings</h3>
+
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium">
+                              Glow Intensity: {((callFormData.orb?.glowIntensity || 0.6) * 100).toFixed(0)}%
+                            </label>
+                            <Slider
+                              aria-label="Glow intensity"
+                              value={[(callFormData.orb?.glowIntensity || 0.6) * 100]}
+                              onValueChange={(v) => updateCallNestedField("orb", "glowIntensity", (v[0] || 60) / 100)}
+                              min={0}
+                              max={100}
+                              step={10}
+                              className="mt-2"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">
+                              Pulse Speed: {callFormData.orb?.pulseSpeed || 2}s
+                            </label>
+                            <Slider
+                              aria-label="Pulse speed"
+                              value={[callFormData.orb?.pulseSpeed || 2]}
+                              onValueChange={(v) => updateCallNestedField("orb", "pulseSpeed", v[0])}
+                              min={1}
+                              max={5}
+                              step={0.5}
+                              className="mt-2"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Call Dialog Settings */}
+                    <div className="border-t border-divider pt-6">
+                      <h3 className="font-semibold mb-4">Call Dialog</h3>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                          <div>
+                            <span className="font-medium">Show Visualizer</span>
+                            <p className="text-sm text-muted-foreground">
+                              Display audio visualizer during calls
+                            </p>
+                          </div>
+                          <Switch
+                            isSelected={callFormData.callDialog?.showVisualizer ?? true}
+                            onValueChange={(v) => updateCallNestedField("callDialog", "showVisualizer", v)}
+                          />
+                        </div>
+
+                        {callFormData.callDialog?.showVisualizer && (
+                          <div>
+                            <label className="text-sm font-medium block mb-2">Visualizer Style</label>
+                            <div className="flex gap-3">
+                              {(["waveform", "bars", "circle"] as const).map((style) => (
+                                <div
+                                  key={style}
+                                  onClick={() => updateCallNestedField("callDialog", "visualizerStyle", style)}
+                                  className={`cursor-pointer rounded-lg border-2 p-3 flex-1 text-center transition-all ${
+                                    callFormData.callDialog?.visualizerStyle === style
+                                      ? "border-primary bg-primary/5"
+                                      : "border-divider hover:border-primary/50"
+                                  }`}
+                                >
+                                  <p className="font-medium text-sm capitalize">{style}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                          <div>
+                            <span className="font-medium">Show Transcript</span>
+                            <p className="text-sm text-muted-foreground">
+                              Display real-time transcript during calls
+                            </p>
+                          </div>
+                          <Switch
+                            isSelected={callFormData.callDialog?.showTranscript ?? true}
+                            onValueChange={(v) => updateCallNestedField("callDialog", "showTranscript", v)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="border-t border-divider pt-6">
+                      <h3 className="font-semibold mb-4">Controls</h3>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                          <div>
+                            <span className="font-medium">Show Mute Button</span>
+                            <p className="text-sm text-muted-foreground">
+                              Allow users to mute their microphone
+                            </p>
+                          </div>
+                          <Switch
+                            isSelected={callFormData.controls?.showMuteButton ?? true}
+                            onValueChange={(v) => updateCallNestedField("controls", "showMuteButton", v)}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                          <div>
+                            <span className="font-medium">Show End Call Button</span>
+                            <p className="text-sm text-muted-foreground">
+                              Display a prominent end call button
+                            </p>
+                          </div>
+                          <Switch
+                            isSelected={callFormData.controls?.showEndCallButton ?? true}
+                            onValueChange={(v) => updateCallNestedField("controls", "showEndCallButton", v)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Branding */}
+                    <div className="border-t border-divider pt-6">
+                      <h3 className="font-semibold mb-4">Branding</h3>
+
+                      <div className="flex items-center justify-between rounded-lg border border-divider p-4">
+                        <div>
+                          <span className="font-medium">Show &quot;Powered by&quot; branding</span>
+                          <p className="text-sm text-muted-foreground">
+                            Display Buzzi branding in the call widget
+                          </p>
+                        </div>
+                        <Switch
+                          isSelected={callFormData.branding?.showPoweredBy ?? true}
+                          onValueChange={(v) => updateCallNestedField("branding", "showPoweredBy", v)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -1659,64 +2033,253 @@ export function WidgetSettings({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold">Live Widget Preview</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Live Widget Preview</h2>
+                {chatbot?.enabledCall && (
+                  <div className="flex rounded-lg bg-muted p-1">
+                    <button
+                      onClick={() => setPreviewTab("chat")}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                        previewTab === "chat"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <MessageCircle size={14} className="inline-block mr-1.5" />
+                      Chat
+                    </button>
+                    <button
+                      onClick={() => setPreviewTab("call")}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                        previewTab === "call"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Phone size={14} className="inline-block mr-1.5" />
+                      Call
+                    </button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardBody>
-              <div className="relative rounded-lg overflow-hidden bg-gradient-to-br from-muted to-muted/50">
-                {/* Chat Window Preview */}
-                <div className="h-[480px]">
-                  <ChatWindow
-                    isDemo={true}
-                    configJson={previewConfig}
-                    className="h-full"
-                  />
+              {/* Chat Preview */}
+              {previewTab === "chat" && (
+                <div className="relative rounded-lg overflow-hidden bg-gradient-to-br from-muted to-muted/50">
+                  {/* Chat Window Preview */}
+                  <div className="h-[480px]">
+                    <ChatWindow
+                      isDemo={true}
+                      configJson={previewConfig}
+                      className="h-full"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Launcher Preview */}
-              <div className="mt-4 pt-4 border-t border-divider">
-                <p className="text-sm text-muted-foreground mb-3">Launcher Preview</p>
-                <div className="flex items-center justify-end gap-2 bg-gradient-to-br from-muted to-muted/50 p-4 rounded-lg">
-                  {/* Launcher Text */}
-                  {formData.showLauncherText && formData.launcherText && (
-                    <div
-                      className="px-3 py-2 rounded-lg text-sm font-medium shadow-lg"
-                      style={{
-                        backgroundColor: formData.launcherTextBackgroundColor,
-                        color: formData.launcherTextColor,
-                        borderRadius: `${Math.min(parseInt(formData.borderRadius, 10), 16)}px`,
-                      }}
-                    >
-                      {formData.launcherText}
+              {/* Call Dialog Preview */}
+              {previewTab === "call" && chatbot?.enabledCall && (
+                <div
+                  className="rounded-lg overflow-hidden shadow-lg mx-auto"
+                  style={{
+                    maxWidth: `${callFormData.callDialog?.width || 400}px`,
+                    backgroundColor: callFormData.colors?.background || "#ffffff",
+                  }}
+                >
+                  {/* Dialog Header */}
+                  <div
+                    className="p-4 text-white"
+                    style={{ backgroundColor: callFormData.colors?.primary || "#6437F3" }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                          <Phone size={20} />
+                        </div>
+                        <div>
+                          <p className="font-medium">Voice Assistant</p>
+                          <p className="text-sm text-white/80">Connected</p>
+                        </div>
+                      </div>
+                      <div className="text-sm">00:42</div>
+                    </div>
+                  </div>
+
+                  {/* Visualizer Preview */}
+                  {callFormData.callDialog?.showVisualizer && (
+                    <div className="p-6 flex items-center justify-center">
+                      {callFormData.callDialog?.visualizerStyle === "waveform" && (
+                        <div className="flex items-center gap-1 h-16">
+                          {[...Array(20)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-1 rounded-full animate-pulse"
+                              style={{
+                                height: `${20 + Math.sin(i * 0.5) * 15 + Math.random() * 20}px`,
+                                backgroundColor: callFormData.colors?.primary || "#6437F3",
+                                animationDelay: `${i * 0.05}s`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {callFormData.callDialog?.visualizerStyle === "bars" && (
+                        <div className="flex items-end gap-2 h-16">
+                          {[...Array(8)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-4 rounded-t animate-pulse"
+                              style={{
+                                height: `${30 + Math.random() * 30}px`,
+                                backgroundColor: callFormData.colors?.primary || "#6437F3",
+                                animationDelay: `${i * 0.1}s`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {callFormData.callDialog?.visualizerStyle === "circle" && (
+                        <div
+                          className="w-24 h-24 rounded-full animate-pulse flex items-center justify-center"
+                          style={{
+                            backgroundColor: `${callFormData.colors?.primary || "#6437F3"}20`,
+                            border: `3px solid ${callFormData.colors?.primary || "#6437F3"}`,
+                          }}
+                        >
+                          <div
+                            className="w-16 h-16 rounded-full animate-pulse"
+                            style={{
+                              backgroundColor: `${callFormData.colors?.primary || "#6437F3"}40`,
+                              animationDelay: "0.2s",
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
-                  {/* Launcher Button */}
-                  <button
-                    className="relative flex items-center justify-center text-white shadow-lg transition-transform hover:scale-105"
-                    style={{
-                      width: `${formData.buttonSize}px`,
-                      height: `${formData.buttonSize}px`,
-                      backgroundColor: formData.primaryColor,
-                      borderRadius: `${formData.launcherIconBorderRadius}%`,
-                      boxShadow: formData.launcherIconPulseGlow
-                        ? `0 0 20px ${formData.primaryColor}80`
-                        : undefined,
-                    }}
-                  >
-                    {formData.launcherIcon === "chat" && <MessageCircle size={24} />}
-                    {formData.launcherIcon === "message" && <MessageSquare size={24} />}
-                    {formData.launcherIcon === "help" && <HelpCircle size={24} />}
-                    {formData.launcherIcon === "sparkle" && <Sparkles size={24} />}
-                    {formData.launcherIconPulseGlow && (
-                      <span
-                        className="absolute inset-0 animate-ping opacity-30"
+
+                  {/* Transcript Preview */}
+                  {callFormData.callDialog?.showTranscript && (
+                    <div className="px-4 pb-4">
+                      <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
+                        <p className="italic">&quot;Hello! How can I help you today?&quot;</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Controls Preview */}
+                  <div className="p-4 border-t border-divider flex items-center justify-center gap-4">
+                    {callFormData.controls?.showMuteButton && (
+                      <button className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg>
+                      </button>
+                    )}
+                    {callFormData.controls?.showEndCallButton && (
+                      <button className="w-14 h-14 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+                        <Phone size={24} className="rotate-[135deg]" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Branding */}
+                  {callFormData.branding?.showPoweredBy && (
+                    <div className="px-4 pb-3 text-center">
+                      <p className="text-xs text-muted-foreground">Powered by Buzzi</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Launcher Preview - Always visible, shows appropriate buttons */}
+              <div className="mt-4 pt-4 border-t border-divider">
+                <p className="text-sm text-muted-foreground mb-3">Launcher Preview</p>
+                <div className="flex flex-col items-end gap-3 bg-gradient-to-br from-muted to-muted/50 p-4 rounded-lg">
+                  {/* Call Launcher Button - shown when call is enabled */}
+                  {chatbot?.enabledCall && callFormData.enabled && (
+                    <>
+                      {callFormData.callButton?.style === "orb" ? (
+                        <div
+                          className="relative flex items-center justify-center rounded-full cursor-pointer transition-transform hover:scale-105"
+                          style={{
+                            width: `${callFormData.callButton?.size || 60}px`,
+                            height: `${callFormData.callButton?.size || 60}px`,
+                            backgroundColor: callFormData.colors?.primary || "#6437F3",
+                            boxShadow: `0 0 ${(callFormData.orb?.glowIntensity || 0.6) * 30}px ${callFormData.colors?.primary || "#6437F3"}80`,
+                          }}
+                        >
+                          <Phone size={24} className="text-white" />
+                          {callFormData.callButton?.animation && (
+                            <span
+                              className="absolute inset-0 rounded-full animate-ping opacity-30"
+                              style={{
+                                backgroundColor: callFormData.colors?.primary || "#6437F3",
+                                animationDuration: `${callFormData.orb?.pulseSpeed || 2}s`,
+                              }}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          className="flex items-center gap-2 px-4 py-2 rounded-full text-white font-medium transition-transform hover:scale-105"
+                          style={{
+                            backgroundColor: callFormData.colors?.primary || "#6437F3",
+                          }}
+                        >
+                          <Phone size={18} />
+                          {callFormData.callButton?.label || "Call us"}
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Chat Launcher - shown when chat is enabled (default to true if not specified) */}
+                  {(chatbot?.enabledChat !== false) && (
+                    <div className="flex items-center gap-2">
+                      {/* Launcher Text */}
+                      {formData.showLauncherText && formData.launcherText && (
+                        <div
+                          className="px-3 py-2 rounded-lg text-sm font-medium shadow-lg"
+                          style={{
+                            backgroundColor: formData.launcherTextBackgroundColor,
+                            color: formData.launcherTextColor,
+                            borderRadius: `${Math.min(parseInt(formData.borderRadius, 10), 16)}px`,
+                          }}
+                        >
+                          {formData.launcherText}
+                        </div>
+                      )}
+                      {/* Launcher Button */}
+                      <button
+                        className="relative flex items-center justify-center text-white shadow-lg transition-transform hover:scale-105"
                         style={{
+                          width: `${formData.buttonSize}px`,
+                          height: `${formData.buttonSize}px`,
                           backgroundColor: formData.primaryColor,
                           borderRadius: `${formData.launcherIconBorderRadius}%`,
+                          boxShadow: formData.launcherIconPulseGlow
+                            ? `0 0 20px ${formData.primaryColor}80`
+                            : undefined,
                         }}
-                      />
-                    )}
-                  </button>
+                      >
+                        {formData.launcherIcon === "chat" && <MessageCircle size={24} />}
+                        {formData.launcherIcon === "message" && <MessageSquare size={24} />}
+                        {formData.launcherIcon === "help" && <HelpCircle size={24} />}
+                        {formData.launcherIcon === "sparkle" && <Sparkles size={24} />}
+                        {formData.launcherIconPulseGlow && (
+                          <span
+                            className="absolute inset-0 animate-ping opacity-30"
+                            style={{
+                              backgroundColor: formData.primaryColor,
+                              borderRadius: `${formData.launcherIconBorderRadius}%`,
+                            }}
+                          />
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardBody>

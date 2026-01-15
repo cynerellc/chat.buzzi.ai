@@ -26,7 +26,7 @@ import { loadPackage } from "@/lib/packages";
 
 // Import all packages statically
 // This ensures Next.js can bundle them correctly
-import salesAssistantPackage from "./1c33f609-ae08-4340-9dbb-e82cebed608a";
+import salesAssistantPackage from "./sales-assistant";
 import customerSupportPackage from "./9f62b375-d70d-48a2-a9cd-8b6a8abe8e77";
 import sampleSingleAgentPackage from "./sample-single-agent";
 import sampleMultiAgentPackage from "./sample-multi-agent";

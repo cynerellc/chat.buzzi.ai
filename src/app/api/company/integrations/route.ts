@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { integrations, webhooks } from "@/lib/db/schema";
+import { integrations } from "@/lib/db/schema";
 
 export interface IntegrationItem {
   id: string;
@@ -17,24 +17,8 @@ export interface IntegrationItem {
   updatedAt: string;
 }
 
-export interface WebhookItem {
-  id: string;
-  name: string;
-  description: string | null;
-  url: string;
-  events: string[];
-  isActive: boolean;
-  totalDeliveries: number;
-  successfulDeliveries: number;
-  failedDeliveries: number;
-  lastDeliveryAt: string | null;
-  lastDeliveryStatus: string | null;
-  createdAt: string;
-}
-
 export interface IntegrationsResponse {
   integrations: IntegrationItem[];
-  webhooks: WebhookItem[];
 }
 
 export async function GET() {
@@ -48,13 +32,6 @@ export async function GET() {
       .where(eq(integrations.chatbotId, company.id))
       .orderBy(desc(integrations.createdAt));
 
-    // Get webhooks
-    const companyWebhooks = await db
-      .select()
-      .from(webhooks)
-      .where(eq(webhooks.chatbotId, company.id))
-      .orderBy(desc(webhooks.createdAt));
-
     const integrationsList: IntegrationItem[] = companyIntegrations.map((i) => ({
       id: i.id,
       type: i.type,
@@ -67,24 +44,8 @@ export async function GET() {
       updatedAt: i.updatedAt.toISOString(),
     }));
 
-    const webhooksList: WebhookItem[] = companyWebhooks.map((w) => ({
-      id: w.id,
-      name: w.name,
-      description: w.description,
-      url: w.url,
-      events: (w.events as string[]) || [],
-      isActive: w.isActive,
-      totalDeliveries: (w.totalDeliveries as number) || 0,
-      successfulDeliveries: (w.successfulDeliveries as number) || 0,
-      failedDeliveries: (w.failedDeliveries as number) || 0,
-      lastDeliveryAt: w.lastDeliveryAt?.toISOString() ?? null,
-      lastDeliveryStatus: w.lastDeliveryStatus,
-      createdAt: w.createdAt.toISOString(),
-    }));
-
     const response: IntegrationsResponse = {
       integrations: integrationsList,
-      webhooks: webhooksList,
     };
 
     return NextResponse.json(response);
@@ -97,71 +58,3 @@ export async function GET() {
   }
 }
 
-interface CreateWebhookRequest {
-  name: string;
-  description?: string;
-  url: string;
-  events: string[];
-  secret?: string;
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const { company } = await requireCompanyAdmin();
-
-    const body: CreateWebhookRequest = await request.json();
-
-    // Validate required fields
-    if (!body.name || !body.url || !body.events?.length) {
-      return NextResponse.json(
-        { error: "Name, URL, and at least one event are required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate URL
-    try {
-      new URL(body.url);
-    } catch {
-      return NextResponse.json({ error: "Invalid webhook URL" }, { status: 400 });
-    }
-
-    const [webhook] = await db
-      .insert(webhooks)
-      .values({
-        chatbotId: company.id, // TODO: Should be actual chatbot ID
-        name: body.name,
-        description: body.description || null,
-        url: body.url,
-        events: body.events,
-        secret: body.secret || null,
-      })
-      .returning();
-
-    if (!webhook) {
-      return NextResponse.json(
-        { error: "Failed to create webhook" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      webhook: {
-        id: webhook.id,
-        name: webhook.name,
-        description: webhook.description,
-        url: webhook.url,
-        events: webhook.events as string[],
-        isActive: webhook.isActive,
-        createdAt: webhook.createdAt.toISOString(),
-      },
-      message: "Webhook created successfully",
-    });
-  } catch (error) {
-    console.error("Error creating webhook:", error);
-    return NextResponse.json(
-      { error: "Failed to create webhook" },
-      { status: 500 }
-    );
-  }
-}

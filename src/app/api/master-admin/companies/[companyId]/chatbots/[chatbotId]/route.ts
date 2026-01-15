@@ -4,8 +4,8 @@ import { z } from "zod";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { chatbots } from "@/lib/db/schema";
-import type { AgentListItem } from "@/lib/db/schema/chatbots";
+import { chatbots, chatbotPackages } from "@/lib/db/schema";
+import type { AgentListItem, ChatbotSettings } from "@/lib/db/schema/chatbots";
 
 interface RouteContext {
   params: Promise<{ companyId: string; chatbotId: string }>;
@@ -24,6 +24,7 @@ const agentSchema = z.object({
   model_settings: z.record(z.string(), z.unknown()).default({ temperature: 0.7, max_tokens: 4096, top_p: 1 }),
   knowledge_base_enabled: z.boolean().nullable().optional(),
   knowledge_categories: z.array(z.string()).nullable().optional(),
+  knowledge_threshold: z.number().min(0.05).max(0.95).nullable().optional(),
   tools: z.array(z.unknown()).optional(),
   managed_agent_ids: z.array(z.string()).optional(),
   sort_order: z.number().optional(),
@@ -34,6 +35,20 @@ const updateChatbotSchema = z.object({
   name: z.string().optional(),
   description: z.string().nullable().optional(),
   status: z.enum(["draft", "active", "paused", "archived"]).optional(),
+  enabledChat: z.boolean().optional(),
+  enabledCall: z.boolean().optional(),
+  callModelId: z.string().uuid().nullable().optional(),
+  voiceConfig: z.record(z.string(), z.unknown()).optional(),
+  widgetConfig: z.object({
+    chat: z.record(z.string(), z.unknown()).optional(),
+    call: z.record(z.string(), z.unknown()).optional(),
+  }).optional(),
+  settings: z.object({
+    callSystemPrompt: z.string().optional(),
+    callKnowledgeBaseEnabled: z.boolean().optional(),
+    callKnowledgeCategories: z.array(z.string()).optional(),
+    callKnowledgeBaseThreshold: z.number().min(0.05).max(0.95).optional(),
+  }).optional(),
 });
 
 /**
@@ -61,6 +76,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Chatbot not found" }, { status: 404 });
     }
 
+    // Get package info if chatbot has a package
+    let packageInfo: { name: string; enabledChat: boolean; enabledCall: boolean } | null = null;
+    if (chatbot.packageId) {
+      const [pkg] = await db
+        .select({
+          name: chatbotPackages.name,
+          enabledChat: chatbotPackages.enabledChat,
+          enabledCall: chatbotPackages.enabledCall,
+        })
+        .from(chatbotPackages)
+        .where(eq(chatbotPackages.id, chatbot.packageId))
+        .limit(1);
+      packageInfo = pkg || null;
+    }
+
     // Get the first agent for default system prompt and model settings
     const agentsList = (chatbot.agentsList as AgentListItem[]) || [];
     const firstAgent = agentsList[0];
@@ -71,18 +101,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
       name: chatbot.name,
       description: chatbot.description,
       packageId: chatbot.packageId,
-      packageName: "Unknown", // This should be joined from packages table if needed
+      packageName: packageInfo?.name || "Custom",
       systemPrompt: firstAgent?.default_system_prompt || "",
       modelId: firstAgent?.default_model_id || "gpt-5-mini-2025-08-07",
       modelSettings: firstAgent?.model_settings || { temperature: 0.7, max_tokens: 4096, top_p: 1 },
       behavior: (chatbot.behavior as Record<string, unknown>) || {},
       status: chatbot.status,
       escalationEnabled: chatbot.escalationEnabled,
+      enabledChat: chatbot.enabledChat,
+      enabledCall: chatbot.enabledCall,
+      // Call settings
+      callModelId: chatbot.callModelId,
+      callAiProvider: chatbot.callAiProvider,
+      voiceConfig: chatbot.voiceConfig,
+      widgetConfig: chatbot.widgetConfig,
+      // Package-level feature flags (null if no package = show all)
+      packageEnabledChat: packageInfo?.enabledChat ?? null,
+      packageEnabledCall: packageInfo?.enabledCall ?? null,
       conversationCount: 0, // Would need to query conversations table
       messageCount: 0, // Would need to query messages table
       createdAt: chatbot.createdAt.toISOString(),
       updatedAt: chatbot.updatedAt.toISOString(),
       agentsList: agentsList,
+      settings: chatbot.settings,
     };
 
     return NextResponse.json({ chatbot: chatbotDetails });
@@ -146,6 +187,35 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     if (parsed.data.status !== undefined) {
       updateData.status = parsed.data.status;
+    }
+    if (parsed.data.enabledChat !== undefined) {
+      updateData.enabledChat = parsed.data.enabledChat;
+    }
+    if (parsed.data.enabledCall !== undefined) {
+      updateData.enabledCall = parsed.data.enabledCall;
+    }
+    if (parsed.data.callModelId !== undefined) {
+      updateData.callModelId = parsed.data.callModelId;
+    }
+    if (parsed.data.voiceConfig !== undefined) {
+      updateData.voiceConfig = parsed.data.voiceConfig;
+    }
+    if (parsed.data.widgetConfig !== undefined) {
+      updateData.widgetConfig = parsed.data.widgetConfig;
+    }
+    if (parsed.data.settings !== undefined) {
+      // Merge with existing settings to preserve other fields
+      const [currentChatbot] = await db
+        .select({ settings: chatbots.settings })
+        .from(chatbots)
+        .where(eq(chatbots.id, chatbotId))
+        .limit(1);
+
+      const existingSettings = (currentChatbot?.settings as ChatbotSettings) || {};
+      updateData.settings = {
+        ...existingSettings,
+        ...parsed.data.settings,
+      };
     }
 
     const [updatedChatbot] = await db

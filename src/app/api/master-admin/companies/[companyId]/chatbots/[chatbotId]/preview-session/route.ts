@@ -80,6 +80,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       userAgent || request.headers.get("user-agent") || "Unknown"
     );
 
+    if (!endUser) {
+      return NextResponse.json(
+        { error: "Failed to create end user" },
+        { status: 500 }
+      );
+    }
+
     // Generate session token
     const sessionId = generateSessionToken();
     const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
@@ -94,15 +101,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
         status: "active",
         channel: "web",
         sessionId,
-        sessionExpiresAt: expiresAt,
         metadata: {
           pageUrl,
           referrer,
           userAgent,
           isPreview: true,
+          sessionExpiresAt: expiresAt.toISOString(),
         },
       })
       .returning();
+
+    if (!conversation) {
+      return NextResponse.json(
+        { error: "Failed to create conversation" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       sessionId,

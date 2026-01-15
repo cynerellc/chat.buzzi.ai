@@ -14,10 +14,11 @@ import { companies } from "./companies";
 import {
   agentStatusEnum,
   agentTypeEnum,
+  callAiProviderEnum,
   chatappSchema,
-  chatbotTypeEnum,
   packageTypeEnum,
 } from "./enums";
+import { aiModels } from "./models";
 
 // Type definitions for package variables (stored as JSONB)
 export interface PackageVariableDefinition {
@@ -37,6 +38,12 @@ export interface ChatbotSettings {
   widgetConfigUrl?: string; // Signed URL to pre-generated JSON config (10-year expiry)
   widgetConfigPath?: string; // Storage path for regeneration
   widgetConfigGeneratedAt?: string; // ISO timestamp of last generation
+  // Call-specific system prompt (master admin only)
+  callSystemPrompt?: string;
+  // Call knowledge base settings
+  callKnowledgeBaseEnabled?: boolean; // Whether voice calls can access knowledge base
+  callKnowledgeCategories?: string[]; // Category names for RAG filtering during calls
+  callKnowledgeBaseThreshold?: number; // Min relevance score for RAG results (0.05-0.95, default 0.3)
 }
 
 // Type definition for model settings (dynamic per model)
@@ -57,6 +64,7 @@ export interface AgentListItem {
   model_settings?: ModelSettings; // Dynamic settings based on model's settingsSchema
   knowledge_base_enabled?: boolean; // Whether this agent can access the knowledge base
   knowledge_categories?: string[]; // Category names for RAG filtering
+  knowledge_threshold?: number; // Min relevance score for RAG results (0.05-0.95, default 0.3)
   tools?: unknown[]; // Tool configurations
   managed_agent_ids?: string[]; // For supervisors: worker agent identifiers
   sort_order?: number; // Display order
@@ -82,6 +90,144 @@ export interface ChatbotBehavior {
   escalationRules?: string[]; // Custom escalation rule prompts for AI interpretation
 }
 
+// Type definition for voice configuration (stored as JSONB)
+export interface VoiceConfig {
+  // OpenAI voices
+  openai_voice?: "alloy" | "ash" | "ballad" | "coral" | "echo" | "sage" | "shimmer" | "verse";
+  // Gemini voices
+  gemini_voice?: "Kore" | "Aoede" | "Puck" | "Charon" | "Fenrir";
+  // Voice Activity Detection settings
+  vad_threshold?: number; // 0.0-1.0 for OpenAI
+  vad_sensitivity?: "LOW" | "MEDIUM" | "HIGH"; // For Gemini
+  silence_duration_ms?: number; // Silence duration before turn completion
+  prefix_padding_ms?: number; // Padding before start of audio
+  // Call-specific prompts
+  call_greeting?: string; // Greeting when call starts
+  system_prompt_call?: string; // System prompt for call mode (deprecated, use ChatbotSettings.callSystemPrompt)
+  callSystemPrompt?: string; // For packages default_voice_config
+}
+
+// Type definition for call widget configuration (stored as JSONB)
+export interface CallWidgetConfig {
+  enabled?: boolean;
+  position?: "bottom-right" | "bottom-left";
+  colors?: {
+    primary?: string;
+    primaryHover?: string;
+    background?: string;
+    text?: string;
+  };
+  callButton?: {
+    style?: "orb" | "pill";
+    size?: number;
+    animation?: boolean;
+    label?: string;
+  };
+  orb?: {
+    glowIntensity?: number;
+    pulseSpeed?: number;
+    states?: {
+      idle?: { color: string; animation: string };
+      connecting?: { color: string; animation: string };
+      active?: { color: string; animation: string };
+      muted?: { color: string; animation: string };
+    };
+  };
+  callDialog?: {
+    width?: number;
+    showVisualizer?: boolean;
+    visualizerStyle?: "waveform" | "bars" | "circle";
+    showTranscript?: boolean;
+  };
+  controls?: {
+    showMuteButton?: boolean;
+    showEndCallButton?: boolean;
+  };
+  branding?: {
+    showPoweredBy?: boolean;
+    companyLogo?: string;
+  };
+}
+
+// Chat widget configuration (migrated from widget_configs table)
+export interface ChatWidgetConfig {
+  // Appearance
+  theme?: "light" | "dark" | "auto";
+  position?: "bottom-right" | "bottom-left";
+  placement?: "above-launcher" | "center-screen";
+  primaryColor?: string;
+  accentColor?: string;
+  userBubbleColor?: string;
+  overrideAgentColor?: boolean;
+  agentBubbleColor?: string;
+  borderRadius?: number;
+  buttonSize?: number;
+
+  // Branding
+  title?: string;
+  subtitle?: string;
+  welcomeMessage?: string;
+  placeholderText?: string;
+  logoUrl?: string;
+  avatarUrl?: string;
+
+  // Behavior
+  autoOpen?: boolean;
+  autoOpenDelay?: number;
+  showBranding?: boolean;
+  playSoundOnMessage?: boolean;
+  persistConversation?: boolean;
+
+  // Features
+  enableFileUpload?: boolean;
+  enableVoiceMessages?: boolean;
+  enableFeedback?: boolean;
+  requireEmail?: boolean;
+  requireName?: boolean;
+
+  // Advanced
+  customCss?: string;
+  allowedDomains?: string[];
+  zIndex?: number;
+
+  // Launcher Customization
+  launcherIcon?: "chat" | "message" | "help" | "custom";
+  launcherText?: string;
+  hideLauncherOnMobile?: boolean;
+  launcherIconBorderRadius?: number;
+  launcherIconPulseGlow?: boolean;
+  showLauncherText?: boolean;
+  launcherTextBackgroundColor?: string;
+  launcherTextColor?: string;
+
+  // Pre-chat Form
+  preChatForm?: {
+    enabled: boolean;
+    fields: Array<{
+      name: string;
+      label: string;
+      type: string;
+      required: boolean;
+    }>;
+  };
+
+  // Stream Display Options
+  showAgentSwitchNotification?: boolean;
+  showThinking?: boolean;
+  showInstantUpdates?: boolean;
+
+  // Multi-agent Display Options
+  showAgentListOnTop?: boolean;
+  agentListMinCards?: number;
+  agentListingType?: "minimal" | "compact" | "standard" | "detailed";
+}
+
+// Unified widget configuration (combines chat and call)
+export interface WidgetConfig {
+  chat: ChatWidgetConfig;
+  call: CallWidgetConfig;
+}
+
 // Chatbot Packages Table (Master Admin templates - Pluggable Agent Framework)
 // Renamed from agent_packages
 export const chatbotPackages = chatappSchema.table(
@@ -97,9 +243,6 @@ export const chatbotPackages = chatappSchema.table(
 
     // Package Type (single_agent or multi_agent)
     packageType: packageTypeEnum("package_type").default("single_agent").notNull(),
-
-    // Chatbot Type (chat or call)
-    chatbotType: chatbotTypeEnum("chatbot_type").default("chat").notNull(),
 
     // Is Custom Package (created specifically for a company vs. template package)
     isCustomPackage: boolean("is_custom_package").default(false).notNull(),
@@ -138,6 +281,31 @@ export const chatbotPackages = chatappSchema.table(
     // Contains all agent configurations for this package
     agentsList: jsonb("agents_list").$type<AgentListItem[]>().default([]).notNull(),
 
+    // Feature Flags
+    enabledChat: boolean("enabled_chat").default(true).notNull(),
+    enabledCall: boolean("enabled_call").default(false).notNull(),
+
+    // Call Feature Settings
+    callAiProvider: callAiProviderEnum("call_ai_provider"),
+    defaultCallModelId: uuid("default_call_model_id").references(() => aiModels.id),
+    defaultVoiceConfig: jsonb("default_voice_config").$type<VoiceConfig>().default({}).notNull(),
+
+    // Unified Widget Configuration
+    defaultWidgetConfig: jsonb("default_widget_config").$type<WidgetConfig>().default({
+      chat: {
+        theme: "light",
+        position: "bottom-right",
+        primaryColor: "#6437F3",
+        title: "Chat with us",
+        welcomeMessage: "Hi there! How can we help you today?",
+      },
+      call: {
+        enabled: true,
+        position: "bottom-right",
+        callButton: { style: "orb", size: 60, animation: true },
+      },
+    }).notNull(),
+
     // Status
     isActive: boolean("is_active").default(true).notNull(),
     isPublic: boolean("is_public").default(true).notNull(),
@@ -171,9 +339,6 @@ export const chatbots = chatappSchema.table(
 
     // Package Type (copied from chatbot_packages when creating)
     packageType: packageTypeEnum("package_type").default("single_agent").notNull(),
-
-    // Chatbot Type (copied from chatbot_packages when creating)
-    chatbotType: chatbotTypeEnum("chatbot_type").default("chat").notNull(),
 
     // Is Custom Package (copied from chatbot_packages when creating by master admin)
     isCustomPackage: boolean("is_custom_package").default(false).notNull(),
@@ -234,6 +399,59 @@ export const chatbots = chatappSchema.table(
     // Settings (widget config URL, etc.)
     settings: jsonb("settings").$type<ChatbotSettings>().default({}).notNull(),
 
+    // Feature Flags
+    enabledChat: boolean("enabled_chat").default(true).notNull(),
+    enabledCall: boolean("enabled_call").default(false).notNull(),
+
+    // Call Feature Settings
+    callAiProvider: callAiProviderEnum("call_ai_provider"),
+    callModelId: uuid("call_model_id").references(() => aiModels.id),
+    voiceConfig: jsonb("voice_config").$type<VoiceConfig>().default({}).notNull(),
+
+    // Unified Widget Configuration (combines chat and call widget settings)
+    widgetConfig: jsonb("widget_config").$type<WidgetConfig>().default({
+      chat: {
+        theme: "light",
+        position: "bottom-right",
+        primaryColor: "#6437F3",
+        accentColor: "#2b3dd8",
+        borderRadius: 16,
+        buttonSize: 60,
+        title: "Chat with us",
+        welcomeMessage: "Hi there! How can we help you today?",
+        showBranding: true,
+        playSoundOnMessage: true,
+        persistConversation: true,
+        enableFeedback: true,
+        zIndex: 9999,
+        launcherIcon: "chat",
+        showAgentSwitchNotification: true,
+        showInstantUpdates: true,
+        showAgentListOnTop: true,
+        agentListMinCards: 3,
+        agentListingType: "detailed",
+      },
+      call: {
+        enabled: true,
+        position: "bottom-right",
+        callButton: { style: "orb", size: 60, animation: true },
+        orb: {
+          glowIntensity: 0.6,
+          pulseSpeed: 2,
+        },
+        callDialog: {
+          width: 400,
+          showVisualizer: true,
+          visualizerStyle: "waveform",
+          showTranscript: true,
+        },
+        controls: {
+          showMuteButton: true,
+          showEndCallButton: true,
+        },
+      },
+    }).notNull(),
+
     // Analytics
     totalConversations: integer("total_conversations").default(0).notNull(),
     avgResolutionTime: integer("avg_resolution_time"), // in seconds
@@ -252,47 +470,13 @@ export const chatbots = chatappSchema.table(
   ]
 );
 
-// Chatbot Versions Table (for version history)
-// Renamed from agent_versions
-export const chatbotVersions = chatappSchema.table(
-  "chatbot_versions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    // Chatbot Reference
-    chatbotId: uuid("chatbot_id")
-      .notNull()
-      .references(() => chatbots.id, { onDelete: "cascade" }),
-
-    // Version Info
-    version: integer("version").notNull(),
-    changelog: text("changelog"),
-
-    // Snapshot of chatbot config at this version
-    systemPrompt: text("system_prompt").notNull(),
-    modelId: varchar("model_id", { length: 100 }).notNull(),
-    temperature: integer("temperature").notNull(),
-    behavior: jsonb("behavior").notNull(),
-
-    // Who made the change
-    createdBy: uuid("created_by"),
-
-    // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("chatbot_versions_chatbot_idx").on(table.chatbotId),
-    index("chatbot_versions_version_idx").on(table.chatbotId, table.version),
-  ]
-);
-
 
 // Relations
 export const chatbotPackagesRelations = relations(chatbotPackages, ({ many }) => ({
   chatbots: many(chatbots),
 }));
 
-export const chatbotsRelations = relations(chatbots, ({ one, many }) => ({
+export const chatbotsRelations = relations(chatbots, ({ one }) => ({
   company: one(companies, {
     fields: [chatbots.companyId],
     references: [companies.id],
@@ -301,14 +485,6 @@ export const chatbotsRelations = relations(chatbots, ({ one, many }) => ({
     fields: [chatbots.packageId],
     references: [chatbotPackages.id],
   }),
-  versions: many(chatbotVersions),
-}));
-
-export const chatbotVersionsRelations = relations(chatbotVersions, ({ one }) => ({
-  chatbot: one(chatbots, {
-    fields: [chatbotVersions.chatbotId],
-    references: [chatbots.id],
-  }),
 }));
 
 // Types
@@ -316,23 +492,17 @@ export type ChatbotPackage = typeof chatbotPackages.$inferSelect;
 export type NewChatbotPackage = typeof chatbotPackages.$inferInsert;
 export type Chatbot = typeof chatbots.$inferSelect;
 export type NewChatbot = typeof chatbots.$inferInsert;
-export type ChatbotVersion = typeof chatbotVersions.$inferSelect;
-export type NewChatbotVersion = typeof chatbotVersions.$inferInsert;
 
 // Legacy type aliases for backward compatibility during migration
 export type AgentPackage = ChatbotPackage;
 export type NewAgentPackage = NewChatbotPackage;
 export type Agent = Chatbot;
 export type NewAgent = NewChatbot;
-export type AgentVersion = ChatbotVersion;
-export type NewAgentVersion = NewChatbotVersion;
 
 // Legacy table aliases for backward compatibility during migration
 export const agentPackages = chatbotPackages;
 export const agents = chatbots;
-export const agentVersions = chatbotVersions;
 
 // Legacy relation aliases
 export const agentPackagesRelations = chatbotPackagesRelations;
 export const agentsRelations = chatbotsRelations;
-export const agentVersionsRelations = chatbotVersionsRelations;

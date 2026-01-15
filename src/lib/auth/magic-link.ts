@@ -55,7 +55,7 @@ export async function generateMagicLink(email: string): Promise<MagicLinkResult>
   }
 
   // Check if user is active
-  if (!user.isActive || user.status !== "active") {
+  if (user.status !== "active") {
     return { success: false, error: "Account is not active" };
   }
 

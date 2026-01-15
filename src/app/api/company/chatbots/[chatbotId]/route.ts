@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agents, agentPackages, agentVersions, type PackageVariableDefinition, type AgentListItem } from "@/lib/db/schema";
+import { agents, agentPackages, type PackageVariableDefinition, type AgentListItem } from "@/lib/db/schema";
 import { generateWidgetConfigJson } from "@/lib/widget/config-generator";
 
 interface RouteParams {
@@ -21,7 +21,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         companyId: agents.companyId,
         packageId: agents.packageId,
         packageType: agents.packageType,
-        chatbotType: agents.chatbotType,
         isCustomPackage: agents.isCustomPackage,
         name: agents.name,
         description: agents.description,
@@ -33,6 +32,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         escalationTriggers: agents.escalationTriggers,
         variableValues: agents.variableValues,
         businessHours: agents.businessHours,
+        // Feature flags
+        enabledChat: agents.enabledChat,
+        enabledCall: agents.enabledCall,
+        // Call feature fields
+        callModelId: agents.callModelId,
+        callAiProvider: agents.callAiProvider,
+        voiceConfig: agents.voiceConfig,
+        // Unified widget config
+        widgetConfig: agents.widgetConfig,
         totalConversations: agents.totalConversations,
         avgResolutionTime: agents.avgResolutionTime,
         satisfactionScore: agents.satisfactionScore,
@@ -131,6 +139,14 @@ interface UpdateChatbotRequest {
   escalationTriggers?: unknown[];
   // Variable values are now stored as a simple key-value object
   variableValues?: Record<string, string>;
+  // Feature flags
+  enabledChat?: boolean;
+  enabledCall?: boolean;
+  // Call feature settings
+  callAiProvider?: "OPENAI" | "GEMINI" | null;
+  voiceConfig?: Record<string, unknown>;
+  // Unified widget config
+  widgetConfig?: { chat?: Record<string, unknown>; call?: Record<string, unknown> };
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -169,6 +185,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.behavior !== undefined) updateData.behavior = body.behavior;
     if (body.escalationEnabled !== undefined) updateData.escalationEnabled = body.escalationEnabled;
     if (body.escalationTriggers !== undefined) updateData.escalationTriggers = body.escalationTriggers;
+    // Feature flags
+    if (body.enabledChat !== undefined) updateData.enabledChat = body.enabledChat;
+    if (body.enabledCall !== undefined) updateData.enabledCall = body.enabledCall;
+    // Call feature settings
+    if (body.callAiProvider !== undefined) updateData.callAiProvider = body.callAiProvider;
+    if (body.voiceConfig !== undefined) updateData.voiceConfig = body.voiceConfig;
+    // Unified widget config - merge with existing
+    if (body.widgetConfig !== undefined) {
+      const existingWidgetConfig = existingChatbot.widgetConfig as { chat?: Record<string, unknown>; call?: Record<string, unknown> } || { chat: {}, call: {} };
+      updateData.widgetConfig = {
+        chat: { ...existingWidgetConfig.chat, ...body.widgetConfig.chat },
+        call: { ...existingWidgetConfig.call, ...body.widgetConfig.call },
+      };
+    }
 
     // Variable values are now stored directly in the chatbot as JSONB
     if (body.variableValues !== undefined) {
@@ -221,39 +251,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       // Replace primary agent in list, keep others
       updateData.agentsList = [updatedPrimaryAgent, ...currentAgentsList.slice(1)];
-    }
-
-    // Get current system prompt for version comparison
-    const currentAgentsList = (existingChatbot.agentsList as AgentListItem[]) || [];
-    const currentSystemPrompt = currentAgentsList[0]?.default_system_prompt ?? "";
-
-    // If systemPrompt changed, create a version
-    if (body.systemPrompt && body.systemPrompt !== currentSystemPrompt) {
-      // Get latest version number
-      const [latestVersion] = await db
-        .select({ version: agentVersions.version })
-        .from(agentVersions)
-        .where(eq(agentVersions.chatbotId, chatbotId))
-        .orderBy(agentVersions.version)
-        .limit(1);
-
-      const nextVersion = (latestVersion?.version ?? 0) + 1;
-
-      // Get temperature for version (convert from model_settings or use backward-compatible)
-      const versionModelSettings = currentAgentsList[0]?.model_settings ?? {};
-      const versionTemp = body.temperature
-        ?? (typeof versionModelSettings.temperature === "number" ? Math.round(versionModelSettings.temperature * 100) : 70);
-
-      // Create version snapshot
-      await db.insert(agentVersions).values({
-        chatbotId: chatbotId,
-        version: nextVersion,
-        changelog: "System prompt updated",
-        systemPrompt: body.systemPrompt,
-        modelId: body.modelId || currentAgentsList[0]?.default_model_id || "gpt-5-mini-2025-08-07",
-        temperature: versionTemp,
-        behavior: body.behavior || existingChatbot.behavior,
-      });
     }
 
     // Update the chatbot

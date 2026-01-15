@@ -11,7 +11,6 @@ import { eq, and, isNull } from "drizzle-orm";
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { chatbots } from "@/lib/db/schema/chatbots";
-import { widgetConfigs } from "@/lib/db/schema/widgets";
 import { companies } from "@/lib/db/schema/companies";
 
 interface RouteContext {
@@ -63,6 +62,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         agentsList: chatbots.agentsList,
         behavior: chatbots.behavior,
         packageType: chatbots.packageType,
+        widgetConfig: chatbots.widgetConfig,
+        enabledChat: chatbots.enabledChat,
+        enabledCall: chatbots.enabledCall,
       })
       .from(chatbots)
       .where(
@@ -74,14 +76,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
       )
       .limit(1);
 
-    if (chatbotResult.length === 0) {
+    const chatbot = chatbotResult[0];
+    if (!chatbot) {
       return NextResponse.json(
         { error: "Chatbot not found" },
         { status: 404 }
       );
     }
 
-    const chatbot = chatbotResult[0];
     const agentsListData = (chatbot.agentsList as {
       agent_identifier: string;
       name: string;
@@ -94,60 +96,56 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const behavior = (chatbot.behavior as { greeting?: string }) ?? {};
     const isMultiAgent = chatbot.packageType === "multi_agent";
 
-    // Fetch widget config for this chatbot
-    const widgetConfigResult = await db
-      .select()
-      .from(widgetConfigs)
-      .where(eq(widgetConfigs.chatbotId, chatbotId))
-      .limit(1);
-
-    const widgetConfig = widgetConfigResult[0];
+    // Widget config is stored directly in the chatbot record (jsonb field)
+    const widgetConfig = chatbot.widgetConfig as unknown as { chat?: Record<string, unknown>; call?: Record<string, unknown> } | null;
+    const chatWidgetConfig = widgetConfig?.chat || widgetConfig as unknown as Record<string, unknown> | null;
+    const callWidgetConfig = widgetConfig?.call || null;
 
     // Merge default config with widget config from database
     const config = {
       ...DEFAULT_CONFIG,
       // Apply widget config customizations if they exist
-      ...(widgetConfig && {
-        theme: widgetConfig.theme,
-        position: widgetConfig.position,
-        placement: widgetConfig.placement,
-        primaryColor: widgetConfig.primaryColor,
-        accentColor: widgetConfig.accentColor,
-        userBubbleColor: widgetConfig.userBubbleColor || undefined,
-        overrideAgentColor: widgetConfig.overrideAgentColor,
-        agentBubbleColor: widgetConfig.agentBubbleColor || undefined,
-        borderRadius: parseInt(widgetConfig.borderRadius) || DEFAULT_CONFIG.borderRadius,
-        title: widgetConfig.title,
-        subtitle: widgetConfig.subtitle || undefined,
+      ...(chatWidgetConfig && {
+        theme: chatWidgetConfig.theme,
+        position: chatWidgetConfig.position,
+        placement: chatWidgetConfig.placement,
+        primaryColor: chatWidgetConfig.primaryColor,
+        accentColor: chatWidgetConfig.accentColor,
+        userBubbleColor: chatWidgetConfig.userBubbleColor || undefined,
+        overrideAgentColor: chatWidgetConfig.overrideAgentColor,
+        agentBubbleColor: chatWidgetConfig.agentBubbleColor || undefined,
+        borderRadius: parseInt(String(chatWidgetConfig.borderRadius)) || DEFAULT_CONFIG.borderRadius,
+        title: chatWidgetConfig.title,
+        subtitle: chatWidgetConfig.subtitle || undefined,
         placeholderText: DEFAULT_CONFIG.placeholderText,
-        welcomeMessage: widgetConfig.welcomeMessage,
-        avatarUrl: widgetConfig.avatarUrl || avatarUrl,
-        logoUrl: widgetConfig.logoUrl || undefined,
-        showBranding: widgetConfig.showBranding,
-        autoOpen: widgetConfig.autoOpen,
-        autoOpenDelay: parseInt(widgetConfig.autoOpenDelay) * 1000 || DEFAULT_CONFIG.autoOpenDelay,
-        soundEnabled: widgetConfig.playSoundOnMessage,
-        persistConversation: widgetConfig.persistConversation,
-        enableVoice: widgetConfig.enableVoiceMessages,
-        enableFileUpload: widgetConfig.enableFileUpload,
-        launcherIcon: widgetConfig.launcherIcon,
-        launcherText: widgetConfig.launcherText || undefined,
-        buttonSize: parseInt(widgetConfig.buttonSize) || 60,
-        launcherIconBorderRadius: parseInt(widgetConfig.launcherIconBorderRadius) || 50,
-        launcherIconPulseGlow: widgetConfig.launcherIconPulseGlow ?? false,
-        hideLauncherOnMobile: widgetConfig.hideLauncherOnMobile ?? false,
-        customCss: widgetConfig.customCss || undefined,
+        welcomeMessage: chatWidgetConfig.welcomeMessage,
+        avatarUrl: chatWidgetConfig.avatarUrl || avatarUrl,
+        logoUrl: chatWidgetConfig.logoUrl || undefined,
+        showBranding: chatWidgetConfig.showBranding,
+        autoOpen: chatWidgetConfig.autoOpen,
+        autoOpenDelay: parseInt(String(chatWidgetConfig.autoOpenDelay)) * 1000 || DEFAULT_CONFIG.autoOpenDelay,
+        soundEnabled: chatWidgetConfig.playSoundOnMessage,
+        persistConversation: chatWidgetConfig.persistConversation,
+        enableVoice: chatWidgetConfig.enableVoiceMessages,
+        enableFileUpload: chatWidgetConfig.enableFileUpload,
+        launcherIcon: chatWidgetConfig.launcherIcon,
+        launcherText: chatWidgetConfig.launcherText || undefined,
+        buttonSize: parseInt(String(chatWidgetConfig.buttonSize)) || 60,
+        launcherIconBorderRadius: parseInt(String(chatWidgetConfig.launcherIconBorderRadius)) || 50,
+        launcherIconPulseGlow: chatWidgetConfig.launcherIconPulseGlow ?? false,
+        hideLauncherOnMobile: chatWidgetConfig.hideLauncherOnMobile ?? false,
+        customCss: chatWidgetConfig.customCss || undefined,
         // Stream Display Options
-        showAgentSwitchNotification: widgetConfig.showAgentSwitchNotification,
-        showThinking: widgetConfig.showThinking,
-        showInstantUpdates: widgetConfig.showInstantUpdates,
+        showAgentSwitchNotification: chatWidgetConfig.showAgentSwitchNotification,
+        showThinking: chatWidgetConfig.showThinking,
+        showInstantUpdates: chatWidgetConfig.showInstantUpdates,
         // Multi-agent Display Options
-        showAgentListOnTop: widgetConfig.showAgentListOnTop,
-        agentListMinCards: parseInt(widgetConfig.agentListMinCards) || 3,
-        agentListingType: widgetConfig.agentListingType,
+        showAgentListOnTop: chatWidgetConfig.showAgentListOnTop,
+        agentListMinCards: parseInt(String(chatWidgetConfig.agentListMinCards)) || 3,
+        agentListingType: chatWidgetConfig.agentListingType,
       }),
       // If no widget config exists, use defaults with chatbot name as title
-      ...(!widgetConfig && {
+      ...(!chatWidgetConfig && {
         title: chatbot.name,
         avatarUrl,
         welcomeMessage: behavior.greeting || DEFAULT_CONFIG.title,
@@ -163,6 +161,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
         color: a.color,
         type: a.agent_type,
       })) : undefined,
+      // Feature flags
+      enabledChat: chatbot.enabledChat,
+      enabledCall: chatbot.enabledCall,
+      // Call widget configuration
+      callConfig: callWidgetConfig,
     };
 
     return NextResponse.json({ config });

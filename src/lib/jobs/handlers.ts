@@ -9,7 +9,6 @@ import { registerJobHandler } from "./queue";
 // Job type constants
 export const JOB_TYPES = {
   SEND_EMAIL: "send_email",
-  SEND_WEBHOOK: "send_webhook",
   PROCESS_KNOWLEDGE: "process_knowledge",
   GENERATE_REPORT: "generate_report",
   CLEANUP_DATA: "cleanup_data",
@@ -30,15 +29,6 @@ export interface SendEmailPayload {
     content: string;
     contentType: string;
   }>;
-}
-
-export interface SendWebhookPayload {
-  url: string;
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  headers?: Record<string, string>;
-  body?: unknown;
-  secret?: string;
-  timeout?: number;
 }
 
 export interface ProcessKnowledgePayload {
@@ -103,42 +93,6 @@ export function registerDefaultHandlers(): void {
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to send email",
-      };
-    }
-  });
-
-  // Webhook handler
-  registerJobHandler<SendWebhookPayload>(JOB_TYPES.SEND_WEBHOOK, async (job) => {
-    try {
-      const { url, method = "POST", headers = {}, body, timeout = 30000 } = job.payload;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          ...headers,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: `Webhook failed with status ${response.status}`,
-        };
-      }
-
-      return { success: true, data: { status: response.status } };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to send webhook",
       };
     }
   });

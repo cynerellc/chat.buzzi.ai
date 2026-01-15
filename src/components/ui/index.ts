@@ -231,3 +231,6 @@ export { EmptyState, type EmptyStateProps } from "./empty-state";
 
 // Tag Input
 export { TagInput, type TagInputProps } from "./tag-input";
+
+// Alert
+export { Alert, type AlertProps } from "./alert";

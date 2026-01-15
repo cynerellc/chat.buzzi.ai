@@ -22,6 +22,10 @@ export interface SecuritySettings {
   allowPublicApi: boolean;
 }
 
+export interface FeatureSettings {
+  callEnabled: boolean;
+}
+
 export interface CompanySettingsResponse {
   id: string;
   name: string;
@@ -37,6 +41,7 @@ export interface CompanySettingsResponse {
   apiKeyPrefix: string | null;
   notificationSettings: NotificationSettings;
   securitySettings: SecuritySettings;
+  features: FeatureSettings;
 }
 
 // Update settings schema
@@ -61,6 +66,9 @@ const updateSettingsSchema = z.object({
     ipWhitelist: z.array(z.string()),
     allowPublicApi: z.boolean(),
   }).optional(),
+  features: z.object({
+    callEnabled: z.boolean(),
+  }).optional(),
 });
 
 // Default settings
@@ -78,9 +86,14 @@ const defaultSecuritySettings: SecuritySettings = {
   allowPublicApi: false,
 };
 
+const defaultFeatureSettings: FeatureSettings = {
+  callEnabled: false,
+};
+
 interface CompanySettings {
   notificationSettings?: NotificationSettings;
   securitySettings?: SecuritySettings;
+  features?: FeatureSettings;
   [key: string]: unknown;
 }
 
@@ -131,6 +144,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       apiKeyPrefix: company.apiKeyPrefix,
       notificationSettings: settings.notificationSettings || defaultNotificationSettings,
       securitySettings: settings.securitySettings || defaultSecuritySettings,
+      features: settings.features || defaultFeatureSettings,
     };
 
     return NextResponse.json({ settings: response });
@@ -192,7 +206,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     // Merge settings into JSONB
-    if (data.notificationSettings || data.securitySettings) {
+    if (data.notificationSettings || data.securitySettings || data.features) {
       const existingSettings = (company.settings as CompanySettings) || {};
       const newSettings: CompanySettings = { ...existingSettings };
 
@@ -201,6 +215,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
       if (data.securitySettings) {
         newSettings.securitySettings = data.securitySettings;
+      }
+      if (data.features) {
+        newSettings.features = data.features;
       }
 
       updateData.settings = newSettings;

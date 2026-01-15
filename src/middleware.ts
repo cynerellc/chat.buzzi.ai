@@ -85,7 +85,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api/widget/call/ws (WebSocket endpoint)
+     * - api/widget/call/twilio (Twilio WebSocket endpoint)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/widget/call/ws|api/widget/call/twilio|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

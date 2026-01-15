@@ -144,6 +144,8 @@ export interface CreatePackageData {
   };
   isActive?: boolean;
   isPublic?: boolean;
+  enabledChat?: boolean;
+  enabledCall?: boolean;
   sortOrder?: number;
   // Agents list stored as JSONB in package
   agentsList?: AgentListItemData[];
@@ -189,6 +191,8 @@ export interface UpdatePackageData {
   };
   isActive?: boolean;
   isPublic?: boolean;
+  enabledChat?: boolean;
+  enabledCall?: boolean;
   sortOrder?: number;
   // Agents list stored as JSONB in package
   agentsList?: AgentListItemData[];

@@ -450,7 +450,7 @@ export function KnowledgeBasePage({
       {/* Filters */}
       {hasContent && (
         <Card>
-          <CardBody>
+          <CardBody className="pt-6">
             <div className="flex flex-wrap gap-4">
               <div className="flex-1 min-w-[200px]">
                 <Input

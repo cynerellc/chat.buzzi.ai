@@ -25,11 +25,11 @@ export * from "./knowledge";
 // Conversations & Messages
 export * from "./conversations";
 
+// Calls & Call Transcripts (Voice Calls Feature)
+export * from "./calls";
+
 // Integrations & Webhooks
 export * from "./integrations";
-
-// Widget Configurations
-export * from "./widgets";
 
 // Analytics
 export * from "./analytics";

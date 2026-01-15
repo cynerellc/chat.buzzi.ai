@@ -14,7 +14,6 @@ export interface CompanyUserItem {
   name: string | null;
   role: string;
   status: string;
-  isActive: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
 }
@@ -65,7 +64,6 @@ export async function GET(request: Request, context: RouteContext) {
         name: users.name,
         role: companyPermissions.role, // Company role from permissions
         status: users.status,
-        isActive: users.isActive,
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
       })

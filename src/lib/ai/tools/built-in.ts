@@ -10,6 +10,7 @@
 import type { AgentContext, ToolResult } from "../types";
 import type { RegisteredTool } from "./types";
 import { BUILT_IN_TOOLS } from "./types";
+import { searchKnowledge, buildKnowledgeContext } from "@/lib/knowledge/rag-service";
 
 // ============================================================================
 // Knowledge Search Tool
@@ -45,25 +46,102 @@ export const searchKnowledgeTool: RegisteredTool = {
   },
   execute: async (
     params: Record<string, unknown>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _context: AgentContext
+    context: AgentContext
   ): Promise<ToolResult> => {
-    // This will be implemented by the RAG service
-    // For now, return a placeholder that will be replaced at runtime
     const query = params.query as string;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _maxResults = (params.maxResults as number) || 5;
+    const maxResults = (params.maxResults as number) || 5;
 
-    // The actual implementation will be injected by the agent runner
-    // This is just the interface definition
-    return {
-      success: true,
-      data: {
-        message: `Knowledge search executed for: "${query}"`,
-        results: [],
-        note: "RAG service integration pending",
-      },
-    };
+    console.log("[searchKnowledgeTool] Called with:", {
+      query,
+      maxResults,
+      companyId: context.companyId,
+      knowledgeCategories: context.knowledgeCategories,
+    });
+
+    // Check if companyId is available in context
+    if (!context.companyId) {
+      console.log("[searchKnowledgeTool] ERROR: No companyId in context");
+      return {
+        success: false,
+        error: "Knowledge search requires company context",
+      };
+    }
+
+    try {
+      // Get categories from context if available (for voice calls with category filtering)
+      const categories = context.knowledgeCategories;
+
+      console.log("[searchKnowledgeTool] Searching with categories:", categories);
+
+      // Use threshold from context (set by executor) or default to 0.3
+      const minScore = context.knowledgeThreshold ?? 0.3;
+      console.log(`[searchKnowledgeTool] Using minScore: ${minScore}`);
+
+      const ragContext = await searchKnowledge(query, context.companyId, {
+        limit: maxResults,
+        minScore,
+        categories: categories?.length ? categories : undefined,
+        searchFaqs: true,
+        rerank: true,
+      });
+
+      console.log("[searchKnowledgeTool] RAG Results:", {
+        totalResults: ragContext.totalResults,
+        searchTimeMs: ragContext.searchTimeMs,
+        chunksCount: ragContext.chunks.length,
+        faqsCount: ragContext.faqs.length,
+      });
+
+      // Log chunk details
+      if (ragContext.chunks.length > 0) {
+        console.log("[searchKnowledgeTool] Chunks found:");
+        ragContext.chunks.forEach((chunk, i) => {
+          console.log(`  [${i}] Source: ${chunk.sourceName}, Score: ${chunk.score?.toFixed(3)}`);
+          console.log(`      Content preview: ${chunk.content.substring(0, 150)}...`);
+        });
+      } else {
+        console.log("[searchKnowledgeTool] No chunks found in knowledge base");
+      }
+
+      // Log FAQ details
+      if (ragContext.faqs.length > 0) {
+        console.log("[searchKnowledgeTool] FAQs found:");
+        ragContext.faqs.forEach((faq, i) => {
+          console.log(`  [${i}] Q: ${faq.question}`);
+          console.log(`      A: ${faq.answer.substring(0, 100)}...`);
+        });
+      }
+
+      // Build human-readable context string for the AI
+      const contextString = buildKnowledgeContext(ragContext);
+
+      console.log("[searchKnowledgeTool] Context string length:", contextString.length);
+      console.log("[searchKnowledgeTool] Context preview:", contextString.substring(0, 500));
+
+      return {
+        success: true,
+        data: {
+          context: contextString,
+          resultCount: ragContext.totalResults,
+          searchTimeMs: ragContext.searchTimeMs,
+          chunks: ragContext.chunks.map((c) => ({
+            content: c.content,
+            score: c.score,
+            sourceName: c.sourceName,
+          })),
+          faqs: ragContext.faqs.map((f) => ({
+            question: f.question,
+            answer: f.answer,
+          })),
+        },
+      };
+    } catch (error) {
+      console.error("[searchKnowledgeTool] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to search knowledge base",
+      };
+    }
   },
 };
 

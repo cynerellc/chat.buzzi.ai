@@ -15,9 +15,7 @@ export interface ConversationDetail {
   userMessageCount: number;
   assistantMessageCount: number;
   sentiment: number | null;
-  sentimentHistory: unknown[];
   satisfactionRating: number | null;
-  satisfactionFeedback: string | null;
   resolutionType: string | null;
   resolvedAt: string | null;
   pageUrl: string | null;
@@ -148,9 +146,7 @@ export async function GET(
       userMessageCount: conversation.userMessageCount,
       assistantMessageCount: conversation.assistantMessageCount,
       sentiment: conversation.sentiment,
-      sentimentHistory: (conversation.sentimentHistory as unknown[]) || [],
       satisfactionRating: conversation.satisfactionRating,
-      satisfactionFeedback: conversation.satisfactionFeedback,
       resolutionType: conversation.resolutionType,
       resolvedAt: conversation.resolvedAt?.toISOString() ?? null,
       pageUrl: conversation.pageUrl,

@@ -141,6 +141,36 @@ export interface ChatWindowConfig {
   requireName?: boolean;
   // Preview mode (for admin testing with draft chatbots)
   isPreview?: boolean;
+  // Call feature settings
+  enableCall?: boolean;
+  callConfig?: CallConfig;
+}
+
+// ============================================================================
+// Call Types
+// ============================================================================
+
+export interface CallConfig {
+  /** Position of call button/orb */
+  position?: "bottom-right" | "bottom-left";
+  /** Button style: orb (circular) or pill (rounded rectangle) */
+  buttonStyle?: "orb" | "pill";
+  /** Show audio visualizer during calls */
+  showVisualizer?: boolean;
+  /** Show live transcript during calls */
+  showTranscript?: boolean;
+  /** Greeting message when call connects */
+  greeting?: string;
+}
+
+export type CallStatus = "idle" | "connecting" | "active" | "ending" | "ended" | "error" | "reconnecting" | "transferring";
+
+export interface CallTranscriptEntry {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: number;
+  isFinal?: boolean;
 }
 
 // ============================================================================

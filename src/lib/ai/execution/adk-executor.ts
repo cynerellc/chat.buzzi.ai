@@ -69,6 +69,8 @@ export interface AdkExecutorOptions {
     modelSettings: Record<string, unknown>;
     knowledgeBaseEnabled: boolean;
     knowledgeCategories: string[];
+    /** Min relevance score for RAG results (0.05-0.95, default 0.3) */
+    knowledgeThreshold?: number;
   };
   /** Full agents list config for multi-agent routing */
   agentsListConfig?: AgentListItem[];
@@ -414,7 +416,7 @@ export class AdkExecutor {
     this.rag = new RAGService({
       enabled: options.agentConfig.knowledgeBaseEnabled,
       maxResults: 5,
-      relevanceThreshold: 0.3,
+      relevanceThreshold: options.agentConfig.knowledgeThreshold ?? 0.3,
       categories: options.agentConfig.knowledgeCategories.length > 0
         ? options.agentConfig.knowledgeCategories
         : undefined,
@@ -486,17 +488,18 @@ export class AdkExecutor {
   /**
    * Get or create a RAGService from pool (avoids duplicate instances)
    */
-  private getOrCreateRagService(categories: string[]): RAGService {
+  private getOrCreateRagService(categories: string[], threshold?: number): RAGService {
+    const thresholdValue = threshold ?? 0.3;
     const cacheKey = categories.length > 0
-      ? categories.slice().sort().join(",")
-      : "__default__";
+      ? `${categories.slice().sort().join(",")}_${thresholdValue}`
+      : `__default__${thresholdValue}`;
 
     let service = this.ragServiceCache.get(cacheKey);
     if (!service) {
       service = new RAGService({
         enabled: true,
         maxResults: 5,
-        relevanceThreshold: 0.3,
+        relevanceThreshold: thresholdValue,
         categories: categories.length > 0 ? categories : undefined,
       });
       this.ragServiceCache.set(cacheKey, service);
@@ -711,7 +714,7 @@ export class AdkExecutor {
 
       // Add knowledge base tool if this worker has KB enabled (using pooled RAGService)
       if (workerHasKb) {
-        const workerRag = this.getOrCreateRagService(worker.knowledge_categories!);
+        const workerRag = this.getOrCreateRagService(worker.knowledge_categories!, worker.knowledge_threshold);
         workerTools.push(
           createKnowledgeBaseTool(workerRag, this.options.companyId, worker.knowledge_categories)
         );

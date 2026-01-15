@@ -6,9 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { agents } from "@/lib/db/schema/chatbots";
+import { agents, type ChatWidgetConfig } from "@/lib/db/schema/chatbots";
 import { companies } from "@/lib/db/schema/companies";
-import { widgetConfigs } from "@/lib/db/schema/widgets";
 import { eq, and } from "drizzle-orm";
 
 const DEFAULT_CONFIG = {
@@ -67,7 +66,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get agent with behavior config
+    // Get agent with behavior config and call settings
     const agentResult = await db
       .select({
         name: agents.name,
@@ -75,6 +74,12 @@ export async function GET(request: NextRequest) {
         behavior: agents.behavior,
         status: agents.status,
         packageType: agents.packageType,
+        // Unified widget config
+        widgetConfig: agents.widgetConfig,
+        // Call feature fields
+        enabledCall: agents.enabledCall,
+        callAiProvider: agents.callAiProvider,
+        voiceConfig: agents.voiceConfig,
       })
       .from(agents)
       .where(
@@ -105,60 +110,57 @@ export async function GET(request: NextRequest) {
     const behavior = (agent.behavior as { greeting?: string }) ?? {};
     const isMultiAgent = agent.packageType === "multi_agent";
 
-    // Fetch widget config for this chatbot
-    const widgetConfigResult = await db
-      .select()
-      .from(widgetConfigs)
-      .where(eq(widgetConfigs.chatbotId, agentId))
-      .limit(1);
-
-    const widgetConfig = widgetConfigResult[0];
+    // Get unified widget config from agent (now stored directly on chatbots table)
+    const unifiedConfig = agent.widgetConfig as { chat?: ChatWidgetConfig; call?: Record<string, unknown> } | null;
+    const chatWidgetConfig = unifiedConfig?.chat;
+    const callWidgetConfig = unifiedConfig?.call;
+    const hasWidgetConfig = chatWidgetConfig && Object.keys(chatWidgetConfig).length > 0;
 
     // Merge default config with widget config from database
     const config = {
       ...DEFAULT_CONFIG,
       // Apply widget config customizations if they exist
-      ...(widgetConfig && {
-        theme: widgetConfig.theme,
-        position: widgetConfig.position,
-        placement: widgetConfig.placement,
-        primaryColor: widgetConfig.primaryColor,
-        accentColor: widgetConfig.accentColor,
-        userBubbleColor: widgetConfig.userBubbleColor || undefined,
-        overrideAgentColor: widgetConfig.overrideAgentColor,
-        agentBubbleColor: widgetConfig.agentBubbleColor || undefined,
-        borderRadius: parseInt(widgetConfig.borderRadius) || DEFAULT_CONFIG.borderRadius,
-        title: widgetConfig.title,
-        subtitle: widgetConfig.subtitle || undefined,
+      ...(hasWidgetConfig && chatWidgetConfig && {
+        theme: chatWidgetConfig.theme,
+        position: chatWidgetConfig.position,
+        placement: chatWidgetConfig.placement,
+        primaryColor: chatWidgetConfig.primaryColor,
+        accentColor: chatWidgetConfig.accentColor,
+        userBubbleColor: chatWidgetConfig.userBubbleColor || undefined,
+        overrideAgentColor: chatWidgetConfig.overrideAgentColor,
+        agentBubbleColor: chatWidgetConfig.agentBubbleColor || undefined,
+        borderRadius: chatWidgetConfig.borderRadius ? parseInt(String(chatWidgetConfig.borderRadius)) : DEFAULT_CONFIG.borderRadius,
+        title: chatWidgetConfig.title,
+        subtitle: chatWidgetConfig.subtitle || undefined,
         placeholderText: DEFAULT_CONFIG.placeholderText,
-        welcomeMessage: widgetConfig.welcomeMessage,
-        avatarUrl: widgetConfig.avatarUrl || avatarUrl,
-        logoUrl: widgetConfig.logoUrl || undefined,
-        showBranding: widgetConfig.showBranding,
-        autoOpen: widgetConfig.autoOpen,
-        autoOpenDelay: parseInt(widgetConfig.autoOpenDelay) * 1000 || DEFAULT_CONFIG.autoOpenDelay,
-        soundEnabled: widgetConfig.playSoundOnMessage,
-        persistConversation: widgetConfig.persistConversation,
-        enableVoice: widgetConfig.enableVoiceMessages,
-        enableFileUpload: widgetConfig.enableFileUpload,
-        launcherIcon: widgetConfig.launcherIcon,
-        launcherText: widgetConfig.launcherText || undefined,
-        buttonSize: parseInt(widgetConfig.buttonSize) || 60,
-        launcherIconBorderRadius: parseInt(widgetConfig.launcherIconBorderRadius) || 50,
-        launcherIconPulseGlow: widgetConfig.launcherIconPulseGlow ?? false,
-        hideLauncherOnMobile: widgetConfig.hideLauncherOnMobile ?? false,
-        customCss: widgetConfig.customCss || undefined,
+        welcomeMessage: chatWidgetConfig.welcomeMessage,
+        avatarUrl: chatWidgetConfig.avatarUrl || avatarUrl,
+        logoUrl: chatWidgetConfig.logoUrl || undefined,
+        showBranding: chatWidgetConfig.showBranding,
+        autoOpen: chatWidgetConfig.autoOpen,
+        autoOpenDelay: chatWidgetConfig.autoOpenDelay ? parseInt(String(chatWidgetConfig.autoOpenDelay)) * 1000 : DEFAULT_CONFIG.autoOpenDelay,
+        soundEnabled: chatWidgetConfig.playSoundOnMessage,
+        persistConversation: chatWidgetConfig.persistConversation,
+        enableVoice: chatWidgetConfig.enableVoiceMessages,
+        enableFileUpload: chatWidgetConfig.enableFileUpload,
+        launcherIcon: chatWidgetConfig.launcherIcon,
+        launcherText: chatWidgetConfig.launcherText || undefined,
+        buttonSize: chatWidgetConfig.buttonSize ? parseInt(String(chatWidgetConfig.buttonSize)) : 60,
+        launcherIconBorderRadius: chatWidgetConfig.launcherIconBorderRadius ? parseInt(String(chatWidgetConfig.launcherIconBorderRadius)) : 50,
+        launcherIconPulseGlow: chatWidgetConfig.launcherIconPulseGlow ?? false,
+        hideLauncherOnMobile: chatWidgetConfig.hideLauncherOnMobile ?? false,
+        customCss: chatWidgetConfig.customCss || undefined,
         // Stream Display Options
-        showAgentSwitchNotification: widgetConfig.showAgentSwitchNotification,
-        showThinking: widgetConfig.showThinking,
-        showInstantUpdates: widgetConfig.showInstantUpdates,
+        showAgentSwitchNotification: chatWidgetConfig.showAgentSwitchNotification,
+        showThinking: chatWidgetConfig.showThinking,
+        showInstantUpdates: chatWidgetConfig.showInstantUpdates,
         // Multi-agent Display Options
-        showAgentListOnTop: widgetConfig.showAgentListOnTop,
-        agentListMinCards: parseInt(widgetConfig.agentListMinCards) || 3,
-        agentListingType: widgetConfig.agentListingType,
+        showAgentListOnTop: chatWidgetConfig.showAgentListOnTop,
+        agentListMinCards: chatWidgetConfig.agentListMinCards ? parseInt(String(chatWidgetConfig.agentListMinCards)) : 3,
+        agentListingType: chatWidgetConfig.agentListingType,
       }),
       // If no widget config exists, use defaults with agent name as title
-      ...(!widgetConfig && {
+      ...(!hasWidgetConfig && {
         title: agent.name,
         avatarUrl,
         welcomeMessage: behavior.greeting || DEFAULT_CONFIG.title,
@@ -174,6 +176,51 @@ export async function GET(request: NextRequest) {
         color: a.color,
         type: a.agent_type,
       })) : undefined,
+      // Call feature configuration
+      call: agent.enabledCall ? {
+        enabled: true,
+        aiProvider: agent.callAiProvider,
+        voiceConfig: agent.voiceConfig as {
+          openai_voice?: string;
+          gemini_voice?: string;
+          vad_threshold?: number;
+          vad_sensitivity?: string;
+          silence_duration_ms?: number;
+          prefix_padding_ms?: number;
+          call_greeting?: string;
+          system_prompt_call?: string;
+        },
+        widgetConfig: callWidgetConfig as {
+          enabled?: boolean;
+          position?: string;
+          colors?: Record<string, string>;
+          callButton?: {
+            style?: string;
+            size?: number;
+            animation?: boolean;
+            label?: string;
+          };
+          orb?: {
+            glowIntensity?: number;
+            pulseSpeed?: number;
+            states?: Record<string, { color: string; animation: string }>;
+          };
+          callDialog?: {
+            width?: number;
+            showVisualizer?: boolean;
+            visualizerStyle?: string;
+            showTranscript?: boolean;
+          };
+          controls?: {
+            showMuteButton?: boolean;
+            showEndCallButton?: boolean;
+          };
+          branding?: {
+            showPoweredBy?: boolean;
+            companyLogo?: string;
+          };
+        },
+      } : undefined,
     };
 
     // Set CORS and cache headers

@@ -10,7 +10,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
-  image: string | null;
+  avatarUrl: string | null;
   role: UserRole;
 }
 
@@ -25,7 +25,7 @@ export function useAuth() {
       id: session.user.id,
       email: session.user.email ?? "",
       name: session.user.name ?? null,
-      image: session.user.image ?? null,
+      avatarUrl: session.user.avatarUrl ?? null,
       role: session.user.role,
     };
   }, [session]);

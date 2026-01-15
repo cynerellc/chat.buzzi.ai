@@ -64,12 +64,7 @@ export function Header({
       )}
     >
       {/* Bottom border that extends to touch left panel */}
-      <div className="absolute bottom-0 right-0 left-0 lg:-left-64 h-[1px] bg-border/30">
-        {/* Data flow animation on the border */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="h-full w-20 bg-gradient-to-r from-transparent via-primary/50 to-transparent border-data-flow-h" />
-        </div>
-      </div>
+      <div className="absolute bottom-0 right-0 left-0 lg:-left-64 h-[1px] bg-border" />
 
       {/* Mobile menu button */}
       {onMenuClick && (

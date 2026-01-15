@@ -64,13 +64,128 @@ export interface ChatbotAgentConfig {
   sort_order?: number;
 }
 
+// Voice Configuration for calls
+export interface VoiceConfig {
+  openai_voice?: "alloy" | "ash" | "ballad" | "coral" | "echo" | "sage" | "shimmer" | "verse";
+  gemini_voice?: "Kore" | "Aoede" | "Puck" | "Charon" | "Fenrir";
+  vad_threshold?: number;
+  vad_sensitivity?: "LOW" | "MEDIUM" | "HIGH";
+  silence_duration_ms?: number;
+  prefix_padding_ms?: number;
+  call_greeting?: string;
+  system_prompt_call?: string;
+}
+
+// Chat Widget Configuration
+export interface ChatWidgetConfig {
+  theme?: "light" | "dark" | "auto";
+  position?: "bottom-right" | "bottom-left";
+  placement?: "above-launcher" | "center-screen";
+  primaryColor?: string;
+  accentColor?: string;
+  userBubbleColor?: string;
+  overrideAgentColor?: boolean;
+  agentBubbleColor?: string;
+  borderRadius?: number;
+  buttonSize?: number;
+  launcherIcon?: string;
+  launcherText?: string;
+  launcherIconBorderRadius?: number;
+  launcherIconPulseGlow?: boolean;
+  showLauncherText?: boolean;
+  launcherTextBackgroundColor?: string;
+  launcherTextColor?: string;
+  zIndex?: number;
+  title?: string;
+  subtitle?: string;
+  welcomeMessage?: string;
+  logoUrl?: string;
+  avatarUrl?: string;
+  showBranding?: boolean;
+  autoOpen?: boolean;
+  autoOpenDelay?: number;
+  playSoundOnMessage?: boolean;
+  persistConversation?: boolean;
+  hideLauncherOnMobile?: boolean;
+  enableFileUpload?: boolean;
+  enableVoiceMessages?: boolean;
+  enableFeedback?: boolean;
+  requireEmail?: boolean;
+  requireName?: boolean;
+  showAgentSwitchNotification?: boolean;
+  showThinking?: boolean;
+  showInstantUpdates?: boolean;
+  showAgentListOnTop?: boolean;
+  agentListMinCards?: number;
+  agentListingType?: "minimal" | "compact" | "standard" | "detailed";
+  customCss?: string;
+  allowedDomains?: string[];
+  preChatForm?: {
+    enabled: boolean;
+    fields: Array<{
+      name: string;
+      label: string;
+      type: string;
+      required: boolean;
+    }>;
+  };
+}
+
+// Call Widget Configuration
+export interface CallWidgetConfig {
+  enabled?: boolean;
+  position?: "bottom-right" | "bottom-left";
+  colors?: {
+    primary?: string;
+    primaryHover?: string;
+    background?: string;
+    text?: string;
+  };
+  callButton?: {
+    style?: "orb" | "pill";
+    size?: number;
+    animation?: boolean;
+    label?: string;
+  };
+  orb?: {
+    glowIntensity?: number;
+    pulseSpeed?: number;
+    states?: {
+      idle?: { color: string; animation: string };
+      connecting?: { color: string; animation: string };
+      active?: { color: string; animation: string };
+      muted?: { color: string; animation: string };
+    };
+  };
+  callDialog?: {
+    width?: number;
+    showVisualizer?: boolean;
+    visualizerStyle?: "waveform" | "bars" | "circle";
+    showTranscript?: boolean;
+  };
+  controls?: {
+    showMuteButton?: boolean;
+    showEndCallButton?: boolean;
+  };
+  branding?: {
+    showPoweredBy?: boolean;
+    companyLogo?: string;
+  };
+}
+
+// Unified Widget Configuration
+export interface WidgetConfig {
+  chat: ChatWidgetConfig;
+  call: CallWidgetConfig;
+}
+
 // Chatbot Detail
 export interface ChatbotDetail {
   id: string;
   companyId: string;
   packageId: string | null;
   packageType: "single_agent" | "multi_agent";
-  chatbotType: "chat" | "call";
+  enabledChat: boolean;
   isCustomPackage: boolean;
   name: string;
   description: string | null;
@@ -98,6 +213,13 @@ export interface ChatbotDetail {
   };
   escalationEnabled: boolean;
   escalationTriggers: unknown[];
+  // Call Feature Fields
+  enabledCall: boolean;
+  callModelId: string | null;
+  callAiProvider: "OPENAI" | "GEMINI" | null;
+  voiceConfig: VoiceConfig;
+  // Unified Widget Config (chat + call)
+  widgetConfig: WidgetConfig;
   totalConversations: number;
   avgResolutionTime: number | null;
   satisfactionScore: number | null;

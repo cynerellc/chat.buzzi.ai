@@ -81,7 +81,6 @@ export async function PATCH(
         .update(users)
         .set({
           status: body.status,
-          isActive: body.status === "active",
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));

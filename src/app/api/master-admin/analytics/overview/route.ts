@@ -1,9 +1,9 @@
-import { sql, desc } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { platformAnalytics, companies, users, dailyAnalytics } from "@/lib/db/schema";
+import { companies, users, dailyAnalytics } from "@/lib/db/schema";
 
 export interface AnalyticsOverview {
   totalConversations: number;
@@ -25,17 +25,7 @@ export async function GET() {
   try {
     await requireMasterAdmin();
 
-    // Get the most recent platform analytics
-    const [latestAnalytics] = await db
-      .select()
-      .from(platformAnalytics)
-      .orderBy(desc(platformAnalytics.date))
-      .limit(1);
-
-    // Note: Previous period data from platformAnalytics reserved for future use
-    // Growth calculations currently use dailyAnalytics aggregation below
-
-    // Get counts from actual tables as fallback/current data
+    // Get counts from actual tables
     const [companiesCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(companies);
@@ -119,7 +109,7 @@ export async function GET() {
       humanEscalationRate,
       humanEscalationGrowth: humanEscalationRate - prevHumanRate,
       totalCompanies: Number(companiesCount?.count ?? 0),
-      activeCompanies: latestAnalytics?.activeCompanies ?? Number(companiesCount?.count ?? 0),
+      activeCompanies: Number(companiesCount?.count ?? 0),
       totalAgents: Number(usersCount?.count ?? 0),
     };
 

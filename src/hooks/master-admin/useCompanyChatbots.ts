@@ -1,7 +1,7 @@
 import useSWR from "swr";
 
 import type { CompanyChatbotItem } from "@/app/api/master-admin/companies/[companyId]/chatbots/route";
-import type { AgentListItem } from "@/lib/db/schema/chatbots";
+import type { AgentListItem, ChatbotSettings, VoiceConfig, WidgetConfig } from "@/lib/db/schema/chatbots";
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -27,11 +27,22 @@ export interface ChatbotDetails {
   behavior: Record<string, unknown>;
   status: string;
   escalationEnabled: boolean;
+  enabledChat: boolean;
+  enabledCall: boolean;
+  // Call settings
+  callModelId: string | null;
+  callAiProvider: "OPENAI" | "GEMINI" | null;
+  voiceConfig: VoiceConfig;
+  widgetConfig?: WidgetConfig;
+  // Package-level feature flags (null if no package = show all options)
+  packageEnabledChat: boolean | null;
+  packageEnabledCall: boolean | null;
   conversationCount: number;
   messageCount: number;
   createdAt: string;
   updatedAt: string;
   agentsList: AgentListItem[];
+  settings?: ChatbotSettings;
 }
 
 // Hook for listing company chatbots

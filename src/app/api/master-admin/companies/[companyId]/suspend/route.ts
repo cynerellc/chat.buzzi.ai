@@ -96,7 +96,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         await db
           .update(users)
           .set({
-            isActive: false,
+            status: "suspended",
             updatedAt: new Date(),
           })
           .where(
@@ -225,7 +225,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       await db
         .update(users)
         .set({
-          isActive: true,
+          status: "active",
           updatedAt: new Date(),
         })
         .where(

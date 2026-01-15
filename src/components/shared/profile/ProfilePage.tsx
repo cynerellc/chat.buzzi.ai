@@ -18,7 +18,6 @@ interface UserProfile {
   email: string;
   phone: string | null;
   avatarUrl: string | null;
-  image: string | null;
   role: string;
   activeCompanyId: string | null;
 }
@@ -175,7 +174,7 @@ export function ProfilePage() {
         </div>
 
         <AvatarUploadSection
-          currentAvatarUrl={profile.avatarUrl ?? profile.image}
+          currentAvatarUrl={profile.avatarUrl}
           userName={profile.name}
           onAvatarChange={handleAvatarChange}
         />

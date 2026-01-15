@@ -1,6 +1,7 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, X, type LucideIcon } from "lucide-react";
 import {
@@ -149,11 +150,15 @@ export function Modal({
             className
           )}
         >
-          {title && (
+          {title ? (
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
               {description && <DialogDescription>{description}</DialogDescription>}
             </DialogHeader>
+          ) : (
+            <VisuallyHidden>
+              <DialogTitle>Modal</DialogTitle>
+            </VisuallyHidden>
           )}
           <div className="py-2">{children}</div>
           {footer && <DialogFooter>{footer}</DialogFooter>}

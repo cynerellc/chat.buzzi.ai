@@ -246,6 +246,10 @@ export interface AgentContext {
   timestamp: Date;
   ipAddress?: string;
   userAgent?: string;
+
+  // Knowledge base configuration (for voice calls)
+  knowledgeCategories?: string[];
+  knowledgeThreshold?: number; // Min relevance score for RAG results (0.05-0.95)
 }
 
 // ============================================================================

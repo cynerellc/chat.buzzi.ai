@@ -392,6 +392,13 @@ export async function searchChunks(
 ): Promise<SearchHit<VectorPayload>[]> {
   const service = getQdrantService();
 
+  console.log(`[Qdrant searchChunks] Called with:`, {
+    companyId,
+    categories: options.categories,
+    limit: options.limit,
+    scoreThreshold: options.scoreThreshold,
+  });
+
   const mustConditions: QdrantCondition[] = [
     { key: "companyId", match: { value: companyId } },
   ];
@@ -405,17 +412,40 @@ export async function searchChunks(
         match: { value: category },
       })),
     };
-    // Wrap in a nested filter for proper AND behavior with company filter
-    return service.search<VectorPayload>({
+
+    const filter = {
+      must: mustConditions,
+      should: categoryFilter.should,
+    };
+
+    console.log(`[Qdrant searchChunks] Filter with categories:`, JSON.stringify(filter, null, 2));
+
+    const results = await service.search<VectorPayload>({
       collectionName: COLLECTIONS.KNOWLEDGE_CHUNKS,
       vector,
       limit: options.limit ?? 10,
-      filter: {
-        must: mustConditions,
-        should: categoryFilter.should,
-      },
+      filter,
       scoreThreshold: options.scoreThreshold ?? 0.7,
     });
+
+    console.log(`[Qdrant searchChunks] Results: ${results.length} chunks found`);
+    if (results.length === 0) {
+      // If no results with category filter, try without category filter as fallback
+      console.log(`[Qdrant searchChunks] No results with category filter, trying without categories...`);
+      const fallbackResults = await service.search<VectorPayload>({
+        collectionName: COLLECTIONS.KNOWLEDGE_CHUNKS,
+        vector,
+        limit: options.limit ?? 10,
+        filter: { must: mustConditions },
+        scoreThreshold: options.scoreThreshold ?? 0.7,
+      });
+      console.log(`[Qdrant searchChunks] Fallback results: ${fallbackResults.length} chunks found`);
+      if (fallbackResults.length > 0) {
+        console.log(`[Qdrant searchChunks] First fallback result category: "${fallbackResults[0].payload?.category}"`);
+      }
+      return fallbackResults;
+    }
+    return results;
   }
 
   const filter: QdrantFilter = {
@@ -429,13 +459,18 @@ export async function searchChunks(
     }));
   }
 
-  return service.search<VectorPayload>({
+  console.log(`[Qdrant searchChunks] Filter (no categories):`, JSON.stringify(filter, null, 2));
+
+  const results = await service.search<VectorPayload>({
     collectionName: COLLECTIONS.KNOWLEDGE_CHUNKS,
     vector,
     limit: options.limit ?? 10,
     filter,
     scoreThreshold: options.scoreThreshold ?? 0.7,
   });
+
+  console.log(`[Qdrant searchChunks] Results: ${results.length} chunks found`);
+  return results;
 }
 
 /**

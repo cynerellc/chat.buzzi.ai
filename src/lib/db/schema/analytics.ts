@@ -158,46 +158,6 @@ export const topicAnalytics = chatappSchema.table(
   ]
 );
 
-// Platform Analytics Table (Master Admin - aggregated across all companies)
-export const platformAnalytics = chatappSchema.table(
-  "platform_analytics",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    // Date
-    date: date("date").notNull().unique(),
-
-    // Company Metrics
-    totalCompanies: integer("total_companies").default(0).notNull(),
-    activeCompanies: integer("active_companies").default(0).notNull(),
-    newCompanies: integer("new_companies").default(0).notNull(),
-    churnedCompanies: integer("churned_companies").default(0).notNull(),
-
-    // User Metrics
-    totalUsers: integer("total_users").default(0).notNull(),
-    activeUsers: integer("active_users").default(0).notNull(),
-    newUsers: integer("new_users").default(0).notNull(),
-
-    // Conversation Metrics
-    totalConversations: integer("total_conversations").default(0).notNull(),
-    totalMessages: integer("total_messages").default(0).notNull(),
-
-    // Revenue Metrics
-    mrr: numeric("mrr", { precision: 12, scale: 2 }),
-    arr: numeric("arr", { precision: 12, scale: 2 }),
-    newMrr: numeric("new_mrr", { precision: 12, scale: 2 }),
-    churnedMrr: numeric("churned_mrr", { precision: 12, scale: 2 }),
-
-    // Plan Distribution
-    planDistribution: jsonb("plan_distribution").default({}),
-
-    // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [index("platform_analytics_date_idx").on(table.date)]
-);
-
 // Relations
 export const dailyAnalyticsRelations = relations(dailyAnalytics, ({ one }) => ({
   company: one(companies, {
@@ -235,5 +195,3 @@ export type HourlyAnalytics = typeof hourlyAnalytics.$inferSelect;
 export type NewHourlyAnalytics = typeof hourlyAnalytics.$inferInsert;
 export type TopicAnalytics = typeof topicAnalytics.$inferSelect;
 export type NewTopicAnalytics = typeof topicAnalytics.$inferInsert;
-export type PlatformAnalytics = typeof platformAnalytics.$inferSelect;
-export type NewPlatformAnalytics = typeof platformAnalytics.$inferInsert;

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { agents, agentPackages, companies, conversations, messages, type PackageVariableDefinition, type AgentListItem as AgentListItemSchema } from "@/lib/db/schema";
+import type { ChatbotSettings, VoiceConfig } from "@/lib/db/schema/chatbots";
 
 interface RouteContext {
   params: Promise<{ companyId: string }>;
@@ -118,6 +119,9 @@ interface CreateChatbotRequest {
   behavior?: Record<string, unknown>;
   // Variable values are now stored as a simple key-value object
   variableValues?: Record<string, string>;
+  // Feature flags
+  enabledChat?: boolean;
+  enabledCall?: boolean;
 }
 
 /**
@@ -157,8 +161,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     let type = body.type || "custom";
     let variableValues: Record<string, string> = {};
     let packageType: "single_agent" | "multi_agent" = "single_agent";
-    let chatbotType: "chat" | "call" = "chat";
+    let enabledChat = true;
+    let enabledCall = false;
     let isCustomPackage = false;
+    const initialSettings: ChatbotSettings = {};
 
     // If packageId is provided, copy agents_list and defaults from the package
     if (body.packageId) {
@@ -172,7 +178,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         // Copy agents_list from package
         agentsList = (agentPackage.agentsList as AgentListItemSchema[]) || [];
         packageType = agentPackage.packageType;
-        chatbotType = agentPackage.chatbotType;
+        enabledChat = agentPackage.enabledChat;
+        enabledCall = agentPackage.enabledCall;
         isCustomPackage = agentPackage.isCustomPackage;
 
         behavior = body.behavior || (agentPackage.defaultBehavior as Record<string, unknown>);
@@ -194,11 +201,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
             variableValues[pv.name] = pv.defaultValue;
           }
         });
+
+        // Copy call system prompt from package voice config
+        const pkgVoiceConfig = agentPackage.defaultVoiceConfig as VoiceConfig;
+        if (pkgVoiceConfig?.callSystemPrompt) {
+          initialSettings.callSystemPrompt = pkgVoiceConfig.callSystemPrompt;
+        }
       }
 
       // Override with provided values
       if (body.variableValues) {
         variableValues = { ...variableValues, ...body.variableValues };
+      }
+
+      // Override feature flags if explicitly provided
+      if (body.enabledChat !== undefined) {
+        enabledChat = body.enabledChat;
+      }
+      if (body.enabledCall !== undefined) {
+        enabledCall = body.enabledCall;
       }
     } else {
       // No package - create a single agent from request params
@@ -222,6 +243,14 @@ If you cannot help with something, offer to connect the customer with a human ag
         tools: [],
         sort_order: 0,
       }];
+
+      // Set feature flags from request body
+      if (body.enabledChat !== undefined) {
+        enabledChat = body.enabledChat;
+      }
+      if (body.enabledCall !== undefined) {
+        enabledCall = body.enabledCall;
+      }
     }
 
     // Create the chatbot with agents_list and variable values stored as JSONB
@@ -231,7 +260,8 @@ If you cannot help with something, offer to connect the customer with a human ag
         companyId,
         packageId: body.packageId || null,
         packageType,
-        chatbotType,
+        enabledChat,
+        enabledCall,
         isCustomPackage,
         name: body.name,
         description: body.description || null,
@@ -250,6 +280,7 @@ If you cannot help with something, offer to connect the customer with a human ag
           offlineMessage: "We're currently offline. Please leave a message and we'll get back to you.",
         },
         variableValues,
+        settings: initialSettings,
       })
       .returning();
 

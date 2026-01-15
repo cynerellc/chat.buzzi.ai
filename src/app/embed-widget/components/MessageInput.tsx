@@ -42,6 +42,10 @@ export interface MessageInputProps {
   onStopRecording?: () => void;
   /** Cancel recording callback */
   onCancelRecording?: () => void;
+  /** Whether call feature is enabled */
+  enableCall?: boolean;
+  /** Called when call button is clicked */
+  onCallClick?: () => void;
   /** Custom class name */
   className?: string;
 }
@@ -68,6 +72,8 @@ export function MessageInput({
   onStartRecording,
   onStopRecording,
   onCancelRecording,
+  enableCall = false,
+  onCallClick,
   className,
 }: MessageInputProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -261,38 +267,70 @@ export function MessageInput({
                   <path d="M22 2L15 22L11 13L2 9L22 2Z" />
                 </svg>
               </button>
-            ) : enableVoice && isVoiceSupported ? (
-              <button
-                type="button"
-                onMouseDown={onStartRecording}
-                onMouseUp={onStopRecording}
-                onMouseLeave={onStopRecording}
-                onTouchStart={onStartRecording}
-                onTouchEnd={onStopRecording}
-                className={cn(
-                  "rounded-full p-2 transition-colors shrink-0",
-                  isDark
-                    ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
-                    : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+            ) : (
+              <>
+                {/* Call button */}
+                {enableCall && (
+                  <button
+                    type="button"
+                    onClick={onCallClick}
+                    className={cn(
+                      "rounded-full p-2 transition-colors shrink-0",
+                      isDark
+                        ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
+                        : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+                    )}
+                    aria-label="Start voice call"
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                  </button>
                 )}
-                aria-label="Hold to record voice message"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" x2="12" y1="19" y2="22" />
-                </svg>
-              </button>
-            ) : null}
+                {/* Voice recording button */}
+                {enableVoice && isVoiceSupported && (
+                  <button
+                    type="button"
+                    onMouseDown={onStartRecording}
+                    onMouseUp={onStopRecording}
+                    onMouseLeave={onStopRecording}
+                    onTouchStart={onStartRecording}
+                    onTouchEnd={onStopRecording}
+                    className={cn(
+                      "rounded-full p-2 transition-colors shrink-0",
+                      isDark
+                        ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
+                        : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+                    )}
+                    aria-label="Hold to record voice message"
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" x2="12" y1="19" y2="22" />
+                    </svg>
+                  </button>
+                )}
+              </>
+            )}
           </>
         )}
       </div>

@@ -138,3 +138,66 @@ export function useUsageAnalytics(
     mutate,
   };
 }
+
+// ============================================================================
+// Call Analytics Hook
+// ============================================================================
+
+import type {
+  CallAnalyticsResponse,
+  CallAnalyticsOverview,
+  CallsByProvider,
+  CallsBySource,
+  CallsByStatus,
+  CallsByCompany,
+  CallDataPoint,
+} from "@/app/api/master-admin/analytics/calls/route";
+
+export type {
+  CallAnalyticsResponse,
+  CallAnalyticsOverview,
+  CallsByProvider,
+  CallsBySource,
+  CallsByStatus,
+  CallsByCompany,
+  CallDataPoint,
+};
+
+export interface UseCallAnalyticsParams {
+  days?: number;
+  limit?: number;
+}
+
+export interface UseCallAnalyticsReturn {
+  data: CallAnalyticsResponse | undefined;
+  isLoading: boolean;
+  error: Error | undefined;
+  mutate: () => void;
+}
+
+export function useCallAnalytics(
+  params: UseCallAnalyticsParams = {}
+): UseCallAnalyticsReturn {
+  const searchParams = new URLSearchParams();
+  if (params.days) searchParams.set("days", params.days.toString());
+  if (params.limit) searchParams.set("limit", params.limit.toString());
+
+  const queryString = searchParams.toString();
+  const url = `/api/master-admin/analytics/calls${queryString ? `?${queryString}` : ""}`;
+
+  const { data, error, isLoading, mutate } = useSWR<CallAnalyticsResponse>(
+    url,
+    fetcher,
+    {
+      refreshInterval: 60000,
+      revalidateOnFocus: false,
+    }
+  );
+
+  return {
+    data,
+    isLoading,
+    error,
+    mutate,
+  };
+}

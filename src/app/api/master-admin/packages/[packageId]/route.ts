@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agentPackages, agents, type PackageVariableDefinition, type AgentListItem } from "@/lib/db/schema";
+import { agentPackages, agents, type PackageVariableDefinition, type AgentListItem, type VoiceConfig } from "@/lib/db/schema";
 
 // Package variable response type (matches PackageVariableDefinition from schema)
 export type PackageVariableDetails = PackageVariableDefinition;
@@ -25,6 +25,9 @@ export interface PackageDetails {
   executionConfig: Record<string, unknown>;
   isActive: boolean;
   isPublic: boolean;
+  enabledChat: boolean;
+  enabledCall: boolean;
+  defaultVoiceConfig: VoiceConfig;
   sortOrder: number;
   agentsCount: number;
   agentsList: AgentListItem[];
@@ -71,6 +74,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       defaultBehavior: pkg.defaultBehavior as Record<string, unknown>,
       features: pkg.features as unknown[],
       executionConfig: pkg.executionConfig as Record<string, unknown>,
+      defaultVoiceConfig: (pkg.defaultVoiceConfig as VoiceConfig) || {},
       agentsCount: countResult?.count ?? 0,
       // Agents list is now stored directly in the package as JSONB
       agentsList: (pkg.agentsList as AgentListItem[]) || [],
@@ -102,6 +106,7 @@ const agentListItemSchema = z.object({
   model_settings: z.record(z.string(), z.unknown()).default({ temperature: 0.7, max_tokens: 4096, top_p: 1 }),
   knowledge_base_enabled: z.boolean().optional(),
   knowledge_categories: z.array(z.string()).default([]),
+  knowledge_threshold: z.number().min(0.05).max(0.95).nullable().optional(),
   tools: z.array(z.unknown()).default([]),
   managed_agent_ids: z.array(z.string()).default([]),
   sort_order: z.number().int().default(0),
@@ -141,8 +146,13 @@ const updatePackageSchema = z.object({
     allowedNetworkDomains: z.array(z.string()).optional(),
     sandboxMode: z.boolean().optional(),
   }).optional(),
+  defaultVoiceConfig: z.object({
+    callSystemPrompt: z.string().optional(),
+  }).optional(),
   isActive: z.boolean().optional(),
   isPublic: z.boolean().optional(),
+  enabledChat: z.boolean().optional(),
+  enabledCall: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -182,7 +192,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (validatedData.executionConfig !== undefined) updateData.executionConfig = validatedData.executionConfig;
     if (validatedData.isActive !== undefined) updateData.isActive = validatedData.isActive;
     if (validatedData.isPublic !== undefined) updateData.isPublic = validatedData.isPublic;
+    if (validatedData.enabledChat !== undefined) updateData.enabledChat = validatedData.enabledChat;
+    if (validatedData.enabledCall !== undefined) updateData.enabledCall = validatedData.enabledCall;
     if (validatedData.sortOrder !== undefined) updateData.sortOrder = validatedData.sortOrder;
+    if (validatedData.defaultVoiceConfig !== undefined) {
+      // Merge with existing defaultVoiceConfig to preserve other fields
+      const [currentPkg] = await db
+        .select({ defaultVoiceConfig: agentPackages.defaultVoiceConfig })
+        .from(agentPackages)
+        .where(eq(agentPackages.id, packageId))
+        .limit(1);
+      const existingConfig = (currentPkg?.defaultVoiceConfig as VoiceConfig) || {};
+      updateData.defaultVoiceConfig = {
+        ...existingConfig,
+        ...validatedData.defaultVoiceConfig,
+      };
+    }
     // Variables are now stored directly in the package as JSONB array
     if (validatedData.variables !== undefined) {
       updateData.variables = validatedData.variables.map((v) => ({
@@ -211,6 +236,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         model_settings: agent.model_settings,
         knowledge_base_enabled: agent.knowledge_base_enabled,
         knowledge_categories: agent.knowledge_categories,
+        knowledge_threshold: agent.knowledge_threshold,
         tools: agent.tools,
         managed_agent_ids: agent.managed_agent_ids,
         sort_order: agent.sort_order ?? index,
@@ -235,6 +261,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         defaultBehavior: updatedPackage.defaultBehavior as Record<string, unknown>,
         features: updatedPackage.features as unknown[],
         executionConfig: updatedPackage.executionConfig as Record<string, unknown>,
+        defaultVoiceConfig: (updatedPackage.defaultVoiceConfig as VoiceConfig) || {},
         // Agents list is now stored directly in the package as JSONB
         agentsList: (updatedPackage.agentsList as AgentListItem[]) || [],
         // Variables are now stored directly in the package as JSONB

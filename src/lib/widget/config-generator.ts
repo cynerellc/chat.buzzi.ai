@@ -8,9 +8,8 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { chatbots, type ChatbotSettings } from "@/lib/db/schema/chatbots";
+import { chatbots, type ChatbotSettings, type ChatWidgetConfig } from "@/lib/db/schema/chatbots";
 import { companies } from "@/lib/db/schema/companies";
-import { widgetConfigs } from "@/lib/db/schema/widgets";
 import {
   uploadWidgetConfig,
   deleteWidgetConfig as deleteR2WidgetConfig,
@@ -63,13 +62,12 @@ export async function generateWidgetConfigJson(
       return { success: false, error: "Company not found" };
     }
 
-    // 2. Fetch widget config for this chatbot
-    const widgetConfig = await db.query.widgetConfigs.findFirst({
-      where: eq(widgetConfigs.chatbotId, chatbotId),
-    });
+    // 2. Get widget config from chatbot's unified widgetConfig.chat field
+    const unifiedConfig = chatbot.widgetConfig as { chat?: ChatWidgetConfig; call?: Record<string, unknown> } | null;
+    const chatWidgetConfig = unifiedConfig?.chat;
 
     // 3. Build the widget config JSON
-    const configJson = buildWidgetConfigJson(chatbot, company, widgetConfig);
+    const configJson = buildWidgetConfigJson(chatbot, company, chatWidgetConfig);
 
     // 4. Upload to R2 Storage
     const storagePath = getWidgetConfigPath(company.id, chatbotId);
@@ -141,7 +139,7 @@ export function getWidgetConfigPublicUrl(
 function buildWidgetConfigJson(
   chatbot: typeof chatbots.$inferSelect,
   company: typeof companies.$inferSelect,
-  widgetConfig: typeof widgetConfigs.$inferSelect | undefined
+  widgetConfig: ChatWidgetConfig | undefined
 ): WidgetConfigJson {
   // Extract agents from chatbot's agentsList
   const agents: WidgetAgentInfo[] = (chatbot.agentsList || []).map((agent) => ({
@@ -185,16 +183,16 @@ function buildWidgetConfigJson(
       userBubbleColor: wc?.userBubbleColor ?? WIDGET_CONFIG_DEFAULTS.appearance.userBubbleColor,
       overrideAgentColor: wc?.overrideAgentColor ?? WIDGET_CONFIG_DEFAULTS.appearance.overrideAgentColor,
       agentBubbleColor: wc?.agentBubbleColor ?? WIDGET_CONFIG_DEFAULTS.appearance.agentBubbleColor,
-      borderRadius: parseInt(wc?.borderRadius ?? String(WIDGET_CONFIG_DEFAULTS.appearance.borderRadius), 10),
-      buttonSize: parseInt(wc?.buttonSize ?? String(WIDGET_CONFIG_DEFAULTS.appearance.buttonSize), 10),
+      borderRadius: Number(wc?.borderRadius ?? WIDGET_CONFIG_DEFAULTS.appearance.borderRadius),
+      buttonSize: Number(wc?.buttonSize ?? WIDGET_CONFIG_DEFAULTS.appearance.buttonSize),
       launcherIcon: wc?.launcherIcon ?? WIDGET_CONFIG_DEFAULTS.appearance.launcherIcon,
       launcherText: wc?.launcherText ?? undefined,
-      launcherIconBorderRadius: parseInt(wc?.launcherIconBorderRadius ?? String(WIDGET_CONFIG_DEFAULTS.appearance.launcherIconBorderRadius), 10),
+      launcherIconBorderRadius: Number(wc?.launcherIconBorderRadius ?? WIDGET_CONFIG_DEFAULTS.appearance.launcherIconBorderRadius),
       launcherIconPulseGlow: wc?.launcherIconPulseGlow ?? WIDGET_CONFIG_DEFAULTS.appearance.launcherIconPulseGlow,
       showLauncherText: wc?.showLauncherText ?? WIDGET_CONFIG_DEFAULTS.appearance.showLauncherText,
       launcherTextBackgroundColor: wc?.launcherTextBackgroundColor ?? WIDGET_CONFIG_DEFAULTS.appearance.launcherTextBackgroundColor,
       launcherTextColor: wc?.launcherTextColor ?? WIDGET_CONFIG_DEFAULTS.appearance.launcherTextColor,
-      zIndex: parseInt(wc?.zIndex ?? String(WIDGET_CONFIG_DEFAULTS.appearance.zIndex), 10),
+      zIndex: Number(wc?.zIndex ?? WIDGET_CONFIG_DEFAULTS.appearance.zIndex),
     },
 
     // Branding
@@ -210,7 +208,7 @@ function buildWidgetConfigJson(
     // Behavior
     behavior: {
       autoOpen: wc?.autoOpen ?? WIDGET_CONFIG_DEFAULTS.behavior.autoOpen,
-      autoOpenDelay: parseInt(wc?.autoOpenDelay ?? String(WIDGET_CONFIG_DEFAULTS.behavior.autoOpenDelay), 10),
+      autoOpenDelay: Number(wc?.autoOpenDelay ?? WIDGET_CONFIG_DEFAULTS.behavior.autoOpenDelay),
       playSoundOnMessage: wc?.playSoundOnMessage ?? WIDGET_CONFIG_DEFAULTS.behavior.playSoundOnMessage,
       persistConversation: wc?.persistConversation ?? WIDGET_CONFIG_DEFAULTS.behavior.persistConversation,
       hideLauncherOnMobile: wc?.hideLauncherOnMobile ?? WIDGET_CONFIG_DEFAULTS.behavior.hideLauncherOnMobile,
@@ -251,7 +249,7 @@ function buildWidgetConfigJson(
   if (isMultiAgent) {
     config.multiAgent = {
       showAgentListOnTop: wc?.showAgentListOnTop ?? WIDGET_CONFIG_DEFAULTS.multiAgent.showAgentListOnTop,
-      agentListMinCards: parseInt(wc?.agentListMinCards ?? String(WIDGET_CONFIG_DEFAULTS.multiAgent.agentListMinCards), 10),
+      agentListMinCards: Number(wc?.agentListMinCards ?? WIDGET_CONFIG_DEFAULTS.multiAgent.agentListMinCards),
       agentListingType: (wc?.agentListingType as "minimal" | "compact" | "standard" | "detailed") ?? WIDGET_CONFIG_DEFAULTS.multiAgent.agentListingType,
     };
   }

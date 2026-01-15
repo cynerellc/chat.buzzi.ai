@@ -107,11 +107,9 @@ export const conversations = chatappSchema.table(
 
     // Sentiment Analysis
     sentiment: integer("sentiment"), // -100 to 100
-    sentimentHistory: jsonb("sentiment_history").default([]),
 
     // Satisfaction
     satisfactionRating: integer("satisfaction_rating"), // 1-5
-    satisfactionFeedback: text("satisfaction_feedback"),
 
     // Session Info
     sessionId: varchar("session_id", { length: 255 }),
@@ -282,42 +280,6 @@ export const cannedResponses = chatappSchema.table(
   ]
 );
 
-// Conversation Notes Table (internal notes from support agents)
-export const conversationNotes = chatappSchema.table(
-  "conversation_notes",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    // Conversation Reference
-    conversationId: uuid("conversation_id")
-      .notNull()
-      .references(() => conversations.id, { onDelete: "cascade" }),
-
-    // Author
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id),
-
-    // Note Content
-    content: text("content").notNull(),
-
-    // Note Type (general, escalation, resolution, follow-up)
-    noteType: varchar("note_type", { length: 50 }).default("general").notNull(),
-
-    // Visibility (team-visible or private)
-    isPrivate: boolean("is_private").default(false).notNull(),
-
-    // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("conversation_notes_conversation_idx").on(table.conversationId),
-    index("conversation_notes_user_idx").on(table.userId),
-    index("conversation_notes_type_idx").on(table.noteType),
-  ]
-);
-
 // Support Agent Status Table
 export const supportAgentStatus = chatappSchema.table(
   "support_agent_status",
@@ -414,17 +376,6 @@ export const cannedResponsesRelations = relations(cannedResponses, ({ one }) => 
   }),
 }));
 
-export const conversationNotesRelations = relations(conversationNotes, ({ one }) => ({
-  conversation: one(conversations, {
-    fields: [conversationNotes.conversationId],
-    references: [conversations.id],
-  }),
-  user: one(users, {
-    fields: [conversationNotes.userId],
-    references: [users.id],
-  }),
-}));
-
 // Types
 export type EndUser = typeof endUsers.$inferSelect;
 export type NewEndUser = typeof endUsers.$inferInsert;
@@ -438,5 +389,3 @@ export type SupportAgentStatus = typeof supportAgentStatus.$inferSelect;
 export type NewSupportAgentStatus = typeof supportAgentStatus.$inferInsert;
 export type CannedResponse = typeof cannedResponses.$inferSelect;
 export type NewCannedResponse = typeof cannedResponses.$inferInsert;
-export type ConversationNote = typeof conversationNotes.$inferSelect;
-export type NewConversationNote = typeof conversationNotes.$inferInsert;

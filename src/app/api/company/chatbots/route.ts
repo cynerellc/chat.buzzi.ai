@@ -163,7 +163,8 @@ export async function POST(request: NextRequest) {
     let type = body.type || "custom";
     let variableValues: Record<string, string> = {};
     let packageType: "single_agent" | "multi_agent" = "single_agent";
-    let chatbotType: "chat" | "call" = "chat";
+    let enabledChat = true;
+    let enabledCall = false;
     let isCustomPackage = false;
 
     // If packageId is provided, copy agents_list and defaults from the package
@@ -178,7 +179,8 @@ export async function POST(request: NextRequest) {
         // Copy agents_list from package
         agentsList = (agentPackage.agentsList as AgentListItemSchema[]) || [];
         packageType = agentPackage.packageType;
-        chatbotType = agentPackage.chatbotType;
+        enabledChat = agentPackage.enabledChat;
+        enabledCall = agentPackage.enabledCall;
         isCustomPackage = agentPackage.isCustomPackage;
 
         behavior = body.behavior || (agentPackage.defaultBehavior as Record<string, unknown>);
@@ -237,7 +239,8 @@ If you cannot help with something, offer to connect the customer with a human ag
         companyId: company.id,
         packageId: body.packageId || null,
         packageType,
-        chatbotType,
+        enabledChat,
+        enabledCall,
         isCustomPackage,
         name: body.name,
         description: body.description || null,

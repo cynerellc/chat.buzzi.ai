@@ -27,6 +27,12 @@ const providers = [
   { value: "anthropic", label: "Anthropic" },
 ];
 
+const modelTypes = [
+  { value: "chat", label: "Chat Only" },
+  { value: "call", label: "Call Only" },
+  { value: "both", label: "Chat & Call" },
+];
+
 // Default settings schema for different providers
 const defaultSettingsSchemas: Record<string, ModelSettingsSchema> = {
   openai: {
@@ -123,6 +129,8 @@ export function ModelEditorModal({ isOpen, onClose, model, onSuccess }: ModelEdi
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
+  const [modelType, setModelType] = useState<"chat" | "call" | "both">("chat");
+  const [supportsAudio, setSupportsAudio] = useState(false);
   const [inputLimit, setInputLimit] = useState("128000");
   const [outputLimit, setOutputLimit] = useState("16384");
   const [inputPricePerMillion, setInputPricePerMillion] = useState("");
@@ -140,6 +148,8 @@ export function ModelEditorModal({ isOpen, onClose, model, onSuccess }: ModelEdi
       setModelId(model.modelId);
       setDisplayName(model.displayName);
       setDescription(model.description ?? "");
+      setModelType(model.modelType ?? "chat");
+      setSupportsAudio(model.supportsAudio ?? false);
       setInputLimit(String(model.inputLimit));
       setOutputLimit(String(model.outputLimit));
       setInputPricePerMillion(model.inputPricePerMillion ?? "");
@@ -155,6 +165,8 @@ export function ModelEditorModal({ isOpen, onClose, model, onSuccess }: ModelEdi
       setModelId("");
       setDisplayName("");
       setDescription("");
+      setModelType("chat");
+      setSupportsAudio(false);
       setInputLimit("128000");
       setOutputLimit("16384");
       setInputPricePerMillion("");
@@ -187,6 +199,8 @@ export function ModelEditorModal({ isOpen, onClose, model, onSuccess }: ModelEdi
         modelId: modelId.trim(),
         displayName: displayName.trim(),
         description: description.trim() || undefined,
+        modelType,
+        supportsAudio,
         inputLimit: parseInt(inputLimit),
         outputLimit: parseInt(outputLimit),
         inputPricePerMillion: inputPricePerMillion || undefined,
@@ -258,6 +272,26 @@ export function ModelEditorModal({ isOpen, onClose, model, onSuccess }: ModelEdi
           onChange={(e) => setDescription(e.target.value)}
           minRows={2}
         />
+
+        {/* Model Type and Audio Support */}
+        <div className="grid grid-cols-2 gap-4">
+          <Select
+            label="Model Type"
+            options={modelTypes}
+            value={modelType}
+            onValueChange={(value) => setModelType(value as "chat" | "call" | "both")}
+            description="Determines if this model can be used for chat, voice calls, or both"
+          />
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Audio Support</label>
+            <div className="flex items-center h-10">
+              <Switch isSelected={supportsAudio} onValueChange={setSupportsAudio}>
+                Supports Real-time Audio
+              </Switch>
+            </div>
+            <p className="text-xs text-muted-foreground">Enable for models with real-time audio streaming</p>
+          </div>
+        </div>
 
         {/* Token Limits */}
         <div className="grid grid-cols-2 gap-4">

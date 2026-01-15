@@ -122,6 +122,52 @@ export interface WidgetConfigJson {
   security: {
     allowedDomains: string[];
   };
+
+  // Call feature configuration (optional, only when calls enabled)
+  call?: {
+    enabled: boolean;
+    aiProvider: "OPENAI" | "GEMINI" | null;
+    voiceConfig: {
+      openai_voice?: string;
+      gemini_voice?: string;
+      vad_threshold?: number;
+      vad_sensitivity?: string;
+      silence_duration_ms?: number;
+      prefix_padding_ms?: number;
+      call_greeting?: string;
+      system_prompt_call?: string;
+    };
+    widgetConfig: {
+      enabled?: boolean;
+      position?: string;
+      colors?: Record<string, string>;
+      callButton?: {
+        style?: string;
+        size?: number;
+        animation?: boolean;
+        label?: string;
+      };
+      orb?: {
+        glowIntensity?: number;
+        pulseSpeed?: number;
+        states?: Record<string, { color: string; animation: string }>;
+      };
+      callDialog?: {
+        width?: number;
+        showVisualizer?: boolean;
+        visualizerStyle?: string;
+        showTranscript?: boolean;
+      };
+      controls?: {
+        showMuteButton?: boolean;
+        showEndCallButton?: boolean;
+      };
+      branding?: {
+        showPoweredBy?: boolean;
+        companyLogo?: string;
+      };
+    };
+  };
 }
 
 // Default values for widget config

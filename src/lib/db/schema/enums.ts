@@ -167,12 +167,6 @@ export const packageTypeEnum = pgEnum("package_type", [
   "multi_agent",
 ]);
 
-// Chatbot Type Enum (chat or call)
-export const chatbotTypeEnum = pgEnum("chatbot_type", [
-  "chat",
-  "call",
-]);
-
 export const packageAgentTypeEnum = pgEnum("package_agent_type", [
   "worker",
   "supervisor",
@@ -196,4 +190,48 @@ export const aiModelProviderEnum = pgEnum("ai_model_provider", [
   "openai",
   "google",
   "anthropic",
+]);
+
+// Call Feature Enums
+export const callSourceEnum = pgEnum("call_source", [
+  "web",
+  "whatsapp",
+  "twilio",
+  "vonage",
+]);
+
+export const callStatusEnum = pgEnum("call_status", [
+  "pending",
+  "connecting",
+  "ringing",
+  "in_progress",
+  "completed",
+  "failed",
+  "no_answer",
+  "busy",
+  "cancelled",
+  "timeout",
+]);
+
+export const callAiProviderEnum = pgEnum("call_ai_provider", [
+  "OPENAI",
+  "GEMINI",
+]);
+
+export const integrationAccountProviderEnum = pgEnum(
+  "integration_account_provider",
+  ["whatsapp", "twilio", "vonage", "bandwidth"]
+);
+
+export const callTranscriptRoleEnum = pgEnum("call_transcript_role", [
+  "user",
+  "assistant",
+  "system",
+]);
+
+// AI Model Type (for filtering call-capable models)
+export const aiModelTypeEnum = pgEnum("ai_model_type", [
+  "chat",
+  "call",
+  "both",
 ]);

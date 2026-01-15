@@ -4,7 +4,6 @@
  * A simple database-backed job queue for handling background tasks:
  * - Email sending
  * - Data processing
- * - Webhook delivery
  * - Report generation
  * - Cleanup tasks
  */

@@ -15,7 +15,8 @@ export interface PackageListItem {
   description: string | null;
   category: string | null;
   packageType: "single_agent" | "multi_agent";
-  chatbotType: "chat" | "call";
+  enabledChat: boolean;
+  enabledCall: boolean;
   isCustomPackage: boolean;
   defaultBehavior: Record<string, unknown>;
   features: unknown[];
@@ -141,7 +142,8 @@ export async function GET(request: NextRequest) {
       return {
         ...pkg,
         packageType: pkg.packageType as "single_agent" | "multi_agent",
-        chatbotType: pkg.chatbotType as "chat" | "call",
+        enabledChat: pkg.enabledChat,
+        enabledCall: pkg.enabledCall,
         isCustomPackage: pkg.isCustomPackage,
         defaultBehavior: pkg.defaultBehavior as Record<string, unknown>,
         features: pkg.features as unknown[],
@@ -187,6 +189,7 @@ const agentListItemSchema = z.object({
   model_settings: z.record(z.string(), z.unknown()).default({ temperature: 0.7, max_tokens: 4096, top_p: 1 }),
   knowledge_base_enabled: z.boolean().optional(),
   knowledge_categories: z.array(z.string()).default([]),
+  knowledge_threshold: z.number().min(0.05).max(0.95).nullable().optional(),
   tools: z.array(z.unknown()).default([]),
   managed_agent_ids: z.array(z.string()).default([]),
   sort_order: z.number().int().default(0),
@@ -213,7 +216,8 @@ const createPackageSchema = z.object({
   description: z.string().optional(),
   category: z.string().max(100).optional(),
   packageType: z.enum(["single_agent", "multi_agent"]).default("single_agent"),
-  chatbotType: z.enum(["chat", "call"]).default("chat"),
+  enabledChat: z.boolean().default(true),
+  enabledCall: z.boolean().default(false),
   isCustomPackage: z.boolean().default(false),
   // Default behavior shared across all agents in the package
   defaultBehavior: z.record(z.string(), z.unknown()).default({}),
@@ -284,6 +288,7 @@ export async function POST(request: NextRequest) {
       model_settings: agent.model_settings,
       knowledge_base_enabled: agent.knowledge_base_enabled,
       knowledge_categories: agent.knowledge_categories,
+      knowledge_threshold: agent.knowledge_threshold,
       tools: agent.tools,
       managed_agent_ids: agent.managed_agent_ids,
       sort_order: agent.sort_order ?? index,
@@ -298,7 +303,8 @@ export async function POST(request: NextRequest) {
         description: validatedData.description ?? null,
         category: validatedData.category ?? null,
         packageType: validatedData.packageType,
-        chatbotType: validatedData.chatbotType,
+        enabledChat: validatedData.enabledChat,
+        enabledCall: validatedData.enabledCall,
         isCustomPackage: validatedData.isCustomPackage,
         defaultBehavior: validatedData.defaultBehavior,
         features: validatedData.features,

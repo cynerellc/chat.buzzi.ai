@@ -1,20 +1,23 @@
+/**
+ * @deprecated This route is deprecated. Use /api/company/chatbots/[chatbotId]/widget instead.
+ * This route was originally designed for company-level widget config but should be chatbot-specific.
+ */
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { widgetConfigs } from "@/lib/db/schema";
+import { chatbots, type ChatWidgetConfig, type WidgetConfig } from "@/lib/db/schema";
 
 export interface WidgetConfigResponse {
-  id: string;
   chatbotId: string;
   // Appearance
   theme: string;
   position: string;
   primaryColor: string;
   accentColor: string;
-  borderRadius: string;
-  buttonSize: string;
+  borderRadius: number | string;
+  buttonSize: number | string;
   // Branding
   title: string;
   subtitle: string | null;
@@ -23,7 +26,7 @@ export interface WidgetConfigResponse {
   avatarUrl: string | null;
   // Behavior
   autoOpen: boolean;
-  autoOpenDelay: string;
+  autoOpenDelay: number | string;
   showBranding: boolean;
   playSoundOnMessage: boolean;
   persistConversation: boolean;
@@ -36,12 +39,12 @@ export interface WidgetConfigResponse {
   // Advanced
   customCss: string | null;
   allowedDomains: string[];
-  zIndex: string;
+  zIndex: number | string;
   // Launcher
   launcherIcon: string;
   launcherText: string | null;
   hideLauncherOnMobile: boolean;
-  launcherIconBorderRadius: string;
+  launcherIconBorderRadius: number | string;
   launcherIconPulseGlow: boolean;
   showLauncherText: boolean;
   launcherTextBackgroundColor: string;
@@ -62,8 +65,44 @@ export interface WidgetConfigResponse {
   updatedAt: string;
 }
 
-function generateEmbedCode(companySlug: string): string {
-  // In production, this would be the actual script URL
+const DEFAULT_CHAT_CONFIG: ChatWidgetConfig = {
+  theme: "light",
+  position: "bottom-right",
+  placement: "above-launcher",
+  primaryColor: "#6437F3",
+  accentColor: "#2b3dd8",
+  borderRadius: 16,
+  buttonSize: 60,
+  title: "Chat with us",
+  welcomeMessage: "Hello! How can we help you today?",
+  autoOpen: false,
+  autoOpenDelay: 5,
+  showBranding: true,
+  playSoundOnMessage: false,
+  persistConversation: true,
+  enableFileUpload: true,
+  enableVoiceMessages: false,
+  enableFeedback: true,
+  requireEmail: false,
+  requireName: false,
+  zIndex: 9999,
+  launcherIcon: "chat",
+  hideLauncherOnMobile: false,
+  launcherIconBorderRadius: 50,
+  launcherIconPulseGlow: false,
+  showLauncherText: false,
+  launcherTextBackgroundColor: "#ffffff",
+  launcherTextColor: "#333333",
+  preChatForm: { enabled: false, fields: [] },
+  showAgentSwitchNotification: true,
+  showThinking: true,
+  showInstantUpdates: true,
+  showAgentListOnTop: false,
+  agentListMinCards: 3,
+  agentListingType: "compact",
+};
+
+function generateEmbedCode(companySlug: string, chatbotId: string): string {
   const scriptUrl = `https://widget.buzzi.ai/embed.js`;
   return `<script>
   (function(w,d,s,o,f,js,fjs){
@@ -71,87 +110,91 @@ function generateEmbedCode(companySlug: string): string {
     js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
     js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
   }(window,document,'script','buzzi','${scriptUrl}'));
-  buzzi('init', '${companySlug}');
+  buzzi('init', '${companySlug}', { chatbotId: '${chatbotId}' });
 </script>`;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { company } = await requireCompanyAdmin();
 
-    // Get or create widget config
-    let [config] = await db
-      .select()
-      .from(widgetConfigs)
-      .where(eq(widgetConfigs.chatbotId, company.id))
+    const { searchParams } = new URL(request.url);
+    const chatbotId = searchParams.get("chatbotId");
+
+    if (!chatbotId) {
+      return NextResponse.json(
+        { error: "chatbotId query parameter is required" },
+        { status: 400 }
+      );
+    }
+
+    // Get chatbot and verify ownership
+    const [chatbot] = await db
+      .select({
+        id: chatbots.id,
+        widgetConfig: chatbots.widgetConfig,
+        createdAt: chatbots.createdAt,
+        updatedAt: chatbots.updatedAt,
+      })
+      .from(chatbots)
+      .where(
+        and(
+          eq(chatbots.id, chatbotId),
+          eq(chatbots.companyId, company.id),
+          isNull(chatbots.deletedAt)
+        )
+      )
       .limit(1);
 
-    // If no config exists, create a default one
-    // TODO: This route should be restructured to take chatbotId as a param
-    if (!config) {
-      const [newConfig] = await db
-        .insert(widgetConfigs)
-        .values({
-          chatbotId: company.id, // Temporary - should be actual chatbot ID
-          logoUrl: company.logoUrl,
-          primaryColor: company.primaryColor || "#6437F3",
-          accentColor: company.secondaryColor || "#2b3dd8",
-        })
-        .returning();
-      config = newConfig;
+    if (!chatbot) {
+      return NextResponse.json({ error: "Chatbot not found" }, { status: 404 });
     }
 
-    if (!config) {
-      return NextResponse.json({ error: "Failed to create widget configuration" }, { status: 500 });
-    }
+    // Get chat config from unified widgetConfig
+    const unifiedConfig = chatbot.widgetConfig as WidgetConfig | null;
+    const config: ChatWidgetConfig = {
+      ...DEFAULT_CHAT_CONFIG,
+      ...(unifiedConfig?.chat || {}),
+    };
 
     const response: WidgetConfigResponse = {
-      id: config.id,
-      chatbotId: config.chatbotId,
-      // Appearance
-      theme: config.theme,
-      position: config.position,
-      primaryColor: config.primaryColor,
-      accentColor: config.accentColor,
-      borderRadius: config.borderRadius,
-      buttonSize: config.buttonSize,
-      // Branding
-      title: config.title,
-      subtitle: config.subtitle,
-      welcomeMessage: config.welcomeMessage,
-      logoUrl: config.logoUrl,
-      avatarUrl: config.avatarUrl,
-      // Behavior
-      autoOpen: config.autoOpen,
-      autoOpenDelay: config.autoOpenDelay,
-      showBranding: config.showBranding,
-      playSoundOnMessage: config.playSoundOnMessage,
-      persistConversation: config.persistConversation,
-      // Features
-      enableFileUpload: config.enableFileUpload,
-      enableVoiceMessages: config.enableVoiceMessages,
-      enableFeedback: config.enableFeedback,
-      requireEmail: config.requireEmail,
-      requireName: config.requireName,
-      // Advanced
-      customCss: config.customCss,
-      allowedDomains: (config.allowedDomains as string[]) || [],
-      zIndex: config.zIndex,
-      // Launcher
-      launcherIcon: config.launcherIcon,
-      launcherText: config.launcherText,
-      hideLauncherOnMobile: config.hideLauncherOnMobile,
-      launcherIconBorderRadius: config.launcherIconBorderRadius,
-      launcherIconPulseGlow: config.launcherIconPulseGlow,
-      showLauncherText: config.showLauncherText,
-      launcherTextBackgroundColor: config.launcherTextBackgroundColor,
-      launcherTextColor: config.launcherTextColor,
-      // Pre-chat Form
-      preChatForm: config.preChatForm as WidgetConfigResponse["preChatForm"],
-      // Embed info
-      embedCode: generateEmbedCode(company.slug),
-      createdAt: config.createdAt.toISOString(),
-      updatedAt: config.updatedAt.toISOString(),
+      chatbotId: chatbot.id,
+      theme: config.theme || "light",
+      position: config.position || "bottom-right",
+      primaryColor: config.primaryColor || "#6437F3",
+      accentColor: config.accentColor || "#2b3dd8",
+      borderRadius: config.borderRadius || "16",
+      buttonSize: config.buttonSize || "60",
+      title: config.title || "Chat with us",
+      subtitle: config.subtitle || null,
+      welcomeMessage: config.welcomeMessage || "Hello! How can we help you today?",
+      logoUrl: config.logoUrl || null,
+      avatarUrl: config.avatarUrl || null,
+      autoOpen: config.autoOpen ?? false,
+      autoOpenDelay: config.autoOpenDelay || "5",
+      showBranding: config.showBranding ?? true,
+      playSoundOnMessage: config.playSoundOnMessage ?? false,
+      persistConversation: config.persistConversation ?? true,
+      enableFileUpload: config.enableFileUpload ?? true,
+      enableVoiceMessages: config.enableVoiceMessages ?? false,
+      enableFeedback: config.enableFeedback ?? true,
+      requireEmail: config.requireEmail ?? false,
+      requireName: config.requireName ?? false,
+      customCss: config.customCss || null,
+      allowedDomains: config.allowedDomains || [],
+      zIndex: config.zIndex || "9999",
+      launcherIcon: config.launcherIcon || "chat",
+      launcherText: config.launcherText || null,
+      hideLauncherOnMobile: config.hideLauncherOnMobile ?? false,
+      launcherIconBorderRadius: config.launcherIconBorderRadius || "50",
+      launcherIconPulseGlow: config.launcherIconPulseGlow ?? false,
+      showLauncherText: config.showLauncherText ?? false,
+      launcherTextBackgroundColor: config.launcherTextBackgroundColor || "#ffffff",
+      launcherTextColor: config.launcherTextColor || "#333333",
+      preChatForm: (config.preChatForm as WidgetConfigResponse["preChatForm"]) || { enabled: false, fields: [] },
+      embedCode: generateEmbedCode(company.slug, chatbotId),
+      createdAt: chatbot.createdAt.toISOString(),
+      updatedAt: chatbot.updatedAt.toISOString(),
     };
 
     return NextResponse.json({ config: response });
@@ -165,36 +208,32 @@ export async function GET() {
 }
 
 interface UpdateWidgetConfigRequest {
-  // Appearance
+  chatbotId: string;
+  // All other fields are optional updates
   theme?: string;
   position?: string;
   primaryColor?: string;
   accentColor?: string;
   borderRadius?: string;
   buttonSize?: string;
-  // Branding
   title?: string;
   subtitle?: string | null;
   welcomeMessage?: string;
   logoUrl?: string | null;
   avatarUrl?: string | null;
-  // Behavior
   autoOpen?: boolean;
   autoOpenDelay?: string;
   showBranding?: boolean;
   playSoundOnMessage?: boolean;
   persistConversation?: boolean;
-  // Features
   enableFileUpload?: boolean;
   enableVoiceMessages?: boolean;
   enableFeedback?: boolean;
   requireEmail?: boolean;
   requireName?: boolean;
-  // Advanced
   customCss?: string | null;
   allowedDomains?: string[];
   zIndex?: string;
-  // Launcher
   launcherIcon?: string;
   launcherText?: string | null;
   hideLauncherOnMobile?: boolean;
@@ -203,7 +242,6 @@ interface UpdateWidgetConfigRequest {
   showLauncherText?: boolean;
   launcherTextBackgroundColor?: string;
   launcherTextColor?: string;
-  // Pre-chat Form
   preChatForm?: {
     enabled: boolean;
     fields: Array<{
@@ -221,125 +259,102 @@ export async function PATCH(request: NextRequest) {
 
     const body: UpdateWidgetConfigRequest = await request.json();
 
-    // Ensure config exists
-    let [existingConfig] = await db
-      .select({ id: widgetConfigs.id })
-      .from(widgetConfigs)
-      .where(eq(widgetConfigs.chatbotId, company.id))
+    if (!body.chatbotId) {
+      return NextResponse.json(
+        { error: "chatbotId is required" },
+        { status: 400 }
+      );
+    }
+
+    // Get chatbot and verify ownership
+    const [chatbot] = await db
+      .select()
+      .from(chatbots)
+      .where(
+        and(
+          eq(chatbots.id, body.chatbotId),
+          eq(chatbots.companyId, company.id),
+          isNull(chatbots.deletedAt)
+        )
+      )
       .limit(1);
 
-    if (!existingConfig) {
-      // Create default config first
-      // TODO: This route should be restructured to take chatbotId as a param
-      [existingConfig] = await db
-        .insert(widgetConfigs)
-        .values({
-          chatbotId: company.id, // Temporary - should be actual chatbot ID
-        })
-        .returning({ id: widgetConfigs.id });
+    if (!chatbot) {
+      return NextResponse.json({ error: "Chatbot not found" }, { status: 404 });
     }
 
-    // Build update object
-    const updateData: Record<string, unknown> = {
-      updatedAt: new Date(),
+    // Get existing config and merge with updates
+    const existingConfig = (chatbot.widgetConfig as WidgetConfig) || { chat: {}, call: {} };
+    const existingChatConfig = existingConfig.chat || {};
+
+    // Build updated chat config
+    const { chatbotId: _, ...updates } = body;
+    const updatedChatConfig: ChatWidgetConfig = {
+      ...existingChatConfig,
+      ...Object.fromEntries(
+        Object.entries(updates).filter(([, v]) => v !== undefined)
+      ),
     };
 
-    // Appearance
-    if (body.theme !== undefined) updateData.theme = body.theme;
-    if (body.position !== undefined) updateData.position = body.position;
-    if (body.primaryColor !== undefined) updateData.primaryColor = body.primaryColor;
-    if (body.accentColor !== undefined) updateData.accentColor = body.accentColor;
-    if (body.borderRadius !== undefined) updateData.borderRadius = body.borderRadius;
-    if (body.buttonSize !== undefined) updateData.buttonSize = body.buttonSize;
-
-    // Branding
-    if (body.title !== undefined) updateData.title = body.title;
-    if (body.subtitle !== undefined) updateData.subtitle = body.subtitle;
-    if (body.welcomeMessage !== undefined) updateData.welcomeMessage = body.welcomeMessage;
-    if (body.logoUrl !== undefined) updateData.logoUrl = body.logoUrl;
-    if (body.avatarUrl !== undefined) updateData.avatarUrl = body.avatarUrl;
-
-    // Behavior
-    if (body.autoOpen !== undefined) updateData.autoOpen = body.autoOpen;
-    if (body.autoOpenDelay !== undefined) updateData.autoOpenDelay = body.autoOpenDelay;
-    if (body.showBranding !== undefined) updateData.showBranding = body.showBranding;
-    if (body.playSoundOnMessage !== undefined) updateData.playSoundOnMessage = body.playSoundOnMessage;
-    if (body.persistConversation !== undefined) updateData.persistConversation = body.persistConversation;
-
-    // Features
-    if (body.enableFileUpload !== undefined) updateData.enableFileUpload = body.enableFileUpload;
-    if (body.enableVoiceMessages !== undefined) updateData.enableVoiceMessages = body.enableVoiceMessages;
-    if (body.enableFeedback !== undefined) updateData.enableFeedback = body.enableFeedback;
-    if (body.requireEmail !== undefined) updateData.requireEmail = body.requireEmail;
-    if (body.requireName !== undefined) updateData.requireName = body.requireName;
-
-    // Advanced
-    if (body.customCss !== undefined) updateData.customCss = body.customCss;
-    if (body.allowedDomains !== undefined) updateData.allowedDomains = body.allowedDomains;
-    if (body.zIndex !== undefined) updateData.zIndex = body.zIndex;
-
-    // Launcher
-    if (body.launcherIcon !== undefined) updateData.launcherIcon = body.launcherIcon;
-    if (body.launcherText !== undefined) updateData.launcherText = body.launcherText;
-    if (body.hideLauncherOnMobile !== undefined) updateData.hideLauncherOnMobile = body.hideLauncherOnMobile;
-    if (body.launcherIconBorderRadius !== undefined) updateData.launcherIconBorderRadius = body.launcherIconBorderRadius;
-    if (body.launcherIconPulseGlow !== undefined) updateData.launcherIconPulseGlow = body.launcherIconPulseGlow;
-    if (body.showLauncherText !== undefined) updateData.showLauncherText = body.showLauncherText;
-    if (body.launcherTextBackgroundColor !== undefined) updateData.launcherTextBackgroundColor = body.launcherTextBackgroundColor;
-    if (body.launcherTextColor !== undefined) updateData.launcherTextColor = body.launcherTextColor;
-
-    // Pre-chat Form
-    if (body.preChatForm !== undefined) updateData.preChatForm = body.preChatForm;
-
-    const [updatedConfig] = await db
-      .update(widgetConfigs)
-      .set(updateData)
-      .where(eq(widgetConfigs.chatbotId, company.id))
+    // Update chatbot with new widget config
+    const [updated] = await db
+      .update(chatbots)
+      .set({
+        widgetConfig: {
+          chat: updatedChatConfig,
+          call: existingConfig.call || {},
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(chatbots.id, body.chatbotId))
       .returning();
 
-    if (!updatedConfig) {
-      return NextResponse.json({ error: "Failed to update widget configuration" }, { status: 500 });
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Failed to update widget configuration" },
+        { status: 500 }
+      );
     }
 
+    const finalConfig = (updated.widgetConfig as WidgetConfig).chat || {};
     const response: WidgetConfigResponse = {
-      id: updatedConfig.id,
-      chatbotId: updatedConfig.chatbotId,
-      theme: updatedConfig.theme,
-      position: updatedConfig.position,
-      primaryColor: updatedConfig.primaryColor,
-      accentColor: updatedConfig.accentColor,
-      borderRadius: updatedConfig.borderRadius,
-      buttonSize: updatedConfig.buttonSize,
-      title: updatedConfig.title,
-      subtitle: updatedConfig.subtitle,
-      welcomeMessage: updatedConfig.welcomeMessage,
-      logoUrl: updatedConfig.logoUrl,
-      avatarUrl: updatedConfig.avatarUrl,
-      autoOpen: updatedConfig.autoOpen,
-      autoOpenDelay: updatedConfig.autoOpenDelay,
-      showBranding: updatedConfig.showBranding,
-      playSoundOnMessage: updatedConfig.playSoundOnMessage,
-      persistConversation: updatedConfig.persistConversation,
-      enableFileUpload: updatedConfig.enableFileUpload,
-      enableVoiceMessages: updatedConfig.enableVoiceMessages,
-      enableFeedback: updatedConfig.enableFeedback,
-      requireEmail: updatedConfig.requireEmail,
-      requireName: updatedConfig.requireName,
-      customCss: updatedConfig.customCss,
-      allowedDomains: (updatedConfig.allowedDomains as string[]) || [],
-      zIndex: updatedConfig.zIndex,
-      launcherIcon: updatedConfig.launcherIcon,
-      launcherText: updatedConfig.launcherText,
-      hideLauncherOnMobile: updatedConfig.hideLauncherOnMobile,
-      launcherIconBorderRadius: updatedConfig.launcherIconBorderRadius,
-      launcherIconPulseGlow: updatedConfig.launcherIconPulseGlow,
-      showLauncherText: updatedConfig.showLauncherText,
-      launcherTextBackgroundColor: updatedConfig.launcherTextBackgroundColor,
-      launcherTextColor: updatedConfig.launcherTextColor,
-      preChatForm: updatedConfig.preChatForm as WidgetConfigResponse["preChatForm"],
-      embedCode: generateEmbedCode(company.slug),
-      createdAt: updatedConfig.createdAt.toISOString(),
-      updatedAt: updatedConfig.updatedAt.toISOString(),
+      chatbotId: updated.id,
+      theme: finalConfig.theme || "light",
+      position: finalConfig.position || "bottom-right",
+      primaryColor: finalConfig.primaryColor || "#6437F3",
+      accentColor: finalConfig.accentColor || "#2b3dd8",
+      borderRadius: finalConfig.borderRadius || "16",
+      buttonSize: finalConfig.buttonSize || "60",
+      title: finalConfig.title || "Chat with us",
+      subtitle: finalConfig.subtitle || null,
+      welcomeMessage: finalConfig.welcomeMessage || "Hello! How can we help you today?",
+      logoUrl: finalConfig.logoUrl || null,
+      avatarUrl: finalConfig.avatarUrl || null,
+      autoOpen: finalConfig.autoOpen ?? false,
+      autoOpenDelay: finalConfig.autoOpenDelay || "5",
+      showBranding: finalConfig.showBranding ?? true,
+      playSoundOnMessage: finalConfig.playSoundOnMessage ?? false,
+      persistConversation: finalConfig.persistConversation ?? true,
+      enableFileUpload: finalConfig.enableFileUpload ?? true,
+      enableVoiceMessages: finalConfig.enableVoiceMessages ?? false,
+      enableFeedback: finalConfig.enableFeedback ?? true,
+      requireEmail: finalConfig.requireEmail ?? false,
+      requireName: finalConfig.requireName ?? false,
+      customCss: finalConfig.customCss || null,
+      allowedDomains: finalConfig.allowedDomains || [],
+      zIndex: finalConfig.zIndex || "9999",
+      launcherIcon: finalConfig.launcherIcon || "chat",
+      launcherText: finalConfig.launcherText || null,
+      hideLauncherOnMobile: finalConfig.hideLauncherOnMobile ?? false,
+      launcherIconBorderRadius: finalConfig.launcherIconBorderRadius || "50",
+      launcherIconPulseGlow: finalConfig.launcherIconPulseGlow ?? false,
+      showLauncherText: finalConfig.showLauncherText ?? false,
+      launcherTextBackgroundColor: finalConfig.launcherTextBackgroundColor || "#ffffff",
+      launcherTextColor: finalConfig.launcherTextColor || "#333333",
+      preChatForm: (finalConfig.preChatForm as WidgetConfigResponse["preChatForm"]) || { enabled: false, fields: [] },
+      embedCode: generateEmbedCode(company.slug, body.chatbotId),
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
     };
 
     return NextResponse.json({ config: response });

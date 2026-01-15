@@ -77,7 +77,6 @@ export async function POST(request: Request) {
         hashedPassword,
         role: "chatapp.user",
         status: "active",
-        isActive: true,
       })
       .returning();
 

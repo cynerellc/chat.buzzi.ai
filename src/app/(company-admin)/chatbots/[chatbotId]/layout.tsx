@@ -9,6 +9,7 @@ import {
   Bot,
   Play,
   Code,
+  Phone,
 } from "lucide-react";
 
 import { SecondaryNav, type SecondaryNavItem, type SecondaryNavSubItem } from "@/components/shared";
@@ -55,6 +56,7 @@ export default function ChatbotDetailsLayout({ children, params }: LayoutProps) 
       defaultExpanded: true,
     },
     { key: "escalation", label: "Escalation Rules", href: `/chatbots/${chatbotId}/escalation`, icon: AlertTriangle },
+    { key: "voice", label: "Voice", href: `/chatbots/${chatbotId}/voice`, icon: Phone },
     { key: "test", label: "Test", href: `/chatbots/${chatbotId}/test`, icon: Play },
     { key: "integration", label: "Integration", href: `/chatbots/${chatbotId}/integration`, icon: Plug },
     // Show Code tab only for custom packages

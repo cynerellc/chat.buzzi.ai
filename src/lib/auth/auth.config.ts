@@ -12,7 +12,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       name: string | null;
-      image: string | null;
+      avatarUrl: string | null;
       role: UserRole;
     };
   }
@@ -21,7 +21,7 @@ declare module "next-auth" {
     id: string;
     name?: string | null;
     email?: string | null;
-    image?: string | null;
+    avatarUrl?: string | null;
     role: UserRole;
   }
 }
@@ -48,7 +48,7 @@ export const authConfig: NextAuthConfig = {
         token.role = user.role;
         token.name = user.name;
         token.email = user.email;
-        token.image = user.image;
+        token.avatarUrl = user.avatarUrl;
       }
 
       // When session is updated (via update() call), refresh user data from DB
@@ -63,7 +63,6 @@ export const authConfig: NextAuthConfig = {
             .select({
               name: users.name,
               email: users.email,
-              image: users.image,
               avatarUrl: users.avatarUrl,
               role: users.role,
             })
@@ -74,8 +73,7 @@ export const authConfig: NextAuthConfig = {
           if (freshUser) {
             token.name = freshUser.name;
             token.email = freshUser.email;
-            // Use avatarUrl if available, otherwise fallback to OAuth image
-            token.image = freshUser.avatarUrl ?? freshUser.image;
+            token.avatarUrl = freshUser.avatarUrl;
             token.role = freshUser.role as UserRole;
           }
         } catch (error) {
@@ -91,7 +89,7 @@ export const authConfig: NextAuthConfig = {
         session.user.role = token.role as UserRole;
         session.user.name = (token.name as string | null) ?? null;
         session.user.email = (token.email as string) ?? session.user.email;
-        session.user.image = (token.image as string | null) ?? null;
+        session.user.avatarUrl = (token.avatarUrl as string | null) ?? null;
       }
 
       return session;

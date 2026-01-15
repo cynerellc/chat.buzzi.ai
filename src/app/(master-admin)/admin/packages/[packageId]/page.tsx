@@ -50,6 +50,9 @@ interface FormData {
   packageType: "single_agent" | "multi_agent";
   isActive: boolean;
   isPublic: boolean;
+  enabledChat: boolean;
+  enabledCall: boolean;
+  callSystemPrompt: string;
   agents: AgentListItemData[];
   variables: PackageVariableData[];
 }
@@ -87,6 +90,9 @@ const defaultFormData: FormData = {
   packageType: "single_agent",
   isActive: true,
   isPublic: true,
+  enabledChat: true,
+  enabledCall: false,
+  callSystemPrompt: "",
   agents: [{ ...defaultAgentData, agent_identifier: crypto.randomUUID().slice(0, 8) }],
   variables: [],
 };
@@ -155,6 +161,9 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
         packageType: (pkg.packageType as "single_agent" | "multi_agent") ?? "single_agent",
         isActive: pkg.isActive,
         isPublic: pkg.isPublic,
+        enabledChat: pkg.enabledChat ?? true,
+        enabledCall: pkg.enabledCall ?? false,
+        callSystemPrompt: pkg.defaultVoiceConfig?.callSystemPrompt ?? "",
         agents: agentsList,
         variables: packageVariables,
       });
@@ -210,6 +219,11 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
         packageType: formData.packageType,
         isActive: formData.isActive,
         isPublic: formData.isPublic,
+        enabledChat: formData.enabledChat,
+        enabledCall: formData.enabledCall,
+        defaultVoiceConfig: formData.enabledCall ? {
+          callSystemPrompt: formData.callSystemPrompt || undefined,
+        } : undefined,
         agentsList: formData.agents.map((agent, index) => ({
           ...agent,
           sort_order: index,
@@ -786,6 +800,45 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </Card>
+
+        {/* Features */}
+        <Card className="p-6">
+          <h4 className="font-medium mb-4">Features</h4>
+          <div className="flex gap-6 mb-4">
+            <Switch
+              isSelected={formData.enabledChat}
+              onValueChange={(v) => updateField("enabledChat", v)}
+            >
+              Enable Chat
+            </Switch>
+            <Switch
+              isSelected={formData.enabledCall}
+              onValueChange={(v) => updateField("enabledCall", v)}
+            >
+              Enable Call
+            </Switch>
+          </div>
+
+          {/* Call System Prompt - shown when enabledCall is true */}
+          {formData.enabledCall && (
+            <div className="mt-4 pt-4 border-t border-divider">
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Call System Prompt
+              </label>
+              <Textarea
+                value={formData.callSystemPrompt}
+                onValueChange={(v) => updateField("callSystemPrompt", v)}
+                placeholder="You are a helpful voice assistant..."
+                minRows={6}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                System prompt used during voice calls. This defines the AI&apos;s behavior, personality, and capabilities for voice interactions.
+                Chatbots created from this package will inherit this prompt.
+              </p>
             </div>
           )}
         </Card>

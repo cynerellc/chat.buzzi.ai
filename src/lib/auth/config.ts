@@ -75,7 +75,6 @@ export const fullAuthConfig: NextAuthConfig = {
             email: user.email,
             hasPassword: !!user.hashedPassword,
             status: user.status,
-            isActive: user.isActive,
           } : "not found");
 
           if (!user || !user.hashedPassword) {
@@ -95,8 +94,8 @@ export const fullAuthConfig: NextAuthConfig = {
           }
 
           // Check if user is active
-          if (!user.isActive || user.status !== "active") {
-            console.log("[Auth] User not active:", { isActive: user.isActive, status: user.status });
+          if (user.status !== "active") {
+            console.log("[Auth] User not active:", { status: user.status });
             return null;
           }
 
@@ -105,7 +104,7 @@ export const fullAuthConfig: NextAuthConfig = {
             id: user.id,
             email: user.email,
             name: user.name,
-            image: user.avatarUrl,
+            avatarUrl: user.avatarUrl,
             role: user.role as UserRole,
           };
         } catch (error) {
@@ -126,7 +125,7 @@ export const fullAuthConfig: NextAuthConfig = {
 
         if (existingUser) {
           // Check if user is active
-          if (!existingUser.isActive || existingUser.status !== "active") {
+          if (existingUser.status !== "active") {
             return false;
           }
 

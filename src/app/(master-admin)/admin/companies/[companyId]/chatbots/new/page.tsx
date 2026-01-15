@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Lock, Variable, Headphones, ShoppingBag, HelpCircle, Sparkles } from "lucide-react";
 
-import { Button, Input, Select, Card, CardHeader, CardBody, Textarea, addToast, Skeleton, Chip } from "@/components/ui";
+import { Button, Input, Select, Card, CardHeader, CardBody, Textarea, addToast, Skeleton, Chip, Switch } from "@/components/ui";
 import { usePackages, usePackage, type PackageListItem } from "@/hooks/master-admin";
 import type { PackageVariableDefinition } from "@/lib/db/schema";
 
@@ -36,6 +36,8 @@ export default function NewChatbotPage({ params }: NewChatbotPageProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<"support" | "sales" | "general" | "custom">("custom");
+  const [enabledChat, setEnabledChat] = useState(true);
+  const [enabledCall, setEnabledCall] = useState(false);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -138,6 +140,8 @@ export default function NewChatbotPage({ params }: NewChatbotPageProps) {
           description: description.trim() || undefined,
           type,
           packageId: selectedPackageId || undefined,
+          enabledChat,
+          enabledCall,
           variableValues: hasVariables ? variableValues : undefined,
         }),
       });
@@ -248,6 +252,33 @@ export default function NewChatbotPage({ params }: NewChatbotPageProps) {
                   if (selected) setType(selected as typeof type);
                 }}
               />
+
+              {/* Show features section only if package allows at least one feature */}
+              {(!selectedPackageId || selectedPackageDetails?.enabledChat || selectedPackageDetails?.enabledCall) && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Features</label>
+                  <div className="flex gap-6">
+                    {/* Show Enable Chat only if no package selected or package has enabledChat */}
+                    {(!selectedPackageId || selectedPackageDetails?.enabledChat) && (
+                      <Switch
+                        isSelected={enabledChat}
+                        onValueChange={setEnabledChat}
+                      >
+                        Enable Chat
+                      </Switch>
+                    )}
+                    {/* Show Enable Call only if no package selected or package has enabledCall */}
+                    {(!selectedPackageId || selectedPackageDetails?.enabledCall) && (
+                      <Switch
+                        isSelected={enabledCall}
+                        onValueChange={setEnabledCall}
+                      >
+                        Enable Call
+                      </Switch>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {selectedPackageId && (
                 <div className="rounded-lg bg-muted p-3 text-sm">

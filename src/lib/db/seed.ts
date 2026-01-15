@@ -1,13 +1,10 @@
+import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { config } from "dotenv";
 
 import * as schema from "./schema";
 import type { ChatbotBehavior, AgentListItem } from "./schema/chatbots";
-
-// Load environment variables
-config();
 
 // Seed script for development/testing
 async function seed() {
@@ -135,12 +132,14 @@ async function seed() {
     const models = await db
       .insert(schema.aiModels)
       .values([
-        // OpenAI Models
+        // OpenAI Chat Models
         {
           provider: "openai",
           modelId: "gpt-5.2",
           displayName: "GPT-5.2",
           description: "OpenAI's flagship model for coding and agentic tasks",
+          modelType: "chat",
+          supportsAudio: false,
           inputLimit: 200000,
           outputLimit: 16000,
           inputPricePerMillion: "1.2500",
@@ -182,6 +181,8 @@ async function seed() {
           modelId: "gpt-5-mini",
           displayName: "GPT-5 Mini",
           description: "Faster, cost-efficient version of GPT-5 for well-defined tasks",
+          modelType: "chat",
+          supportsAudio: false,
           inputLimit: 200000,
           outputLimit: 16000,
           inputPricePerMillion: "0.2500",
@@ -223,6 +224,8 @@ async function seed() {
           modelId: "gpt-5-nano",
           displayName: "GPT-5 Nano",
           description: "Fastest, most cost-efficient GPT-5 for summarization and classification",
+          modelType: "chat",
+          supportsAudio: false,
           inputLimit: 128000,
           outputLimit: 16000,
           inputPricePerMillion: "0.0500",
@@ -259,12 +262,14 @@ async function seed() {
           isDefault: false,
           sortOrder: 2,
         },
-        // Google Models
+        // Google Chat Models
         {
           provider: "google",
           modelId: "gemini-3-pro-preview",
           displayName: "Gemini 3 Pro",
           description: "Google's most advanced model for multimodal understanding and agentic tasks",
+          modelType: "chat",
+          supportsAudio: false,
           inputLimit: 1048576,
           outputLimit: 65536,
           inputPricePerMillion: "0.0000",
@@ -314,6 +319,8 @@ async function seed() {
           modelId: "gemini-3-flash-preview",
           displayName: "Gemini 3 Flash",
           description: "Balanced model built for speed, scale, and frontier intelligence",
+          modelType: "chat",
+          supportsAudio: false,
           inputLimit: 1048576,
           outputLimit: 65536,
           inputPricePerMillion: "0.0000",
@@ -357,6 +364,82 @@ async function seed() {
           isActive: true,
           isDefault: false,
           sortOrder: 11,
+        },
+        // OpenAI Call Models (Real-time Voice)
+        {
+          provider: "openai",
+          modelId: "gpt-4o-realtime-preview-2024-10-01",
+          displayName: "GPT-4o Realtime",
+          description: "OpenAI's real-time voice model with low latency for voice calls",
+          modelType: "call",
+          supportsAudio: true,
+          inputLimit: 128000,
+          outputLimit: 4096,
+          inputPricePerMillion: "5.0000",
+          outputPricePerMillion: "20.0000",
+          settingsSchema: {
+            voice: {
+              type: "select",
+              options: ["alloy", "echo", "shimmer", "ash", "ballad", "coral", "sage", "verse"],
+              default: "alloy",
+              label: "Voice",
+              description: "The voice to use for audio responses",
+            },
+            vad_threshold: {
+              type: "slider",
+              min: 0,
+              max: 1,
+              step: 0.05,
+              default: 0.5,
+              label: "VAD Threshold",
+              description: "Voice activity detection sensitivity",
+            },
+            silence_duration_ms: {
+              type: "number",
+              min: 100,
+              max: 2000,
+              default: 500,
+              label: "Silence Duration (ms)",
+              description: "Silence duration before end of turn",
+            },
+          },
+          isActive: true,
+          isDefault: false,
+          sortOrder: 20,
+        },
+        // Google Call Models (Live API)
+        {
+          provider: "google",
+          modelId: "gemini-2.0-flash-exp",
+          displayName: "Gemini 2.0 Flash Live",
+          description: "Google's real-time voice model with multimodal support",
+          modelType: "call",
+          supportsAudio: true,
+          inputLimit: 1000000,
+          outputLimit: 8192,
+          inputPricePerMillion: "0.0750",
+          outputPricePerMillion: "0.3000",
+          settingsSchema: {
+            voice: {
+              type: "select",
+              options: ["Puck", "Charon", "Kore", "Fenrir", "Aoede"],
+              default: "Puck",
+              label: "Voice",
+              description: "The voice to use for audio responses",
+            },
+            vad_sensitivity: {
+              type: "slider",
+              min: 0,
+              max: 1,
+              step: 0.1,
+              default: 0.5,
+              label: "VAD Sensitivity",
+              description: "Voice activity detection sensitivity",
+            },
+          },
+          isActive: true,
+          isDefault: false,
+          sortOrder: 21,
         },
       ])
       .returning();
@@ -576,7 +659,6 @@ Guidelines:
         name: "Master Admin",
         role: "chatapp.master_admin",
         status: "active",
-        isActive: true,
         hashedPassword,
       })
       .returning();
@@ -596,7 +678,6 @@ Guidelines:
         name: "Demo Admin",
         role: "chatapp.user",
         status: "active",
-        isActive: true,
         hashedPassword: demoPassword,
       })
       .returning();
@@ -622,7 +703,6 @@ Guidelines:
         name: "Demo Agent",
         role: "chatapp.user",
         status: "active",
-        isActive: true,
         hashedPassword: demoPassword,
       })
       .returning();

@@ -92,7 +92,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         .update(users)
         .set({
           status: data.status,
-          isActive: data.status === "active",
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));

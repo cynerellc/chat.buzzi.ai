@@ -356,7 +356,7 @@ export async function DELETE(request: Request, context: RouteContext) {
         .set({
           deletedAt: now,
           updatedAt: now,
-          isActive: false,
+          status: "inactive",
         })
         .where(inArray(users.id, companyUserIds.map(u => u.userId)));
     }

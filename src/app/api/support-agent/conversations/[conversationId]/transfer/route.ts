@@ -78,7 +78,7 @@ export async function POST(
         and(
           eq(users.id, data.targetUserId),
           eq(companyPermissions.companyId, company.id),
-          eq(users.isActive, true),
+          eq(users.status, "active"),
           sql`${users.deletedAt} IS NULL`
         )
       )
@@ -206,7 +206,7 @@ export async function GET(
       .where(
         and(
           eq(companyPermissions.companyId, company.id),
-          eq(users.isActive, true),
+          eq(users.status, "active"),
           ne(users.id, user.id),
           sql`${users.deletedAt} IS NULL`
         )

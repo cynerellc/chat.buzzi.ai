@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { requireCompanyAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { agents, widgetConfigs } from "@/lib/db/schema";
+import { agents, type ChatWidgetConfig } from "@/lib/db/schema";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,12 +16,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Agent ID is required" }, { status: 400 });
     }
 
-    // Verify agent belongs to company
+    // Verify agent belongs to company and get widget config
     const [agent] = await db
       .select({
         id: agents.id,
         name: agents.name,
         status: agents.status,
+        widgetConfig: agents.widgetConfig,
       })
       .from(agents)
       .where(
@@ -37,12 +38,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    // Get widget config for the company
-    const [widgetConfig] = await db
-      .select()
-      .from(widgetConfigs)
-      .where(eq(widgetConfigs.chatbotId, company.id))
-      .limit(1);
+    // Get chat widget config from unified widgetConfig
+    const unifiedConfig = agent.widgetConfig as { chat?: ChatWidgetConfig; call?: Record<string, unknown> } | null;
+    const widgetConfig = unifiedConfig?.chat;
 
     // Generate embed code
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://chat.buzzi.ai";

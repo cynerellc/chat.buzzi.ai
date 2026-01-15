@@ -9,6 +9,9 @@ import {
   Trash2,
   Star,
   DollarSign,
+  MessageSquare,
+  Phone,
+  PhoneCall,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -42,6 +45,24 @@ const providerConfig: Record<string, { icon: typeof Brain; gradient: string; ico
   },
 };
 
+const modelTypeConfig: Record<string, { icon: typeof MessageSquare; bg: string; label: string }> = {
+  chat: {
+    icon: MessageSquare,
+    bg: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    label: "Chat",
+  },
+  call: {
+    icon: Phone,
+    bg: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+    label: "Call",
+  },
+  both: {
+    icon: PhoneCall,
+    bg: "bg-green-500/10 text-green-600 dark:text-green-400",
+    label: "Chat & Call",
+  },
+};
+
 function formatTokenLimit(limit: number): string {
   if (limit >= 1_000_000) {
     return `${(limit / 1_000_000).toFixed(1)}M`;
@@ -64,6 +85,8 @@ export function ModelCard({ model, onEdit, onDelete }: ModelCardProps) {
   const providerKey = model.provider ?? "openai";
   // providerConfig.openai is guaranteed to exist in the object literal above
   const { icon: Icon, iconBg, label: providerLabel } = providerConfig[providerKey] ?? providerConfig.openai!;
+  const modelTypeKey = model.modelType ?? "chat";
+  const { icon: TypeIcon, bg: typeBg, label: typeLabel } = modelTypeConfig[modelTypeKey] ?? modelTypeConfig.chat!;
   const settingsCount = Object.keys(model.settingsSchema || {}).length;
 
   return (
@@ -99,12 +122,26 @@ export function ModelCard({ model, onEdit, onDelete }: ModelCardProps) {
         </div>
 
         <h3 className="text-lg font-semibold group-hover:text-primary transition-colors">{model.displayName}</h3>
-        <span className={cn(
-          "inline-flex items-center w-fit mt-2 px-2.5 py-0.5 rounded-lg text-xs font-medium",
-          iconBg
-        )}>
-          {providerLabel}
-        </span>
+        <div className="flex flex-wrap gap-2 mt-2">
+          <span className={cn(
+            "inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium",
+            iconBg
+          )}>
+            {providerLabel}
+          </span>
+          <span className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-medium",
+            typeBg
+          )}>
+            <TypeIcon size={11} />
+            {typeLabel}
+          </span>
+          {model.supportsAudio && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium bg-pink-500/10 text-pink-600 dark:text-pink-400">
+              Audio
+            </span>
+          )}
+        </div>
 
         <p className="text-xs text-muted-foreground mt-1 font-mono">{model.modelId}</p>
 

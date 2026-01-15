@@ -29,7 +29,6 @@ export async function GET() {
         email: users.email,
         phone: users.phone,
         avatarUrl: users.avatarUrl,
-        image: users.image,
         role: users.role,
         activeCompanyId: users.activeCompanyId,
       })
@@ -48,7 +47,6 @@ export async function GET() {
         email: userData.email,
         phone: userData.phone,
         avatarUrl: userData.avatarUrl,
-        image: userData.image,
         role: userData.role,
         activeCompanyId: userData.activeCompanyId,
       },
@@ -94,7 +92,6 @@ export async function PATCH(request: NextRequest) {
         email: users.email,
         phone: users.phone,
         avatarUrl: users.avatarUrl,
-        image: users.image,
         role: users.role,
         activeCompanyId: users.activeCompanyId,
       });
@@ -110,7 +107,6 @@ export async function PATCH(request: NextRequest) {
         email: updatedUser.email,
         phone: updatedUser.phone,
         avatarUrl: updatedUser.avatarUrl,
-        image: updatedUser.image,
         role: updatedUser.role,
         activeCompanyId: updatedUser.activeCompanyId,
       },

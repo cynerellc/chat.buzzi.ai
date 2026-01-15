@@ -4,6 +4,13 @@ const nextConfig: NextConfig = {
   devIndicators: {
     position: "top-left",
   },
+  // Mark native Node.js modules as server-only externals (not bundled by webpack)
+  serverExternalPackages: [
+    "wrtc",
+    "sdp-transform",
+    "@discordjs/opus",
+    "@alexanderolsen/libsamplerate-js",
+  ],
   experimental: {
     optimizePackageImports: [
       "lucide-react",

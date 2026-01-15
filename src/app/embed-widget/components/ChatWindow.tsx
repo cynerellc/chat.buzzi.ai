@@ -22,6 +22,9 @@ import { ThinkingBubble, type ToolCallState } from "./ThinkingBubble";
 import { VoiceMessageBubble } from "./VoiceMessageBubble";
 import { HumanWaitingBubble } from "./HumanWaitingBubble";
 import { HumanJoinedBubble, HumanExitedBubble } from "./HumanJoinedBubble";
+import { CallDialog } from "./CallDialog";
+import { CallHistory } from "./CallHistory";
+import { useCallSession } from "../hooks/useCallSession";
 import type {
   AgentInfo,
   ChatWindowConfig,
@@ -89,6 +92,12 @@ export function ChatWindow({
     avatarUrl?: string;
   } | null>(null);
 
+  // Call dialog state
+  const [isCallDialogOpen, setIsCallDialogOpen] = useState(false);
+  const [showCallHistory, setShowCallHistory] = useState(false);
+  // Call-only mode: when mode=call URL param is set, show only call widget
+  const [isCallOnlyMode, setIsCallOnlyMode] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -119,6 +128,19 @@ export function ChatWindow({
     maxDuration: 60,
     onError: (err) => {
       console.error("Voice recording error:", err);
+      setError(err);
+    },
+  });
+
+  // Voice call session management
+  const callSession = useCallSession({
+    chatbotId: config?.agentId || "",
+    companyId: config?.companyId || "",
+    callConfig: config?.callConfig,
+    callerName: preChatName || undefined,
+    callerEmail: preChatEmail || undefined,
+    onError: (err) => {
+      console.error("Call error:", err);
       setError(err);
     },
   });
@@ -208,6 +230,12 @@ export function ChatWindow({
     const theme = (params.get("theme") as ChatWindowConfig["theme"]) || "light";
     const primaryColor = params.get("primaryColor") || "#007bff";
     const customerStr = params.get("customer");
+    // Check for call-only mode
+    const mode = params.get("mode");
+    if (mode === "call") {
+      setIsCallOnlyMode(true);
+      setIsCallDialogOpen(true); // Auto-open call dialog in call-only mode
+    }
 
     if (!agentId || !companyId) {
       setError("Missing required configuration");
@@ -377,6 +405,12 @@ export function ChatWindow({
         case "setCustomer":
           setConfig((prev) => (prev ? { ...prev, customer: data } : null));
           break;
+        case "openCallDialog":
+          setIsCallDialogOpen(true);
+          break;
+        case "closeCallDialog":
+          setIsCallDialogOpen(false);
+          break;
       }
     };
 
@@ -389,6 +423,24 @@ export function ChatWindow({
       window.removeEventListener("message", handleMessage);
     };
   }, [isDemo]);
+
+  // Notify parent when call dialog opens/closes
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.parent !== window) {
+      if (isCallDialogOpen) {
+        window.parent.postMessage({ type: "widget:callDialogOpened" }, "*");
+      } else {
+        window.parent.postMessage({ type: "widget:callDialogClosed" }, "*");
+      }
+    }
+  }, [isCallDialogOpen]);
+
+  // Auto-close call dialog when call ends
+  useEffect(() => {
+    if (callSession.status === "ended") {
+      setIsCallDialogOpen(false);
+    }
+  }, [callSession.status]);
 
   // Create session when config is ready (skip in demo mode)
   // Try to resume existing session first if persistence is enabled
@@ -585,17 +637,23 @@ export function ChatWindow({
     try {
       let configData: ChatWindowConfig | null = null;
 
-      // In preview mode, use the admin preview-config API directly
+      // In preview mode, try the admin preview-config API first
       if (isPreview) {
-        const response = await fetch(
-          `/api/master-admin/companies/${companyId}/chatbots/${agentId}/preview-config`
-        );
+        try {
+          const response = await fetch(
+            `/api/master-admin/companies/${companyId}/chatbots/${agentId}/preview-config`
+          );
 
-        if (response.ok) {
-          const data = await response.json();
-          configData = { ...initialConfig, ...data.config };
+          if (response.ok) {
+            const data = await response.json();
+            configData = { ...initialConfig, ...data.config };
+          }
+        } catch {
+          // Preview config failed, will fall back to widget/config API
         }
-      } else {
+      }
+
+      if (!configData) {
         // Production mode: try pre-generated JSON first
         try {
           const configUrlResponse = await fetch(
@@ -677,7 +735,17 @@ export function ChatWindow({
 
           if (response.ok) {
             const data = await response.json();
-            configData = { ...initialConfig, ...data.config };
+            const apiConfig = data.config;
+            // Map call config from API format to ChatWindow format
+            // API returns: call: { enabled, widgetConfig, ... }
+            // ChatWindow expects: enableCall, callConfig
+            configData = {
+              ...initialConfig,
+              ...apiConfig,
+              // Map call feature config
+              enableCall: apiConfig?.call?.enabled ?? false,
+              callConfig: apiConfig?.call?.widgetConfig,
+            };
           }
         }
       }
@@ -2550,6 +2618,47 @@ export function ChatWindow({
   const borderRadius = config.borderRadius ?? 16;
   const accentColor = config.accentColor || config.primaryColor;
 
+  // Call-only mode: render only the call interface
+  if (isCallOnlyMode) {
+    return (
+      <div
+        className={cn(
+          "flex h-full flex-col overflow-hidden",
+          isDark ? "bg-zinc-900 text-white" : "bg-white text-zinc-900",
+          className
+        )}
+        style={{
+          borderRadius: `${borderRadius}px`,
+          ...style,
+        }}
+      >
+        <CallDialog
+          isOpen={true}
+          onClose={() => {
+            // In call-only mode, notify parent to close the widget
+            notifyParent("widget:close", {});
+          }}
+          onStartCall={callSession.startCall}
+          onEndCall={callSession.endCall}
+          onToggleMute={callSession.toggleMute}
+          status={callSession.status}
+          isMuted={callSession.isMuted}
+          duration={callSession.duration}
+          transcript={callSession.transcript}
+          audioData={callSession.audioData}
+          error={callSession.error}
+          connectionQuality={callSession.connectionQuality}
+          isDark={isDark}
+          primaryColor={config.primaryColor}
+          callConfig={config.callConfig}
+          agentName={config.title}
+          agentAvatarUrl={config.avatarUrl}
+          inline={true}
+        />
+      </div>
+    );
+  }
+
   // Show pre-chat form if needed
   if (showPreChatForm && !preChatSubmitted) {
     return (
@@ -2726,6 +2835,30 @@ export function ChatWindow({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Call History button - show when calls are enabled and session exists */}
+          {config.enableCall && session?.endUserId && (
+            <button
+              onClick={() => setShowCallHistory(true)}
+              className="rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
+              aria-label="Call history"
+              title="View call history"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                <path d="M14.05 2a9 9 0 0 1 8 7.94" />
+                <path d="M14.05 6A5 5 0 0 1 18 10" />
+              </svg>
+            </button>
+          )}
           {/* New Chat button - show when there are user messages */}
           {messages.some(m => m.role === "user") && (
             <button
@@ -3458,38 +3591,70 @@ export function ChatWindow({
                     <path d="M22 2L15 22L11 13L2 9L22 2Z" />
                   </svg>
                 </button>
-              ) : config.enableVoice && isVoiceSupported ? (
-                <button
-                  type="button"
-                  onMouseDown={handlePttClick}
-                  onMouseUp={handleVoiceRecordingStop}
-                  onMouseLeave={handleVoiceRecordingStop}
-                  onTouchStart={handlePttClick}
-                  onTouchEnd={handleVoiceRecordingStop}
-                  className={cn(
-                    "rounded-full p-2 transition-colors shrink-0",
-                    isDark
-                      ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
-                      : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+              ) : (
+                <>
+                  {/* Call button */}
+                  {config.enableCall && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCallDialogOpen(true)}
+                      className={cn(
+                        "rounded-full p-2 transition-colors shrink-0",
+                        isDark
+                          ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
+                          : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+                      )}
+                      aria-label="Start voice call"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                      </svg>
+                    </button>
                   )}
-                  aria-label="Hold to record voice message"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" x2="12" y1="19" y2="22" />
-                  </svg>
-                </button>
-              ) : null}
+                  {/* Voice recording button */}
+                  {config.enableVoice && isVoiceSupported && (
+                    <button
+                      type="button"
+                      onMouseDown={handlePttClick}
+                      onMouseUp={handleVoiceRecordingStop}
+                      onMouseLeave={handleVoiceRecordingStop}
+                      onTouchStart={handlePttClick}
+                      onTouchEnd={handleVoiceRecordingStop}
+                      className={cn(
+                        "rounded-full p-2 transition-colors shrink-0",
+                        isDark
+                          ? "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700"
+                          : "text-gray-500 hover:text-gray-600 hover:bg-gray-200"
+                      )}
+                      aria-label="Hold to record voice message"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" x2="12" y1="19" y2="22" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              )}
             </>
           )}
         </div>
@@ -3517,6 +3682,46 @@ export function ChatWindow({
           >
             Buzzi
           </a>
+        </div>
+      )}
+
+      {/* Call Dialog */}
+      {config.enableCall && (
+        <CallDialog
+          isOpen={isCallDialogOpen}
+          onClose={() => {
+            if (callSession.status === "idle" || callSession.status === "ended" || callSession.status === "error") {
+              setIsCallDialogOpen(false);
+            }
+          }}
+          onStartCall={callSession.startCall}
+          onEndCall={callSession.endCall}
+          onToggleMute={callSession.toggleMute}
+          status={callSession.status}
+          isMuted={callSession.isMuted}
+          duration={callSession.duration}
+          transcript={callSession.transcript}
+          audioData={callSession.audioData}
+          error={callSession.error}
+          connectionQuality={callSession.connectionQuality}
+          isDark={isDark}
+          primaryColor={config.primaryColor}
+          callConfig={config.callConfig}
+          agentName={config.title}
+          agentAvatarUrl={config.avatarUrl}
+        />
+      )}
+
+      {/* Call History Modal */}
+      {showCallHistory && config.enableCall && session?.endUserId && (
+        <div className="absolute inset-0 z-50 flex flex-col" style={{ borderRadius: `${borderRadius}px` }}>
+          <CallHistory
+            chatbotId={config.agentId}
+            endUserId={session.endUserId}
+            primaryColor={config.primaryColor}
+            onClose={() => setShowCallHistory(false)}
+            className="h-full"
+          />
         </div>
       )}
     </div>

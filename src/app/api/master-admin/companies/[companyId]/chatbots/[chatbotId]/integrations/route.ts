@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { chatbots, channelConfigs, webhooks } from "@/lib/db/schema";
+import { chatbots, channelConfigs } from "@/lib/db/schema";
 
 interface RouteParams {
   params: Promise<{ companyId: string; chatbotId: string }>;
@@ -54,26 +54,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         )
       );
 
-    // Fetch webhooks
-    const webhookList = await db
-      .select({
-        id: webhooks.id,
-        name: webhooks.name,
-        description: webhooks.description,
-        url: webhooks.url,
-        events: webhooks.events,
-        isActive: webhooks.isActive,
-        successfulDeliveries: webhooks.successfulDeliveries,
-        failedDeliveries: webhooks.failedDeliveries,
-        lastDeliveryAt: webhooks.lastDeliveryAt,
-        createdAt: webhooks.createdAt,
-      })
-      .from(webhooks)
-      .where(eq(webhooks.chatbotId, chatbotId));
-
     return NextResponse.json({
       channels,
-      webhooks: webhookList,
     });
   } catch (error) {
     console.error("Error fetching integrations:", error);

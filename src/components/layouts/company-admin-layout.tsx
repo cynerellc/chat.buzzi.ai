@@ -9,6 +9,9 @@ import {
   CreditCard,
   Users,
   Hexagon,
+  BarChart3,
+  Phone,
+  Plug,
 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode } from "react";
@@ -29,9 +32,18 @@ const companyAdminSections: SidebarSection[] = [
     ],
   },
   {
+    key: "analytics",
+    title: "Analytics",
+    items: [
+      { key: "analytics", label: "Chat Analytics", href: "/analytics", icon: BarChart3 },
+      { key: "call-analytics", label: "Call Analytics", href: "/analytics/calls", icon: Phone },
+    ],
+  },
+  {
     key: "configure",
     title: "Configuration",
     items: [
+      { key: "integrations", label: "Integrations", href: "/integrations", icon: Plug },
       { key: "settings", label: "Settings", href: "/settings", icon: Settings },
       { key: "billing", label: "Billing", href: "/billing", icon: CreditCard },
     ],

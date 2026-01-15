@@ -35,7 +35,9 @@ import {
   Laptop,
   Monitor,
   Palette,
+  Phone,
   RefreshCw,
+  Settings2,
   Shield,
   Smartphone,
   Tablet,
@@ -113,6 +115,9 @@ export default function CompanySettingsPage() {
       ipWhitelist: [] as string[],
       allowPublicApi: false,
     },
+    features: {
+      callEnabled: false,
+    },
   });
 
   const [hasChanges, setHasChanges] = useState(false);
@@ -186,6 +191,7 @@ export default function CompanySettingsPage() {
         customDomain: settings.customDomain || "",
         notificationSettings: settings.notificationSettings,
         securitySettings: settings.securitySettings,
+        features: settings.features || { callEnabled: false },
       });
     }
   }, [settings]);
@@ -275,6 +281,14 @@ export default function CompanySettingsPage() {
     setFormData((prev) => ({
       ...prev,
       securitySettings: { ...prev.securitySettings, [key]: value },
+    }));
+    setHasChanges(true);
+  };
+
+  const updateFeatureSetting = (key: string, value: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      features: { ...prev.features, [key]: value },
     }));
     setHasChanges(true);
   };
@@ -530,6 +544,46 @@ export default function CompanySettingsPage() {
                 onValueChange={(value) => updateSecuritySetting("allowPublicApi", value)}
               />
             </div>
+          </CardBody>
+        </Card>
+      ),
+    },
+    {
+      key: "features",
+      label: "Features",
+      icon: Settings2,
+      content: (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Feature Toggles</h3>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Enable or disable features for this company.
+            </p>
+            <div className="flex items-center justify-between p-4 border border-default-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-muted rounded-lg">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-medium">Voice Calls</p>
+                  <p className="text-sm text-muted-foreground">
+                    Allow chatbots to handle voice calls using AI
+                  </p>
+                </div>
+              </div>
+              <Switch
+                isSelected={formData.features.callEnabled}
+                onValueChange={(value) => updateFeatureSetting("callEnabled", value)}
+              />
+            </div>
+            {formData.features.callEnabled && (
+              <div className="ml-12 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+                When enabled, company admins can configure voice call settings for individual chatbots.
+                Calls will use OpenAI Realtime API or Google Gemini Live API.
+              </div>
+            )}
           </CardBody>
         </Card>
       ),

@@ -14,6 +14,8 @@ export interface ModelListItem {
   modelId: string;
   displayName: string;
   description: string | null;
+  modelType: "chat" | "call" | "both";
+  supportsAudio: boolean;
   inputLimit: number;
   outputLimit: number;
   inputPricePerMillion: string | null;
@@ -108,6 +110,8 @@ export async function GET(request: NextRequest) {
       modelId: model.modelId,
       displayName: model.displayName,
       description: model.description,
+      modelType: model.modelType as "chat" | "call" | "both",
+      supportsAudio: model.supportsAudio,
       inputLimit: model.inputLimit,
       outputLimit: model.outputLimit,
       inputPricePerMillion: model.inputPricePerMillion,
@@ -156,6 +160,8 @@ const createModelSchema = z.object({
   modelId: z.string().min(1).max(100),
   displayName: z.string().min(1).max(100),
   description: z.string().optional(),
+  modelType: z.enum(["chat", "call", "both"]).default("chat"),
+  supportsAudio: z.boolean().default(false),
   inputLimit: z.number().int().positive(),
   outputLimit: z.number().int().positive(),
   inputPricePerMillion: z.string().optional(),
@@ -204,6 +210,8 @@ export async function POST(request: NextRequest) {
         modelId: validatedData.modelId,
         displayName: validatedData.displayName,
         description: validatedData.description ?? null,
+        modelType: validatedData.modelType,
+        supportsAudio: validatedData.supportsAudio,
         inputLimit: validatedData.inputLimit,
         outputLimit: validatedData.outputLimit,
         inputPricePerMillion: validatedData.inputPricePerMillion ?? null,
@@ -231,6 +239,8 @@ export async function POST(request: NextRequest) {
           modelId: newModel.modelId,
           displayName: newModel.displayName,
           description: newModel.description,
+          modelType: newModel.modelType as "chat" | "call" | "both",
+          supportsAudio: newModel.supportsAudio,
           inputLimit: newModel.inputLimit,
           outputLimit: newModel.outputLimit,
           inputPricePerMillion: newModel.inputPricePerMillion,

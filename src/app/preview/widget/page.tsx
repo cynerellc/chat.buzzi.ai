@@ -1,13 +1,32 @@
 "use client";
 
-import { Suspense, useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { MessageCircle, MessageSquare, HelpCircle, Sparkles, X, Loader2 } from "lucide-react";
+import { MessageCircle, MessageSquare, HelpCircle, Sparkles, X, Loader2, Phone } from "lucide-react";
 
 // Validate UUID format
 function isValidUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
+}
+
+interface CallWidgetConfig {
+  enabled?: boolean;
+  position?: "bottom-right" | "bottom-left";
+  colors?: {
+    primary?: string;
+    background?: string;
+  };
+  callButton?: {
+    style?: "orb" | "pill";
+    size?: number;
+    animation?: boolean;
+    label?: string;
+  };
+  orb?: {
+    glowIntensity?: number;
+    pulseSpeed?: number;
+  };
 }
 
 interface WidgetConfig {
@@ -22,6 +41,11 @@ interface WidgetConfig {
   autoOpen?: boolean;
   autoOpenDelay?: number;
   soundEnabled?: boolean;
+  // Feature flags
+  enabledChat?: boolean;
+  enabledCall?: boolean;
+  // Call config
+  callConfig?: CallWidgetConfig;
 }
 
 function WidgetPreviewContent() {
@@ -30,6 +54,7 @@ function WidgetPreviewContent() {
   const companyId = searchParams.get("companyId");
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isCallOpen, setIsCallOpen] = useState(false);
   const [config, setConfig] = useState<WidgetConfig>({
     primaryColor: "#6437F3",
     launcherIcon: "chat",
@@ -42,8 +67,18 @@ function WidgetPreviewContent() {
     autoOpen: false,
     autoOpenDelay: 5000,
     soundEnabled: false,
+    enabledChat: true,
+    enabledCall: false,
+    callConfig: undefined,
   });
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const chatIframeRef = useRef<HTMLIFrameElement>(null);
+  const callIframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Handle call button click - opens call widget directly
+  const handleCallClick = useCallback(() => {
+    setIsCallOpen(true);
+  }, []);
 
   // Compute validation error as derived value (not state)
   const validationError = useMemo(() => {
@@ -76,6 +111,9 @@ function WidgetPreviewContent() {
             autoOpen: data.config.autoOpen ?? false,
             autoOpenDelay: data.config.autoOpenDelay ?? 5000,
             soundEnabled: data.config.soundEnabled ?? false,
+            enabledChat: data.config.enabledChat ?? true,
+            enabledCall: data.config.enabledCall ?? false,
+            callConfig: data.config.callConfig || undefined,
           });
         }
         setIsConfigLoaded(true);
@@ -97,11 +135,16 @@ function WidgetPreviewContent() {
     return () => clearTimeout(timer);
   }, [isConfigLoaded, config.autoOpen, config.autoOpenDelay, isOpen]);
 
-  // Listen for close messages from the iframe (embed widget)
+  // Listen for messages from the iframes (chat and call widgets)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "widget:close" || event.data?.type === "widget:minimize") {
-        setIsOpen(false);
+        // Determine which widget sent the close message
+        if (event.source === callIframeRef.current?.contentWindow) {
+          setIsCallOpen(false);
+        } else {
+          setIsOpen(false);
+        }
       }
     };
 
@@ -193,7 +236,7 @@ function WidgetPreviewContent() {
       </footer>
 
       {/* Overlay for center-screen placement - does not close on click */}
-      {isOpen && config.placement === "center-screen" && (
+      {(isOpen || isCallOpen) && config.placement === "center-screen" && (
         <div className="fixed inset-0 bg-black/50 z-[999998] transition-opacity duration-200" />
       )}
 
@@ -206,9 +249,27 @@ function WidgetPreviewContent() {
           }}
         >
           <iframe
+            ref={chatIframeRef}
             src={`/embed-widget?chatbotId=${chatbotId}&companyId=${companyId}&preview=true`}
             className="w-full h-full border-none"
             title="Chat Widget"
+          />
+        </div>
+      )}
+
+      {/* Call Widget for center-screen placement */}
+      {isCallOpen && config.placement === "center-screen" && (
+        <div
+          className="fixed z-[999999] overflow-hidden shadow-2xl transition-all duration-200 md:w-[min(50vw,400px)] md:h-[min(60vh,500px)] md:max-w-[400px] md:max-h-[500px] md:min-w-[340px] md:min-h-[400px] w-full h-full top-0 left-0 md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2"
+          style={{
+            borderRadius: typeof window !== "undefined" && window.innerWidth > 768 ? `${config.borderRadius || 16}px` : 0,
+          }}
+        >
+          <iframe
+            ref={callIframeRef}
+            src={`/embed-widget?chatbotId=${chatbotId}&companyId=${companyId}&preview=true&mode=call`}
+            className="w-full h-full border-none"
+            title="Call Widget"
           />
         </div>
       )}
@@ -235,6 +296,7 @@ function WidgetPreviewContent() {
             }}
           >
             <iframe
+              ref={chatIframeRef}
               src={`/embed-widget?chatbotId=${chatbotId}&companyId=${companyId}&preview=true`}
               className="w-full h-full border-none"
               title="Chat Widget"
@@ -242,45 +304,101 @@ function WidgetPreviewContent() {
           </div>
         )}
 
-        {/* Launcher Button */}
-        {isConfigLoaded ? (
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="relative border-none cursor-pointer flex items-center justify-center shadow-xl transition-transform hover:scale-105"
+        {/* Call Widget for above-launcher placement */}
+        {isCallOpen && config.placement !== "center-screen" && (
+          <div
+            className="absolute w-[380px] h-[500px] max-h-[calc(100vh-120px)] overflow-hidden shadow-2xl transition-all duration-200"
             style={{
-              width: `${config.buttonSize || 60}px`,
-              height: `${config.buttonSize || 60}px`,
-              backgroundColor: config.primaryColor,
-              borderRadius: `${config.launcherIconBorderRadius || 50}%`,
-              boxShadow: config.launcherIconPulseGlow
-                ? `0 0 20px ${config.primaryColor}80`
-                : undefined,
+              bottom: `${(config.callConfig?.callButton?.size || config.buttonSize || 60) + 20}px`,
+              right: config.position === "bottom-left" ? "auto" : 0,
+              left: config.position === "bottom-left" ? 0 : "auto",
+              borderRadius: `${config.borderRadius || 16}px`,
+              opacity: isCallOpen ? 1 : 0,
+              transform: isCallOpen ? "translateY(0) scale(1)" : "translateY(20px) scale(0.95)",
             }}
-            aria-label={isOpen ? "Close chat" : "Open chat"}
           >
-            {isOpen ? (
-              <X className="w-6 h-6 text-white" />
-            ) : (
-              <>
-                {config.launcherIcon === "chat" && <MessageCircle className="w-7 h-7 text-white" />}
-                {config.launcherIcon === "message" && <MessageSquare className="w-7 h-7 text-white" />}
-                {config.launcherIcon === "help" && <HelpCircle className="w-7 h-7 text-white" />}
-                {config.launcherIcon === "sparkle" && <Sparkles className="w-7 h-7 text-white" />}
-                {!["chat", "message", "help", "sparkle"].includes(config.launcherIcon || "") && (
-                  <MessageCircle className="w-7 h-7 text-white" />
-                )}
-              </>
-            )}
-            {config.launcherIconPulseGlow && !isOpen && (
-              <span
-                className="absolute inset-0 animate-ping opacity-30"
+            <iframe
+              ref={callIframeRef}
+              src={`/embed-widget?chatbotId=${chatbotId}&companyId=${companyId}&preview=true&mode=call`}
+              className="w-full h-full border-none"
+              title="Call Widget"
+            />
+          </div>
+        )}
+
+        {/* Launcher Buttons */}
+        {isConfigLoaded ? (
+          <div className="flex flex-col gap-3 items-center">
+            {/* Call Launcher Button - hidden when chat or call widget is open */}
+            {config.enabledCall && config.callConfig?.enabled !== false && !isOpen && !isCallOpen && (
+              <button
+                onClick={handleCallClick}
+                className="relative border-none cursor-pointer flex items-center justify-center shadow-xl transition-transform hover:scale-105"
                 style={{
+                  width: `${config.callConfig?.callButton?.size || 60}px`,
+                  height: `${config.callConfig?.callButton?.size || 60}px`,
+                  backgroundColor: config.callConfig?.colors?.primary || config.primaryColor,
+                  borderRadius: config.callConfig?.callButton?.style === "pill" ? "30px" : "50%",
+                  boxShadow: config.callConfig?.callButton?.animation
+                    ? `0 0 ${(config.callConfig?.orb?.glowIntensity || 0.6) * 30}px ${config.callConfig?.colors?.primary || config.primaryColor}80`
+                    : undefined,
+                }}
+                aria-label="Start call"
+              >
+                <Phone className="w-6 h-6 text-white" />
+                {config.callConfig?.callButton?.animation && (
+                  <span
+                    className="absolute inset-0 animate-ping opacity-30"
+                    style={{
+                      backgroundColor: config.callConfig?.colors?.primary || config.primaryColor,
+                      borderRadius: config.callConfig?.callButton?.style === "pill" ? "30px" : "50%",
+                    }}
+                  />
+                )}
+              </button>
+            )}
+
+            {/* Chat Launcher Button - hidden when call widget is open */}
+            {config.enabledChat !== false && !isCallOpen && (
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="relative border-none cursor-pointer flex items-center justify-center shadow-xl transition-transform hover:scale-105"
+                style={{
+                  width: `${config.buttonSize || 60}px`,
+                  height: `${config.buttonSize || 60}px`,
                   backgroundColor: config.primaryColor,
                   borderRadius: `${config.launcherIconBorderRadius || 50}%`,
+                  boxShadow: config.launcherIconPulseGlow
+                    ? `0 0 20px ${config.primaryColor}80`
+                    : undefined,
                 }}
-              />
+                aria-label={isOpen ? "Close chat" : "Open chat"}
+              >
+                {isOpen ? (
+                  <X className="w-6 h-6 text-white" />
+                ) : (
+                  <>
+                    {config.launcherIcon === "chat" && <MessageCircle className="w-7 h-7 text-white" />}
+                    {config.launcherIcon === "message" && <MessageSquare className="w-7 h-7 text-white" />}
+                    {config.launcherIcon === "help" && <HelpCircle className="w-7 h-7 text-white" />}
+                    {config.launcherIcon === "sparkle" && <Sparkles className="w-7 h-7 text-white" />}
+                    {!["chat", "message", "help", "sparkle"].includes(config.launcherIcon || "") && (
+                      <MessageCircle className="w-7 h-7 text-white" />
+                    )}
+                  </>
+                )}
+                {config.launcherIconPulseGlow && !isOpen && (
+                  <span
+                    className="absolute inset-0 animate-ping opacity-30"
+                    style={{
+                      backgroundColor: config.primaryColor,
+                      borderRadius: `${config.launcherIconBorderRadius || 50}%`,
+                    }}
+                  />
+                )}
+              </button>
             )}
-          </button>
+          </div>
         ) : (
           <div
             className="bg-gray-300 animate-pulse"

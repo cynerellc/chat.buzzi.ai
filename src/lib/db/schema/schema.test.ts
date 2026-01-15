@@ -139,11 +139,6 @@ describe("Database Schema", () => {
       expect(getTableName(schema.integrations)).toBe("integrations");
     });
 
-    it("should export webhooks table", () => {
-      expect(schema.webhooks).toBeDefined();
-      expect(getTableName(schema.webhooks)).toBe("webhooks");
-    });
-
     it("should export invitations table", () => {
       expect(schema.invitations).toBeDefined();
       expect(getTableName(schema.invitations)).toBe("invitations");
@@ -162,11 +157,6 @@ describe("Database Schema", () => {
     it("should export hourly analytics table", () => {
       expect(schema.hourlyAnalytics).toBeDefined();
       expect(getTableName(schema.hourlyAnalytics)).toBe("hourly_analytics");
-    });
-
-    it("should export platform analytics table", () => {
-      expect(schema.platformAnalytics).toBeDefined();
-      expect(getTableName(schema.platformAnalytics)).toBe("platform_analytics");
     });
   });
 
@@ -225,19 +215,14 @@ describe("Database Schema", () => {
         email: "test@test.com",
         emailVerified: null,
         name: "Test User",
-        image: null,
         hashedPassword: null,
         role: "chatapp.user",
         status: "active",
         phone: null,
         avatarUrl: null,
-        permissions: {},
         settings: {},
         activeCompanyId: null,
-        isActive: true,
         lastLoginAt: null,
-        ipAllowlist: [],
-        accessExpiresAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         deletedAt: null,
@@ -251,7 +236,7 @@ describe("Database Schema", () => {
         companyId: "company-id",
         packageId: null,
         packageType: "single_agent",
-        chatbotType: "chat",
+        enabledChat: true,
         isCustomPackage: false,
         name: "Test Agent",
         description: null,
@@ -272,6 +257,30 @@ describe("Database Schema", () => {
         escalationEnabled: true,
         escalationTriggers: [],
         variableValues: {},
+        enabledCall: false,
+        callModelId: null,
+        callAiProvider: null,
+        voiceConfig: {},
+        widgetConfig: {
+          chat: {
+            theme: "light",
+            position: "bottom-right",
+            primaryColor: "#6437F3",
+          },
+          call: {
+            enabled: true,
+            position: "bottom-right",
+            callButton: { style: "orb", size: 60, animation: true },
+            orb: { glowIntensity: 0.6, pulseSpeed: 2 },
+            callDialog: {
+              width: 400,
+              showVisualizer: true,
+              visualizerStyle: "waveform",
+              showTranscript: true,
+            },
+            controls: { showMuteButton: true, showEndCallButton: true },
+          },
+        },
         totalConversations: 0,
         avgResolutionTime: null,
         satisfactionScore: null,
@@ -299,9 +308,7 @@ describe("Database Schema", () => {
         resolvedAt: null,
         resolvedBy: null,
         sentiment: null,
-        sentimentHistory: [],
         satisfactionRating: null,
-        satisfactionFeedback: null,
         sessionId: null,
         pageUrl: null,
         referrer: null,

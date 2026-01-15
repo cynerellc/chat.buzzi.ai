@@ -93,7 +93,7 @@ export function UserMenu() {
         <button className="flex items-center gap-2 p-1 rounded-lg hover:bg-default-100 transition-colors">
           <UserAvatar
             name={user.name}
-            src={user.image ?? undefined}
+            src={user.avatarUrl ?? undefined}
             size="sm"
           />
           <div className="hidden md:block text-left">

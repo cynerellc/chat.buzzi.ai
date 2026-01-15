@@ -44,7 +44,6 @@ export async function GET(
         id: users.id,
         name: users.name,
         avatarUrl: users.avatarUrl,
-        image: users.image,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -52,7 +51,7 @@ export async function GET(
 
     return NextResponse.json({
       name: user?.name || "Support Agent",
-      avatarUrl: user?.avatarUrl || user?.image || null,
+      avatarUrl: user?.avatarUrl || null,
     });
   } catch (error) {
     console.error("Agent info error:", error);

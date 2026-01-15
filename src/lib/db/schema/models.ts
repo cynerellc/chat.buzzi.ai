@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { aiModelProviderEnum, chatappSchema } from "./enums";
+import { aiModelProviderEnum, aiModelTypeEnum, chatappSchema } from "./enums";
 
 // ============================================================================
 // Model Settings Schema Types
@@ -55,6 +55,10 @@ export const aiModels = chatappSchema.table(
     modelId: varchar("model_id", { length: 100 }).notNull().unique(),
     displayName: varchar("display_name", { length: 100 }).notNull(),
     description: text("description"),
+
+    // Model Capabilities
+    modelType: aiModelTypeEnum("model_type").default("chat").notNull(), // chat, call, or both
+    supportsAudio: boolean("supports_audio").default(false).notNull(), // Real-time audio streaming
 
     // Token Limits
     inputLimit: integer("input_limit").notNull(), // Max input tokens

@@ -107,6 +107,8 @@ export interface CreateModelData {
   modelId: string;
   displayName: string;
   description?: string;
+  modelType?: "chat" | "call" | "both";
+  supportsAudio?: boolean;
   inputLimit: number;
   outputLimit: number;
   inputPricePerMillion?: string;
@@ -140,6 +142,8 @@ export interface UpdateModelData {
   modelId?: string;
   displayName?: string;
   description?: string | null;
+  modelType?: "chat" | "call" | "both";
+  supportsAudio?: boolean;
   inputLimit?: number;
   outputLimit?: number;
   inputPricePerMillion?: string | null;
