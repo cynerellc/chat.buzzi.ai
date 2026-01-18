@@ -31,7 +31,7 @@ import {
   addToast,
 } from "@/components/ui";
 import { UploadModal } from "@/components/company-admin/knowledge/upload-modal";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 
 interface CompanyFile {
   id: string;
@@ -107,7 +107,7 @@ function formatDate(dateString: string): string {
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function FilesPage() {
-  useSetPageTitle("Files");
+  useSetBreadcrumbs([{ label: "Files" }]);
   const [filters, setFilters] = useState({
     page: 1,
     limit: 20,

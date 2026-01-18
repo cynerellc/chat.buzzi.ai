@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { requireMasterAdmin } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { chatbots, type AgentListItem } from "@/lib/db/schema";
+import { chatbots, chatbotPackages, type AgentListItem } from "@/lib/db/schema";
 import { createAdkExecutor } from "@/lib/ai/execution/adk-executor";
 import { createVariableContext } from "@/lib/ai/types";
 import type { AgentContext } from "@/lib/ai/types";
@@ -32,10 +32,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.log(`[TestRoute] - companyId: ${companyId}`);
     console.log(`[TestRoute] - chatbotId: ${chatbotId}`);
 
-    // Get the chatbot
-    const [chatbot] = await db
-      .select()
+    // Get the chatbot with package slug
+    const [chatbotResult] = await db
+      .select({
+        chatbot: chatbots,
+        packageSlug: chatbotPackages.slug,
+      })
       .from(chatbots)
+      .leftJoin(chatbotPackages, eq(chatbots.packageId, chatbotPackages.id))
       .where(
         and(
           eq(chatbots.id, chatbotId),
@@ -45,12 +49,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
       .limit(1);
 
-    if (!chatbot) {
+    if (!chatbotResult) {
       return new Response(JSON.stringify({ error: "Chatbot not found" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    const chatbot = chatbotResult.chatbot;
+    const packageSlug = chatbotResult.packageSlug;
 
     const body: TestMessageRequest = await request.json();
 
@@ -114,7 +121,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               knowledgeBaseEnabled: selectedAgent.knowledge_base_enabled ?? false,
               knowledgeCategories: selectedAgent.knowledge_categories ?? [],
               historyLength: history.length,
-              packageId: chatbot.packageId ?? null,
+              packageSlug: packageSlug ?? null,
             });
           }
 
@@ -147,8 +154,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           let fullContent = "";
 
           // Create AdkExecutor for all chatbots (package-based execution)
-          if (!chatbot.packageId) {
-            sendEvent("error", { message: "Chatbot requires a package ID" });
+          if (!packageSlug) {
+            sendEvent("error", { message: "Chatbot requires a package" });
             controller.close();
             return;
           }
@@ -156,7 +163,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           const adkExecutor = createAdkExecutor({
             chatbotId,
             companyId,
-            packageId: chatbot.packageId,
+            packageSlug,
             agentConfig: {
               systemPrompt: selectedAgent.default_system_prompt,
               modelId: selectedAgent.default_model_id,

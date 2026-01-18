@@ -6,13 +6,14 @@ import { useState, useEffect } from "react";
 
 import { fadeIn, smoothTransition } from "@/lib/animations";
 import { cn } from "@/lib/utils";
-import { IconButton, Tooltip, Input } from "@/components/ui";
+import { IconButton, Tooltip, Input, Breadcrumbs } from "@/components/ui";
+import type { BreadcrumbItem } from "@/contexts/page-context";
 
 import { NotificationDropdown } from "./notification-dropdown";
 import { UserMenu } from "./user-menu";
 
 export interface HeaderProps {
-  pageTitle?: string;
+  breadcrumbs?: BreadcrumbItem[];
   showSearch?: boolean;
   showHelp?: boolean;
   showNotifications?: boolean;
@@ -22,7 +23,7 @@ export interface HeaderProps {
 }
 
 export function Header({
-  pageTitle,
+  breadcrumbs,
   showSearch = true,
   showHelp = true,
   showNotifications = true,
@@ -77,11 +78,16 @@ export function Header({
         />
       )}
 
-      {/* Page Title */}
-      {pageTitle && (
-        <h1 className="text-sm font-medium tracking-tight text-foreground">
-          {pageTitle}
-        </h1>
+      {/* Breadcrumbs */}
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <Breadcrumbs
+          className="text-sm"
+          items={breadcrumbs.map((crumb, index) => ({
+            label: crumb.label,
+            href: crumb.href,
+            isCurrent: index === breadcrumbs.length - 1,
+          }))}
+        />
       )}
 
       {/* Spacer */}

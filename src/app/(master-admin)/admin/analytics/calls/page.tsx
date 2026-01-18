@@ -13,7 +13,7 @@ import {
   CallsByStatusList,
 } from "@/components/master-admin/analytics/calls";
 import { Button, Select } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useCallAnalytics } from "@/hooks/master-admin";
 
 const DATE_RANGE_OPTIONS = [
@@ -25,7 +25,10 @@ const DATE_RANGE_OPTIONS = [
 ];
 
 export default function CallAnalyticsPage() {
-  useSetPageTitle("Call Analytics");
+  useSetBreadcrumbs([
+    { label: "Analytics", href: "/admin/analytics" },
+    { label: "Call Analytics" },
+  ]);
   const [days, setDays] = useState(30);
 
   const { data, isLoading } = useCallAnalytics({ days, limit: 10 });
@@ -114,11 +117,6 @@ export default function CallAnalyticsPage() {
         title="Call Analytics"
         description="Monitor voice call metrics across the platform"
         showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Analytics", href: "/admin/analytics" },
-          { label: "Calls" },
-        ]}
         icon={<Phone className="text-primary" />}
         actions={
           <div className="flex items-center gap-3">

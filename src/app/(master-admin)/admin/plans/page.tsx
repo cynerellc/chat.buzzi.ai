@@ -6,11 +6,11 @@ import { useState } from "react";
 import { PageHeader } from "@/components/layouts";
 import { PlanEditorModal, PlansGrid } from "@/components/master-admin/plans";
 import { Button } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { usePlans, type PlanListItem } from "@/hooks/master-admin";
 
 export default function PlansPage() {
-  useSetPageTitle("Subscription Plans");
+  useSetBreadcrumbs([{ label: "Subscription Plans" }]);
   const { plans, isLoading, refresh } = usePlans();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanListItem | null>(null);
@@ -40,11 +40,6 @@ export default function PlansPage() {
       <PageHeader
         title="Subscription Plans"
         description="Manage subscription plans and pricing for your customers"
-        showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Plans" },
-        ]}
         actions={
           <Button
             color="primary"

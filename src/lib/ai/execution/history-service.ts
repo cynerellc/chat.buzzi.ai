@@ -46,44 +46,60 @@ export interface ConversationHistory {
 }
 
 // ============================================================================
-// In-Memory Cache (will be replaced with Redis in production)
+// In-Memory Cache with LRU Eviction and Background Cleanup
 // ============================================================================
 
-class HistoryCache {
-  private cache: Map<string, ConversationHistory> = new Map();
-  private readonly maxCacheSize = 1000;
-  private readonly ttlMs: number;
+interface CacheEntry {
+  history: ConversationHistory;
+  lastAccess: number; // Timestamp for LRU tracking
+}
 
-  constructor(ttlMs: number = 3600000) {
-    // Default 1 hour TTL
-    this.ttlMs = ttlMs;
+class HistoryCache {
+  private cache: Map<string, CacheEntry> = new Map();
+  private readonly maxCacheSize: number;
+  private readonly ttlMs: number;
+  private readonly cleanupIntervalMs: number;
+  private cleanupTimer: NodeJS.Timeout | null = null;
+
+  constructor(options: {
+    ttlMs?: number;
+    maxCacheSize?: number;
+    cleanupIntervalMs?: number;
+  } = {}) {
+    this.ttlMs = options.ttlMs ?? 3600000; // Default 1 hour TTL
+    this.maxCacheSize = options.maxCacheSize ?? 1000;
+    this.cleanupIntervalMs = options.cleanupIntervalMs ?? 5 * 60 * 1000; // Default 5 min cleanup
+    this.startCleanupTimer();
   }
 
   get(conversationId: string): ConversationHistory | undefined {
     const entry = this.cache.get(conversationId);
     if (entry) {
-      // Check if expired
-      const age = Date.now() - entry.updatedAt.getTime();
-      if (age > this.ttlMs) {
+      const now = Date.now();
+      // Check if expired based on last access time
+      if (now - entry.lastAccess > this.ttlMs) {
         this.cache.delete(conversationId);
         return undefined;
       }
+      // Update last access time (LRU tracking)
+      entry.lastAccess = now;
+      return entry.history;
     }
-    return entry;
+    return undefined;
   }
 
   set(conversationId: string, history: ConversationHistory): void {
-    // Evict oldest entries if cache is full
-    if (this.cache.size >= this.maxCacheSize) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey) {
-        this.cache.delete(oldestKey);
-      }
+    // Evict LRU entries if cache is full
+    if (this.cache.size >= this.maxCacheSize && !this.cache.has(conversationId)) {
+      this.evictLeastRecentlyUsed();
     }
 
     this.cache.set(conversationId, {
-      ...history,
-      updatedAt: new Date(),
+      history: {
+        ...history,
+        updatedAt: new Date(),
+      },
+      lastAccess: Date.now(),
     });
   }
 
@@ -93,6 +109,81 @@ class HistoryCache {
 
   clear(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Shutdown the cache and stop background cleanup
+   */
+  shutdown(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    this.cache.clear();
+  }
+
+  /**
+   * Get cache statistics for monitoring
+   */
+  getStats(): { size: number; maxSize: number; ttlMs: number } {
+    return {
+      size: this.cache.size,
+      maxSize: this.maxCacheSize,
+      ttlMs: this.ttlMs,
+    };
+  }
+
+  /**
+   * Start background cleanup timer
+   */
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) return;
+
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupExpiredEntries();
+    }, this.cleanupIntervalMs);
+
+    // Ensure timer doesn't prevent process exit
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
+    }
+  }
+
+  /**
+   * Remove all expired entries
+   */
+  private cleanupExpiredEntries(): void {
+    const now = Date.now();
+    let evicted = 0;
+
+    for (const [conversationId, entry] of this.cache.entries()) {
+      if (now - entry.lastAccess > this.ttlMs) {
+        this.cache.delete(conversationId);
+        evicted++;
+      }
+    }
+
+    if (evicted > 0) {
+      console.log(`[HistoryCache] Cleanup: evicted ${evicted} expired entries, remaining: ${this.cache.size}`);
+    }
+  }
+
+  /**
+   * Evict the least recently used entry
+   */
+  private evictLeastRecentlyUsed(): void {
+    let oldest: { conversationId: string; lastAccess: number } | null = null;
+
+    for (const [conversationId, entry] of this.cache.entries()) {
+      if (!oldest || entry.lastAccess < oldest.lastAccess) {
+        oldest = { conversationId, lastAccess: entry.lastAccess };
+      }
+    }
+
+    if (oldest) {
+      this.cache.delete(oldest.conversationId);
+      console.log(`[HistoryCache] Evicted LRU entry ${oldest.conversationId} (cache at capacity: ${this.maxCacheSize})`);
+    }
   }
 }
 
@@ -106,7 +197,18 @@ export class HistoryService {
 
   constructor(config: HistoryConfig) {
     this.config = config;
-    this.cache = new HistoryCache(config.ttlSeconds * 1000);
+    this.cache = new HistoryCache({
+      ttlMs: config.ttlSeconds * 1000,
+      maxCacheSize: 1000,
+      cleanupIntervalMs: 5 * 60 * 1000, // 5 minutes
+    });
+  }
+
+  /**
+   * Shutdown the history service and release resources
+   */
+  shutdown(): void {
+    this.cache.shutdown();
   }
 
   /**

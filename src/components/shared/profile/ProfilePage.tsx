@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Save, User } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { Card, Button, Spinner, EmptyState } from "@/components/ui";
 import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,7 +23,7 @@ interface UserProfile {
 }
 
 export function ProfilePage() {
-  useSetPageTitle("My Profile");
+  useSetBreadcrumbs([{ label: "Profile" }]);
   const { refreshSession } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);

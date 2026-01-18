@@ -18,7 +18,7 @@ import {
 import { useState } from "react";
 
 import { PageHeader } from "@/components/layouts/page-header";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useAnalytics } from "@/hooks/company";
 import {
   Button,
@@ -115,7 +115,7 @@ function formatDuration(seconds: number | null): string {
 }
 
 export default function AnalyticsPage() {
-  useSetPageTitle("Analytics");
+  useSetBreadcrumbs([{ label: "Analytics" }]);
   const [days, setDays] = useState(30);
   const { summary, dailyMetrics, topTopics, channelBreakdown, dateRange, isLoading } =
     useAnalytics(days);

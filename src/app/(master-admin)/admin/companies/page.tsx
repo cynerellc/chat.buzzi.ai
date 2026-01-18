@@ -13,7 +13,7 @@ import {
   EditCompanyModal,
 } from "@/components/master-admin/companies";
 import { Button, Card, ConfirmationDialog } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   deleteCompanies,
   updateCompaniesStatus,
@@ -24,7 +24,7 @@ import {
 import type { SortDescriptor } from "@/components/ui";
 
 export default function CompaniesPage() {
-  useSetPageTitle("Companies");
+  useSetBreadcrumbs([{ label: "Companies" }]);
   // Filters state
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -141,10 +141,6 @@ export default function CompaniesPage() {
       <PageHeader
         title="Companies"
         description="Manage all companies on the platform"
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Companies" },
-        ]}
         actions={
           <Button
             color="primary"

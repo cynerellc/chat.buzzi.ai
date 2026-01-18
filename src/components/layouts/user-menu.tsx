@@ -29,7 +29,7 @@ function getProfileUrl(pathname: string, isMasterAdmin: boolean): string {
   }
 
   // Default to company admin profile
-  return "/dashboard/profile";
+  return "/user/profile";
 }
 
 export function UserMenu() {

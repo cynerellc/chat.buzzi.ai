@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   Card,
   Badge,
@@ -107,7 +107,7 @@ interface ConversationsResponse {
 type FilterType = "all" | "waiting" | "active" | "resolved" | "starred" | "unassigned";
 
 export default function SupportAgentInbox() {
-  useSetPageTitle("Inbox");
+  useSetBreadcrumbs([{ label: "Inbox" }]);
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [stats, setStats] = useState<Stats>({

@@ -1,9 +1,9 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { CodeEditor } from "@/components/shared/code-editor";
 
 interface CodeEditorPageProps {
@@ -11,7 +11,6 @@ interface CodeEditorPageProps {
 }
 
 export default function CodeEditorPage({ params }: CodeEditorPageProps) {
-  useSetPageTitle("Code Editor");
   const { packageId } = use(params);
   const router = useRouter();
 
@@ -41,6 +40,14 @@ export default function CodeEditorPage({ params }: CodeEditorPageProps) {
       cancelled = true;
     };
   }, [packageId]);
+
+  const breadcrumbs = useMemo(() => [
+    { label: "Chatbot Packages", href: "/admin/packages" },
+    { label: packageName, href: `/admin/packages/${packageId}` },
+    { label: "Code Editor" },
+  ], [packageName, packageId]);
+
+  useSetBreadcrumbs(breadcrumbs);
 
   return (
     <CodeEditor

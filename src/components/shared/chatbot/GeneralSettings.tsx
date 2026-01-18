@@ -144,9 +144,9 @@ export function GeneralSettings({
     }
   }, [chatbot, callModels]);
 
-  // Fetch categories when call is enabled and user is master admin
+  // Fetch categories when call is enabled (for both master admin and company admin)
   useEffect(() => {
-    if (isMasterAdmin && formData.enabledCall && categoriesApiBase) {
+    if (formData.enabledCall && categoriesApiBase) {
       setIsCategoriesLoading(true);
       fetch(`${categoriesApiBase}/knowledge/categories`)
         .then((res) => res.json())
@@ -161,7 +161,7 @@ export function GeneralSettings({
           setIsCategoriesLoading(false);
         });
     }
-  }, [isMasterAdmin, formData.enabledCall, categoriesApiBase]);
+  }, [formData.enabledCall, categoriesApiBase]);
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -249,12 +249,17 @@ export function GeneralSettings({
           },
         };
       } else {
-        // Company admin can save basic info + voiceConfig (but NOT callModelId)
+        // Company admin can save basic info + voiceConfig + knowledge base settings (but NOT callModelId or callSystemPrompt)
         payload = {
           name: formData.name,
           description: formData.description,
           status: formData.status,
           voiceConfig, // Company admin can edit voice
+          settings: {
+            callKnowledgeBaseEnabled: formData.callKnowledgeBaseEnabled,
+            callKnowledgeCategories: formData.callKnowledgeCategories,
+            callKnowledgeBaseThreshold: formData.callKnowledgeBaseThreshold,
+          },
         };
       }
 
@@ -291,8 +296,8 @@ export function GeneralSettings({
 
   if (!chatbot) return null;
 
-  // Check if tabs should be shown
-  const showTabs = isMasterAdmin && formData.enabledCall && chatbot.packageEnabledCall !== false;
+  // Check if tabs should be shown - now also for company admin when call is enabled
+  const showTabs = formData.enabledCall && chatbot.packageEnabledCall !== false;
 
   // ============================================================
   // Tab Content (as JSX elements, NOT function components)
@@ -397,32 +402,32 @@ export function GeneralSettings({
       {/* Call Model & Voice Card */}
       <Card className="p-6">
         <FormSection title="Voice Settings" description="Configure the AI model and voice for voice calls">
-          {/* Call Model Dropdown */}
-          <FormFieldWrapper
-            label="Call Model"
-            description={isMasterAdmin ? "Select the AI model to use for voice calls" : "AI model configured by administrator"}
-          >
-            <Select
-              selectedKeys={formData.callModelId ? new Set([formData.callModelId]) : new Set()}
-              onSelectionChange={(keys) => {
-                if (!isMasterAdmin) return; // Company admin cannot change
-                const modelId = Array.from(keys)[0] as string;
-                setFormData((prev) => ({ ...prev, callModelId: modelId }));
-                // Set default voice from model's settingsSchema
-                const model = callModels?.find((m) => m.id === modelId);
-                const defaultVoice = model?.settingsSchema?.voice?.default as string | undefined;
-                setFormData((prev) => ({ ...prev, selectedVoice: defaultVoice || null }));
-                // Stop any playing preview
-                stopPreview();
-              }}
-              options={(callModels || []).map((m) => ({
-                value: m.id,
-                label: m.displayName,
-              }))}
-              placeholder="Select a call model"
-              isDisabled={!isMasterAdmin}
-            />
-          </FormFieldWrapper>
+          {/* Call Model Dropdown - Only show for Master Admin */}
+          {isMasterAdmin && (
+            <FormFieldWrapper
+              label="Call Model"
+              description="Select the AI model to use for voice calls"
+            >
+              <Select
+                selectedKeys={formData.callModelId ? new Set([formData.callModelId]) : new Set()}
+                onSelectionChange={(keys) => {
+                  const modelId = Array.from(keys)[0] as string;
+                  setFormData((prev) => ({ ...prev, callModelId: modelId }));
+                  // Set default voice from model's settingsSchema
+                  const model = callModels?.find((m) => m.id === modelId);
+                  const defaultVoice = model?.settingsSchema?.voice?.default as string | undefined;
+                  setFormData((prev) => ({ ...prev, selectedVoice: defaultVoice || null }));
+                  // Stop any playing preview
+                  stopPreview();
+                }}
+                options={(callModels || []).map((m) => ({
+                  value: m.id,
+                  label: m.displayName,
+                }))}
+                placeholder="Select a call model"
+              />
+            </FormFieldWrapper>
+          )}
 
           {/* Voice Selection with Preview */}
           {formData.callModelId && voiceOptions.length > 0 && (
@@ -475,25 +480,27 @@ export function GeneralSettings({
         </FormSection>
       </Card>
 
-      {/* Call System Prompt Card */}
-      <Card className="p-6">
-        <FormSection
-          title="System Prompt"
-          description="System prompt used during voice calls. This defines the AI's behavior, personality, and capabilities for voice interactions."
-        >
-          <FormFieldWrapper label="Call System Prompt">
-            <Textarea
-              value={formData.callSystemPrompt}
-              onChange={(e) => setFormData((prev) => ({ ...prev, callSystemPrompt: e.target.value }))}
-              placeholder="You are a helpful voice assistant..."
-              rows={8}
-              className="font-mono text-sm"
-            />
-          </FormFieldWrapper>
-        </FormSection>
-      </Card>
+      {/* Call System Prompt Card - Only show for Master Admin */}
+      {isMasterAdmin && (
+        <Card className="p-6">
+          <FormSection
+            title="System Prompt"
+            description="System prompt used during voice calls. This defines the AI's behavior, personality, and capabilities for voice interactions."
+          >
+            <FormFieldWrapper label="Call System Prompt">
+              <Textarea
+                value={formData.callSystemPrompt}
+                onChange={(e) => setFormData((prev) => ({ ...prev, callSystemPrompt: e.target.value }))}
+                placeholder="You are a helpful voice assistant..."
+                rows={8}
+                className="font-mono text-sm"
+              />
+            </FormFieldWrapper>
+          </FormSection>
+        </Card>
+      )}
 
-      {/* Knowledge Base Card */}
+      {/* Knowledge Base Card - Show for both Master Admin and Company Admin */}
       <Card className="p-6">
         <FormSection
           title="Knowledge Base"
@@ -539,7 +546,7 @@ export function GeneralSettings({
                   <div className="space-y-2">
                     <Slider
                       value={[formData.callKnowledgeBaseThreshold]}
-                      onValueChange={([value]) => setFormData((prev) => ({ ...prev, callKnowledgeBaseThreshold: value }))}
+                      onValueChange={(values) => setFormData((prev) => ({ ...prev, callKnowledgeBaseThreshold: values[0] ?? prev.callKnowledgeBaseThreshold }))}
                       min={0.05}
                       max={0.95}
                       step={0.05}

@@ -52,6 +52,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   isClearable?: boolean;
   onValueChange?: (value: string) => void;
   onClear?: () => void;
+  name?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -78,10 +79,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       onValueChange,
       onClear,
       value,
+      name,
+      id,
       ...props
     },
     ref
   ) => {
+    const inputId = id || name;
     const hasError = isInvalid || !!errorMessage;
     const helpText = errorMessage || helperText || description;
     const isFieldDisabled = disabled || isDisabled;
@@ -115,7 +119,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className={cn("space-y-2", className)}>
         {label && (
-          <Label>
+          <Label htmlFor={inputId}>
             {label}
             {isFieldRequired && <span className="text-destructive ml-1">*</span>}
           </Label>
@@ -128,6 +132,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           <input
             type={type}
+            id={inputId}
+            name={name}
             className={cn(
               inputVariants({ hasError }),
               leftContent && "pl-10",

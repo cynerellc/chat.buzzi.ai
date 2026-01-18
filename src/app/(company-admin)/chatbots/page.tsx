@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 
 import { Button, Tabs, type TabItem, addToast } from "@/components/ui";
 import { AgentsGrid } from "@/components/company-admin/agents/agents-grid";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useChatbots } from "@/hooks/company";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -18,7 +18,7 @@ const STATUS_TABS: TabItem[] = [
 ];
 
 export default function ChatbotsPage() {
-  useSetPageTitle("Chatbots");
+  useSetBreadcrumbs([{ label: "Chatbots" }]);
   const { isMasterAdmin } = useAuth();
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");

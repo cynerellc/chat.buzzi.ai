@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui";
 import { PageHeader } from "@/components/layouts/page-header";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useBilling } from "@/hooks/company";
 
 const statusColors: Record<string, "success" | "warning" | "danger" | "default" | "info"> = {
@@ -71,7 +71,7 @@ function getDaysRemaining(dateString: string) {
 }
 
 export default function BillingPage() {
-  useSetPageTitle("Billing");
+  useSetBreadcrumbs([{ label: "Billing" }]);
   const { subscription, currentPlan, availablePlans, paymentHistory, isLoading } = useBilling();
 
   if (isLoading) {

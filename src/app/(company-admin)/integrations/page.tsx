@@ -20,7 +20,7 @@ import {
   Tabs,
   type TabItem,
 } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   AlertTriangle,
@@ -103,7 +103,7 @@ type Provider = keyof typeof providerConfig;
 // ============================================================================
 
 export default function IntegrationsPage() {
-  useSetPageTitle("Integration Accounts");
+  useSetBreadcrumbs([{ label: "Integration Accounts" }]);
 
   const { accounts, isLoading, mutate } = useIntegrationAccounts();
   const { createAccount, isCreating } = useCreateIntegrationAccount();

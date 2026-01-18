@@ -8,6 +8,10 @@
  * - COMPANY_NAME: Company name for quotation header
  * - SALES_EMAIL: Contact email for quotation inquiries
  * - CALENDAR_LINK: Link for scheduling follow-up meetings
+ *
+ * Authentication:
+ * - This tool requires authentication
+ * - Customer name and email are loaded from the authenticated session
  */
 
 import { tool } from "@langchain/core/tools";
@@ -17,8 +21,8 @@ import type { AgentContext } from "@/lib/ai/types";
 const generateQuotationToolBase = tool(
   async (
     {
-      customerName,
-      customerEmail,
+      customerName: customerNameParam,
+      customerEmail: customerEmailParam,
       customerCompany,
       items,
       currency = "USD",
@@ -30,11 +34,40 @@ const generateQuotationToolBase = tool(
     },
     { configurable }
   ) => {
-    // Access package variables from context
+    // Access package variables and auth session from context
     const context = configurable?.agentContext as AgentContext | undefined;
     const companyName = context?.variables.get("COMPANY_NAME") || "Our Company";
     const salesEmail = context?.variables.get("SALES_EMAIL");
     const calendarLink = context?.variables.get("CALENDAR_LINK");
+
+    // =========================================================================
+    // Authentication Required
+    // This tool requires the user to be authenticated before generating quotes
+    // =========================================================================
+    const authSession = context?.authSession;
+    if (!authSession) {
+      return "Error: Authentication required. Please log in to generate a quotation. Use phone number +911111111111 and OTP 222222 for demo.";
+    }
+
+    // Log authenticated session info
+    console.log("[GenerateQuotation] Authenticated user:", {
+      userId: authSession.userId,
+      name: authSession.name,
+      email: authSession.email,
+    });
+
+    // Load customer info from authenticated session (always use session values)
+    const customerName = authSession.name || customerNameParam;
+    const customerEmail = authSession.email || customerEmailParam;
+
+    // Validate that we have customer info (should always have from session)
+    if (!customerName) {
+      return "Error: Customer name not found in session. Please re-authenticate.";
+    }
+    if (!customerEmail) {
+      return "Error: Customer email not found in session. Please re-authenticate.";
+    }
+
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(customerEmail)) {
@@ -143,10 +176,11 @@ const generateQuotationToolBase = tool(
     description:
       "Generate a formal quotation for a customer based on their requirements. " +
       "Use this when a customer requests pricing, a quote, or a proposal for products/services. " +
-      "Include all relevant line items with quantities and pricing.",
+      "Include all relevant line items with quantities and pricing. " +
+      "Customer name and email are loaded from the authenticated session if available.",
     schema: z.object({
-      customerName: z.string().describe("Customer's name for the quotation header"),
-      customerEmail: z.string().describe("Customer's email address"),
+      customerName: z.string().optional().describe("Customer's name (optional - loaded from session if authenticated)"),
+      customerEmail: z.string().optional().describe("Customer's email address (optional - loaded from session if authenticated)"),
       customerCompany: z.string().optional().describe("Customer's company name"),
       items: z
         .array(

@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import useSWR from "swr";
 
 import { PageHeader } from "@/components/layouts";
@@ -25,7 +25,7 @@ import {
   UserAvatar,
   type BadgeVariant,
 } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { startImpersonation } from "@/hooks/master-admin";
 
 const fetcher = async (url: string) => {
@@ -64,7 +64,6 @@ const roleBadgeVariants: Record<string, BadgeVariant> = {
 };
 
 export default function ImpersonationPage({ params }: ImpersonationPageProps) {
-  useSetPageTitle("Impersonate User");
   const { companyId } = use(params);
   const router = useRouter();
   const [selectedUser, setSelectedUser] = useState<CompanyUser | null>(null);
@@ -82,6 +81,14 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
   const { data: usersData, isLoading: usersLoading } = useSWR<{
     users: CompanyUser[];
   }>(`/api/master-admin/companies/${companyId}/users`, fetcher);
+
+  const breadcrumbs = useMemo(() => [
+    { label: "Companies", href: "/admin/companies" },
+    { label: companyData?.name ?? "...", href: `/admin/companies/${companyId}/overview` },
+    { label: "Impersonate" },
+  ], [companyData?.name, companyId]);
+
+  useSetBreadcrumbs(breadcrumbs);
 
   const handleStartImpersonation = async () => {
     if (!selectedUser) return;
@@ -154,12 +161,6 @@ export default function ImpersonationPage({ params }: ImpersonationPageProps) {
         title={`Impersonate User - ${companyData.name}`}
         description="Select a user from this company to impersonate"
         showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Companies", href: "/admin/companies" },
-          { label: companyData.name, href: `/admin/companies/${companyId}` },
-          { label: "Impersonate" },
-        ]}
       />
 
       {/* Warning Banner */}

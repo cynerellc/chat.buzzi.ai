@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   Card,
   Badge,
@@ -56,7 +56,7 @@ interface ResponseFormData {
 type ScopeFilter = "all" | "personal" | "company";
 
 export default function CannedResponsesPage() {
-  useSetPageTitle("Canned Responses");
+  useSetBreadcrumbs([{ label: "Canned Responses" }]);
   const [responses, setResponses] = useState<CannedResponse[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);

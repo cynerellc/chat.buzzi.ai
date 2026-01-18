@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   Card,
   Button,
@@ -90,7 +90,6 @@ interface CustomerProfileData {
 type TabFilter = "all" | "active" | "resolved";
 
 export default function CustomerProfilePage() {
-  useSetPageTitle("Customer Profile");
   const params = useParams();
   const router = useRouter();
   const customerId = params.customerId as string;
@@ -99,6 +98,15 @@ export default function CustomerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<TabFilter>("all");
+
+  const breadcrumbs = useMemo(
+    () => [
+      { label: "Customers", href: "/inbox" },
+      { label: data?.customer?.name ?? "Customer" },
+    ],
+    [data?.customer?.name]
+  );
+  useSetBreadcrumbs(breadcrumbs);
 
   // Fetch customer data
   const fetchCustomer = useCallback(async () => {

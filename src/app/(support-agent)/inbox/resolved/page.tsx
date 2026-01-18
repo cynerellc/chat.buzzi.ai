@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layouts";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   Card,
   Badge,
@@ -81,7 +81,7 @@ const dateRangeOptions = [
 ];
 
 export default function ResolvedInboxPage() {
-  useSetPageTitle("Resolved");
+  useSetBreadcrumbs([{ label: "Inbox", href: "/inbox" }, { label: "Resolved" }]);
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);

@@ -2,7 +2,7 @@
 
 import { use } from "react";
 
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { ConversationDetailPage } from "@/components/shared/conversations";
 
 interface PageProps {
@@ -10,8 +10,12 @@ interface PageProps {
 }
 
 export default function ConversationDetail({ params }: PageProps) {
-  useSetPageTitle("Conversation");
   const { conversationId } = use(params);
+
+  useSetBreadcrumbs([
+    { label: "Conversations", href: "/conversations" },
+    { label: "Conversation" },
+  ]);
 
   return (
     <ConversationDetailPage

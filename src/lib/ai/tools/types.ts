@@ -66,6 +66,7 @@ export const BUILT_IN_TOOLS = {
   REQUEST_HUMAN_HANDOVER: "request_human_handover",
   GET_CURRENT_TIME: "get_current_time",
   CALCULATE: "calculate",
+  LOGOUT: "logout",
 } as const;
 
 export type BuiltInToolName = (typeof BUILT_IN_TOOLS)[keyof typeof BUILT_IN_TOOLS];

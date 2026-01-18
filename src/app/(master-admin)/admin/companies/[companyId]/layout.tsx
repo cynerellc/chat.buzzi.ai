@@ -1,11 +1,10 @@
 "use client";
 
-import { use, type ReactNode } from "react";
+import { use, useMemo, type ReactNode } from "react";
 
-import { PageHeader } from "@/components/layouts";
 import { CompanyMenuBar } from "@/components/master-admin/companies";
 import { Card, Skeleton } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useCompany, useCompanyChatbots } from "@/hooks/master-admin";
 
 import { CompanyContext } from "./company-context";
@@ -16,11 +15,17 @@ interface CompanyDetailsLayoutProps {
 }
 
 export default function CompanyDetailsLayout({ children, params }: CompanyDetailsLayoutProps) {
-  useSetPageTitle("Company Details");
   const { companyId } = use(params);
   const companyData = useCompany(companyId);
   const { company, isLoading } = companyData;
   const { chatbots } = useCompanyChatbots(companyId);
+
+  const breadcrumbs = useMemo(() => [
+    { label: "Companies", href: "/admin/companies" },
+    { label: company?.name ?? "..." },
+  ], [company?.name]);
+
+  useSetBreadcrumbs(breadcrumbs);
 
   if (isLoading) {
     return (
@@ -56,15 +61,6 @@ export default function CompanyDetailsLayout({ children, params }: CompanyDetail
         <div className="p-6 pb-0">
           {/* Menu Bar - Above breadcrumb */}
           <CompanyMenuBar companyId={companyId} chatbots={chatbots} companyName={company.name} />
-
-          <PageHeader
-            title=""
-            breadcrumbs={[
-              { label: "Admin", href: "/admin/dashboard" },
-              { label: "Companies", href: "/admin/companies" },
-              { label: company.name },
-            ]}
-          />
         </div>
 
         {/* Full-width Content Area */}

@@ -17,6 +17,10 @@ import { RAGService } from "../rag/service";
 import { HistoryService } from "./history-service";
 import { registerOpenAILlm } from "../adk/openai-llm";
 import { registerGeminiLlm } from "../adk/gemini-llm";
+import {
+  AuthInterceptor,
+  createAuthInterceptor,
+} from "./auth-interceptor";
 
 import type {
   AgentContext,
@@ -59,8 +63,8 @@ export interface AdkExecutorOptions {
   chatbotId: string;
   /** Company ID (for RAG filtering) */
   companyId: string;
-  /** Package ID (for loading package code) */
-  packageId: string;
+  /** Package slug (for loading package code, e.g., "sales-assistant") */
+  packageSlug: string;
   /** Agent configuration from database */
   agentConfig: {
     systemPrompt: string;
@@ -332,6 +336,41 @@ function createKnowledgeBaseTool(
   });
 }
 
+/**
+ * Logout tool schema
+ */
+const logoutSchema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    confirmation: {
+      type: Type.STRING,
+      description: "Confirmation message to show the user after logout",
+    },
+  },
+  required: [],
+};
+
+/**
+ * Create logout tool for ADK
+ */
+function createLogoutTool(): FunctionTool<Schema> {
+  return new FunctionTool<Schema>({
+    name: "logout",
+    description: "Log out the current user and clear their authentication session. Use this when the user explicitly requests to log out, sign out, or end their authenticated session.",
+    parameters: logoutSchema,
+    execute: async (params: unknown) => {
+      const { confirmation } = (params as { confirmation?: string }) || {};
+      // The actual logout is handled by the executor after this tool returns
+      // This tool just signals the intent to logout
+      return {
+        action: "logout",
+        confirmation: confirmation || "You have been logged out successfully.",
+        timestamp: new Date().toISOString(),
+      };
+    },
+  });
+}
+
 // ============================================================================
 // Session Adapter
 // ============================================================================
@@ -399,6 +438,7 @@ export class AdkExecutor {
   private history: HistoryService;
   private pkg: BuzziAgentPackage | null = null;
   private sessionAdapter: HistorySessionAdapter;
+  private authInterceptor: AuthInterceptor | null = null;
 
   // Caching for performance optimization
   private cachedAgent: LlmAgent | null = null;
@@ -439,26 +479,36 @@ export class AdkExecutor {
    */
   async initialize(): Promise<boolean> {
     const initSpan = profiler.startSpan("executor_init", "executor", {
-      packageId: this.options.packageId,
+      packageSlug: this.options.packageSlug,
     });
 
     try {
       // Try static registry first (for built-in/sample packages)
       const registrySpan = profiler.startSpan("executor_registry_lookup", "executor");
-      this.pkg = getPackage(this.options.packageId);
+      this.pkg = getPackage(this.options.packageSlug);
       registrySpan.end({ found: !!this.pkg });
 
       // If not found, try dynamic loader (for packages in storage)
       if (!this.pkg) {
-        console.log(`[AdkExecutor] Package ${this.options.packageId} not in registry, trying dynamic loader...`);
+        console.log(`[AdkExecutor] Package "${this.options.packageSlug}" not in registry, trying dynamic loader...`);
         const dynamicSpan = profiler.startSpan("executor_dynamic_load", "executor");
-        this.pkg = await loadPackage(this.options.packageId);
+        this.pkg = await loadPackage(this.options.packageSlug);
         dynamicSpan.end({ found: !!this.pkg });
       }
 
       if (!this.pkg) {
-        console.error(`[AdkExecutor] Failed to load package ${this.options.packageId}`);
+        console.error(`[AdkExecutor] Failed to load package "${this.options.packageSlug}"`);
         return false;
+      }
+
+      // Initialize auth interceptor if package has auth guard
+      if (this.pkg.authGuard) {
+        this.authInterceptor = createAuthInterceptor({
+          chatbotId: this.options.chatbotId,
+          companyId: this.options.companyId,
+          authGuard: this.pkg.authGuard,
+          authConfig: this.pkg.authConfig,
+        });
       }
 
       return true;
@@ -611,6 +661,15 @@ export class AdkExecutor {
       this.toolMessagesCache.set("search_knowledge_base", {
         executing: "Searching knowledge base...",
         completed: "Knowledge retrieved",
+      });
+    }
+
+    // Add logout tool if auth is configured for this package
+    if (this.pkg?.authGuard) {
+      adkTools.push(createLogoutTool());
+      this.toolMessagesCache.set("logout", {
+        executing: "Logging out...",
+        completed: "Logged out successfully",
       });
     }
 
@@ -876,7 +935,74 @@ export class AdkExecutor {
         }
       }
 
-    
+      // =========================================================================
+      // Auth Check
+      // Check authentication before processing message if package has auth guard
+      // =========================================================================
+      if (this.authInterceptor && options.context.endUserId) {
+        const authResult = await this.authInterceptor.checkAuth(
+          options.context.endUserId
+        );
+
+        // If auth is required but user is not authenticated
+        if (!authResult.proceed) {
+          // Permission denied (authenticated but wrong role)
+          if (authResult.permissionDenied) {
+            yield {
+              type: "permission_denied",
+              data: {
+                reason: authResult.permissionDenied.reason,
+                requiredRoles: authResult.permissionDenied.requiredRoles,
+              },
+              timestamp: Date.now(),
+            };
+            streamSpan.end({ authDenied: true });
+            return;
+          }
+
+          // Auth required - emit auth step
+          if (authResult.pendingAuth) {
+            yield {
+              type: "auth_required",
+              data: {
+                stepId: authResult.pendingAuth.step.id,
+                stepName: authResult.pendingAuth.step.name,
+                fields: authResult.pendingAuth.step.fields,
+                aiPrompt: authResult.pendingAuth.aiPrompt,
+                channel: options.context.channel,
+              },
+              timestamp: Date.now(),
+            };
+            streamSpan.end({ authRequired: true });
+            return;
+          }
+
+          // Unknown auth state - shouldn't happen
+          yield {
+            type: "error",
+            data: {
+              code: "AUTH_ERROR",
+              message: "Authentication required",
+              retryable: true,
+            },
+            timestamp: Date.now(),
+          };
+          streamSpan.end({ authError: true });
+          return;
+        }
+
+        // User is authenticated - add session to context for tools
+        if (authResult.authSession) {
+          options.context.authSession = {
+            userId: authResult.authSession.userId,
+            email: authResult.authSession.email,
+            name: authResult.authSession.name,
+            roles: authResult.authSession.roles,
+            expiresAt: authResult.authSession.expiresAt,
+            metadata: authResult.authSession.metadata,
+          };
+        }
+      }
 
       // Detailed timing for ADK executor internals
       const adkTimings: Record<string, number> = {};
@@ -1056,6 +1182,39 @@ export class AdkExecutor {
                 }
               }
 
+              // Check for logout request
+              if (toolName === "logout") {
+                const response = funcResp.response as { action?: string; confirmation?: string } | undefined;
+                if (response?.action === "logout") {
+                  // Clear auth session
+                  if (this.authInterceptor && options.context.endUserId) {
+                    try {
+                      await this.authInterceptor.logout(
+                        options.context.endUserId,
+                        options.context.conversationId,
+                        {
+                          channel: options.context.channel || "web",
+                          variables: options.context.variables || { get: () => undefined },
+                          securedVariables: options.context.securedVariables || { get: () => undefined },
+                        }
+                      );
+                      console.log(`[AdkExecutor] User logged out: ${options.context.endUserId}`);
+                    } catch (err) {
+                      console.error("[AdkExecutor] Failed to clear auth session:", err);
+                    }
+                  }
+
+                  // Emit logout_success event so widget can update UI
+                  yield {
+                    type: "logout_success",
+                    data: {
+                      message: response.confirmation || "You have been logged out successfully.",
+                    },
+                    timestamp: Date.now(),
+                  };
+                }
+              }
+
               // Look up custom notification message from tool definition
               const toolMessages = this.toolMessagesCache.get(toolName);
 
@@ -1079,6 +1238,48 @@ export class AdkExecutor {
 
           // Only emit notification if agent actually changed
           if (targetAgentId !== currentAgentId) {
+            // =========================================================================
+            // Agent-Level Auth Check
+            // Check if target agent requires authentication
+            // =========================================================================
+            const agentRequiresAuth = this.pkg?.authConfig?.requireAuthForAgents?.includes(targetAgentId);
+
+            if (agentRequiresAuth && !options.context.authSession) {
+              // Target agent requires auth but user is not authenticated
+              // Emit auth_required and stop processing
+
+              // Get first login step from auth guard
+              const loginSteps = this.pkg?.authGuard?.getLoginSteps();
+              const firstStep = loginSteps?.[0];
+
+              if (firstStep) {
+                // Set pending state for the user
+                if (this.authInterceptor && options.context.endUserId) {
+                  // Mark pending in storage so next request resumes auth flow
+                  const storage = await import("@/lib/auth/session-storage");
+                  const sessionStorage = storage.createAuthSessionStorage(this.options.chatbotId);
+                  await sessionStorage.setPending(options.context.endUserId, firstStep.id);
+                }
+
+                yield {
+                  type: "auth_required",
+                  data: {
+                    stepId: firstStep.id,
+                    stepName: firstStep.name,
+                    fields: firstStep.fields,
+                    aiPrompt: firstStep.aiPrompt,
+                    channel: options.context.channel,
+                    targetAgentId: targetAgentId,
+                  },
+                  timestamp: Date.now(),
+                };
+
+                console.log(`[AdkExecutor] Auth required for agent "${targetAgentId}" - stopping processing`);
+                streamSpan.end({ authRequiredForAgent: targetAgentId });
+                return; // Stop processing
+              }
+            }
+
             const previousAgentId = currentAgentId;
             currentAgentId = targetAgentId;
 
@@ -1220,6 +1421,28 @@ export class AdkExecutor {
       packageType: metadata.packageType,
       agentCount: metadata.agentCount,
     };
+  }
+
+  /**
+   * Clean up resources held by this executor.
+   * Call this before removing from cache to prevent memory leaks.
+   */
+  dispose(): void {
+    // Clear cached ADK objects
+    this.cachedAgent = null;
+    this.cachedRunner = null;
+    this.cachedContext = null;
+
+    // Clear RAG service cache
+    this.ragServiceCache.clear();
+
+    // Clear tool messages cache
+    this.toolMessagesCache.clear();
+
+    // Clear the package reference
+    this.pkg = null;
+
+    console.log(`[AdkExecutor] Disposed executor for chatbot ${this.options.chatbotId}`);
   }
 }
 

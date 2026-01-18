@@ -10,6 +10,8 @@ export { ChatWindow } from "./ChatWindow";
 // Types (from shared types file)
 export type {
   AgentInfo,
+  AuthField,
+  AuthState,
   ChatWindowConfig,
   ChatWindowProps,
   Message,
@@ -32,6 +34,9 @@ export type { ThinkingBubbleProps, ToolCallState } from "./ThinkingBubble";
 // Human escalation bubble components
 export { HumanWaitingBubble } from "./HumanWaitingBubble";
 export type { HumanWaitingBubbleProps } from "./HumanWaitingBubble";
+
+// Auth form bubble component
+export { AuthFormBubble } from "./AuthFormBubble";
 
 export { HumanJoinedBubble, HumanExitedBubble } from "./HumanJoinedBubble";
 export type { HumanJoinedBubbleProps, HumanExitedBubbleProps, HumanAgentInfo } from "./HumanJoinedBubble";

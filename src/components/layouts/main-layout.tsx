@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import { PageProvider, usePageTitle } from "@/contexts/page-context";
+import { PageProvider, usePageContext } from "@/contexts/page-context";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +58,7 @@ interface MainContentProps {
 }
 
 function MainContent({ children, onMenuClick, className }: MainContentProps) {
-  const { pageTitle } = usePageTitle();
+  const { breadcrumbs } = usePageContext();
 
   // Get sidebar state if available
   let isCollapsed = false;
@@ -78,7 +78,7 @@ function MainContent({ children, onMenuClick, className }: MainContentProps) {
         isCollapsed && "lg:ml-[72px]"
       )}
     >
-      <Header pageTitle={pageTitle} onMenuClick={onMenuClick} />
+      <Header breadcrumbs={breadcrumbs} onMenuClick={onMenuClick} />
 
       {/* Content area with subtle grid pattern */}
       <div className="relative flex-1">

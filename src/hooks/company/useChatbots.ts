@@ -179,6 +179,14 @@ export interface WidgetConfig {
   call: CallWidgetConfig;
 }
 
+// Chatbot Settings (call configuration)
+export interface ChatbotSettings {
+  callSystemPrompt?: string;
+  callKnowledgeBaseEnabled?: boolean;
+  callKnowledgeCategories?: string[];
+  callKnowledgeBaseThreshold?: number;
+}
+
 // Chatbot Detail
 export interface ChatbotDetail {
   id: string;
@@ -218,6 +226,8 @@ export interface ChatbotDetail {
   callModelId: string | null;
   callAiProvider: "OPENAI" | "GEMINI" | null;
   voiceConfig: VoiceConfig;
+  // Chatbot settings (call configuration)
+  settings?: ChatbotSettings;
   // Unified Widget Config (chat + call)
   widgetConfig: WidgetConfig;
   totalConversations: number;

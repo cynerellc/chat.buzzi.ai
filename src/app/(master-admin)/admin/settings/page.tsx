@@ -13,7 +13,7 @@ import {
   MaintenanceSettings,
 } from "@/components/master-admin/settings";
 import { Button, Tabs, Skeleton, Card, type TabItem } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   useSystemSettings,
   updateSettings,
@@ -23,7 +23,7 @@ import {
 type TabKey = "general" | "email" | "ai" | "security" | "integrations" | "maintenance";
 
 export default function SettingsPage() {
-  useSetPageTitle("Settings");
+  useSetBreadcrumbs([{ label: "Settings" }]);
   const { settings, isLoading, mutate } = useSystemSettings();
   const [activeTab, setActiveTab] = useState<TabKey>("general");
   const [pendingChanges, setPendingChanges] = useState<Partial<SystemSettings>>({});
@@ -160,11 +160,6 @@ export default function SettingsPage() {
       <PageHeader
         title="System Settings"
         description="Configure platform-wide settings and preferences"
-        showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Settings" },
-        ]}
         actions={
           <div className="flex items-center gap-2">
             {hasChanges && (

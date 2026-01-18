@@ -21,7 +21,7 @@ import {
   type TabItem,
   Textarea,
 } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   AlertTriangle,
@@ -77,7 +77,7 @@ const locales = [
 ];
 
 export default function SettingsPage() {
-  useSetPageTitle("Settings");
+  useSetBreadcrumbs([{ label: "Settings" }]);
   const { settings, isLoading, mutate } = useSettings();
   const { updateSettings, isUpdating } = useUpdateSettings();
   const { generateKey, isGenerating } = useGenerateApiKey();

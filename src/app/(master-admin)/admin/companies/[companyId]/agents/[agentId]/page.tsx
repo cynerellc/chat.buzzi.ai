@@ -16,10 +16,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 
 import { PageHeader } from "@/components/layouts";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   Badge,
   Button,
@@ -130,6 +131,15 @@ export default function AgentConfigurationPage({
     "/api/master-admin/packages?isActive=true",
     fetcher
   );
+
+  const breadcrumbs = useMemo(() => [
+    { label: "Companies", href: "/admin/companies" },
+    { label: companyData?.name ?? "...", href: `/admin/companies/${companyId}/overview` },
+    { label: "Agents" },
+    { label: agentData?.name ?? "..." },
+  ], [companyData?.name, companyId, agentData?.name]);
+
+  useSetBreadcrumbs(breadcrumbs);
 
   // Initialize form data when agent data loads
   useEffect(() => {
@@ -295,13 +305,6 @@ export default function AgentConfigurationPage({
       <PageHeader
         title=""
         showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Companies", href: "/admin/companies" },
-          { label: companyData.name, href: `/admin/companies/${companyId}` },
-          { label: "Agents" },
-          { label: agentData.name },
-        ]}
         actions={
           <div className="flex items-center gap-2">
             {isEditing ? (

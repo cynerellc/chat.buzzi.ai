@@ -2,7 +2,7 @@
 
 import { Plus, Save, Trash2, Users, User, Bot, Variable, ChevronDown, ChevronUp, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState, useCallback } from "react";
+import { use, useEffect, useState, useCallback, useMemo } from "react";
 
 import { PageHeader } from "@/components/layouts";
 import { AgentAvatarPicker } from "@/components/shared";
@@ -17,7 +17,7 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   createPackage,
   deletePackage,
@@ -106,11 +106,17 @@ const categoryOptions = [
 
 
 export default function PackageEditorPage({ params }: PackageEditorPageProps) {
-  useSetPageTitle("Package Editor");
   const { packageId } = use(params);
   const router = useRouter();
   const isNewPackage = packageId === "new";
   const { package: pkg, isLoading } = usePackage(isNewPackage ? null : packageId);
+
+  // Set breadcrumbs
+  const breadcrumbs = useMemo(() => [
+    { label: "Chatbot Packages", href: "/admin/packages" },
+    { label: isNewPackage ? "Create Package" : (pkg?.name ?? "...") },
+  ], [isNewPackage, pkg?.name]);
+  useSetBreadcrumbs(breadcrumbs);
 
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -428,11 +434,6 @@ export default function PackageEditorPage({ params }: PackageEditorPageProps) {
       <PageHeader
         title={isNewPackage ? "Create Agent Package" : "Edit Agent Package"}
         showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Packages", href: "/admin/packages" },
-          { label: isNewPackage ? "New Package" : (pkg?.name ?? "Edit") },
-        ]}
         actions={
           <div className="flex items-center gap-2">
             {!isNewPackage && (

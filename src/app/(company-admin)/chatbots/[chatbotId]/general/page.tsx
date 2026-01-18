@@ -26,6 +26,7 @@ export default function ChatbotGeneralPage() {
         voiceConfig: chatbot.voiceConfig,
         packageEnabledChat: null, // Company admin doesn't see package restrictions
         packageEnabledCall: null,
+        settings: chatbot.settings,
       }
     : null;
 
@@ -36,6 +37,7 @@ export default function ChatbotGeneralPage() {
       onRefresh={refresh}
       isMasterAdmin={false}
       callModels={callModels}
+      categoriesApiBase="/api/company"
     />
   );
 }

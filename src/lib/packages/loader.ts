@@ -100,9 +100,9 @@ async function loadPackageFromCode(code: string, packageId: string): Promise<Buz
 }
 
 /**
- * Get package metadata from database
+ * Get package metadata from database by slug
  */
-async function getPackageMetadata(packageId: string): Promise<{
+async function getPackageMetadata(packageSlug: string): Promise<{
   bundlePath: string;
   checksum: string | null;
 } | null> {
@@ -112,7 +112,7 @@ async function getPackageMetadata(packageId: string): Promise<{
       bundleChecksum: chatbotPackages.bundleChecksum,
     })
     .from(chatbotPackages)
-    .where(eq(chatbotPackages.id, packageId))
+    .where(eq(chatbotPackages.slug, packageSlug))
     .limit(1);
 
   const pkg = results[0];
@@ -127,14 +127,14 @@ async function getPackageMetadata(packageId: string): Promise<{
 }
 
 /**
- * Load a package by ID with multi-level caching
+ * Load a package by slug with multi-level caching
  *
  * Loading order:
  * 1. Memory cache (instant)
  * 2. Disk cache (fast)
  * 3. Remote storage (slow but source of truth)
  */
-export async function loadPackage(packageId: string): Promise<BuzziAgentPackage | null> {
+export async function loadPackage(packageSlug: string): Promise<BuzziAgentPackage | null> {
   const startTime = performance.now();
   const cache = getPackageCache();
   // Track where package was loaded from for debugging
@@ -142,7 +142,7 @@ export async function loadPackage(packageId: string): Promise<BuzziAgentPackage 
 
   try {
     // Step 1: Check memory cache
-    const memoryEntry = cache.getFromMemoryWithChecksum(packageId);
+    const memoryEntry = cache.getFromMemoryWithChecksum(packageSlug);
     if (memoryEntry) {
       stats.memoryCacheHits++;
       recordLoadTime(startTime);
@@ -151,30 +151,30 @@ export async function loadPackage(packageId: string): Promise<BuzziAgentPackage 
     stats.memoryCacheMisses++;
 
     // Step 2: Get metadata from database to get checksum
-    const metadata = await getPackageMetadata(packageId);
+    const metadata = await getPackageMetadata(packageSlug);
     if (!metadata) {
-      console.error(`[PackageLoader] Package ${packageId} not found in database`);
+      console.error(`[PackageLoader] Package "${packageSlug}" not found in database`);
       stats.errors++;
       return null;
     }
 
     // Step 3: Check disk cache (with checksum validation)
-    const diskCachePath = await cache.getDiskCachePath(packageId);
+    const diskCachePath = await cache.getDiskCachePath(packageSlug);
     if (diskCachePath) {
       // Validate checksum if available
-      const diskEntry = await cache.getDiskCacheEntry(packageId);
+      const diskEntry = await cache.getDiskCacheEntry(packageSlug);
       if (diskEntry && (!metadata.checksum || diskEntry.checksum === metadata.checksum)) {
         try {
           const pkg = await loadPackageFromFile(diskCachePath);
 
           // Store in memory cache
-          cache.setInMemory(packageId, pkg, diskEntry.checksum);
+          cache.setInMemory(packageSlug, pkg, diskEntry.checksum);
 
           stats.diskCacheHits++;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           _loadedFrom = "disk";
           recordLoadTime(startTime);
-          console.log(`[PackageLoader] Loaded ${packageId} from disk cache`);
+          console.log(`[PackageLoader] Loaded "${packageSlug}" from disk cache`);
           return pkg;
         } catch (error) {
           console.error(`[PackageLoader] Failed to load from disk cache: ${error}`);
@@ -185,23 +185,23 @@ export async function loadPackage(packageId: string): Promise<BuzziAgentPackage 
     stats.diskCacheMisses++;
 
     // Step 4: Download from remote storage
-    console.log(`[PackageLoader] Downloading package ${packageId} from storage...`);
+    console.log(`[PackageLoader] Downloading package "${packageSlug}" from storage...`);
     const bundleCode = await downloadBundle(metadata.bundlePath);
 
     // Load the package
-    const pkg = await loadPackageFromCode(bundleCode, packageId);
+    const pkg = await loadPackageFromCode(bundleCode, packageSlug);
 
     // Store in both caches
     const checksum = metadata.checksum || generateChecksum(bundleCode);
-    cache.setInMemory(packageId, pkg, checksum);
-    await cache.setInDisk(packageId, bundleCode, checksum);
+    cache.setInMemory(packageSlug, pkg, checksum);
+    await cache.setInDisk(packageSlug, bundleCode, checksum);
 
     stats.remoteLoads++;
     recordLoadTime(startTime);
-    console.log(`[PackageLoader] Loaded ${packageId} from remote storage`);
+    console.log(`[PackageLoader] Loaded "${packageSlug}" from remote storage`);
     return pkg;
   } catch (error) {
-    console.error(`[PackageLoader] Failed to load package ${packageId}:`, error);
+    console.error(`[PackageLoader] Failed to load package "${packageSlug}":`, error);
     stats.errors++;
     return null;
   }
@@ -211,10 +211,10 @@ export async function loadPackage(packageId: string): Promise<BuzziAgentPackage 
  * Invalidate a package from all caches
  * Call this when a package is updated
  */
-export async function invalidatePackage(packageId: string): Promise<void> {
+export async function invalidatePackage(packageSlug: string): Promise<void> {
   const cache = getPackageCache();
-  await cache.delete(packageId);
-  console.log(`[PackageLoader] Invalidated cache for package ${packageId}`);
+  await cache.delete(packageSlug);
+  console.log(`[PackageLoader] Invalidated cache for package "${packageSlug}"`);
 }
 
 /**
@@ -275,11 +275,11 @@ function generateChecksum(code: string): string {
  * Preload packages into memory cache
  * Useful for warming up frequently used packages
  */
-export async function preloadPackages(packageIds: string[]): Promise<void> {
-  console.log(`[PackageLoader] Preloading ${packageIds.length} packages...`);
+export async function preloadPackages(packageSlugs: string[]): Promise<void> {
+  console.log(`[PackageLoader] Preloading ${packageSlugs.length} packages...`);
 
   const results = await Promise.allSettled(
-    packageIds.map((id) => loadPackage(id))
+    packageSlugs.map((slug) => loadPackage(slug))
   );
 
   const loaded = results.filter((r) => r.status === "fulfilled" && r.value !== null).length;
@@ -289,9 +289,9 @@ export async function preloadPackages(packageIds: string[]): Promise<void> {
 }
 
 /**
- * Get cached package IDs (for debugging/monitoring)
+ * Get cached package slugs (for debugging/monitoring)
  */
-export function getCachedPackageIds(): string[] {
+export function getCachedPackageSlugs(): string[] {
   return getPackageCache().getMemoryCacheKeys();
 }
 

@@ -27,50 +27,46 @@ import { loadPackage } from "@/lib/packages";
 // Import all packages statically
 // This ensures Next.js can bundle them correctly
 import salesAssistantPackage from "./sales-assistant";
-import customerSupportPackage from "./9f62b375-d70d-48a2-a9cd-8b6a8abe8e77";
-import sampleSingleAgentPackage from "./sample-single-agent";
-import sampleMultiAgentPackage from "./sample-multi-agent";
+import customerSupportPackage from "./customer-support";
+ 
 
 /**
  * Registry of all available packages
- * Key: Package ID (UUID)
+ * Key: Package slug (e.g., "sales-assistant")
  * Value: The package object
  */
 const PACKAGE_REGISTRY: Map<string, BuzziAgentPackage> = new Map([
   // Sales Assistant - Multi-agent with orchestrator
-  ["1c33f609-ae08-4340-9dbb-e82cebed608a", salesAssistantPackage],
+  ["sales-assistant", salesAssistantPackage],
 
   // Customer Support - Single-agent
-  ["9f62b375-d70d-48a2-a9cd-8b6a8abe8e77", customerSupportPackage],
+  ["customer-support", customerSupportPackage],
 
-  // Sample packages
-  ["c2709628-4cef-4ebd-b55c-0708e298c167", sampleSingleAgentPackage],
-  ["a8b3c4d5-6e7f-8901-2345-67890abcdef1", sampleMultiAgentPackage],
 ]);
 
 /**
- * Get a package by its ID
- * @param packageId - The package UUID
+ * Get a package by its slug
+ * @param packageSlug - The package slug (e.g., "sales-assistant")
  * @returns The package or null if not found
  */
-export function getPackage(packageId: string): BuzziAgentPackage | null {
-  return PACKAGE_REGISTRY.get(packageId) ?? null;
+export function getPackage(packageSlug: string): BuzziAgentPackage | null {
+  return PACKAGE_REGISTRY.get(packageSlug) ?? null;
 }
 
 /**
  * Check if a package exists in the registry
- * @param packageId - The package UUID
+ * @param packageSlug - The package slug
  * @returns true if the package exists
  */
-export function hasPackage(packageId: string): boolean {
-  return PACKAGE_REGISTRY.has(packageId);
+export function hasPackage(packageSlug: string): boolean {
+  return PACKAGE_REGISTRY.has(packageSlug);
 }
 
 /**
- * Get all registered package IDs
- * @returns Array of package IDs
+ * Get all registered package slugs
+ * @returns Array of package slugs
  */
-export function getPackageIds(): string[] {
+export function getPackageSlugs(): string[] {
   return Array.from(PACKAGE_REGISTRY.keys());
 }
 
@@ -95,20 +91,20 @@ export function getPackageMetadata(): Array<{
 }
 
 /**
- * Get a package by ID, checking static registry first then dynamic loader
+ * Get a package by slug, checking static registry first then dynamic loader
  * This is the recommended way to load packages - it handles both built-in
  * and dynamically uploaded packages seamlessly.
  *
- * @param packageId - The package UUID
+ * @param packageSlug - The package slug (e.g., "sales-assistant")
  * @returns The package or null if not found in either registry or storage
  */
-export async function getPackageAsync(packageId: string): Promise<BuzziAgentPackage | null> {
+export async function getPackageAsync(packageSlug: string): Promise<BuzziAgentPackage | null> {
   // 1. Check static registry first (instant, no network)
-  const staticPkg = PACKAGE_REGISTRY.get(packageId);
+  const staticPkg = PACKAGE_REGISTRY.get(packageSlug);
   if (staticPkg) {
     return staticPkg;
   }
 
   // 2. Fall back to dynamic loader (checks cache, then storage)
-  return loadPackage(packageId);
+  return loadPackage(packageSlug);
 }

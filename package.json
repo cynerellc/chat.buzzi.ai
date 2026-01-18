@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx server.ts",
+    "dev": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx watch --exclude 'src/app/**' --exclude 'src/components/**' server.ts",
     "dev:next": "next dev --turbo",
     "build": "next build",
     "start": "next start",

@@ -39,6 +39,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         callModelId: agents.callModelId,
         callAiProvider: agents.callAiProvider,
         voiceConfig: agents.voiceConfig,
+        // Chatbot settings (includes call config)
+        settings: agents.settings,
         // Unified widget config
         widgetConfig: agents.widgetConfig,
         totalConversations: agents.totalConversations,
@@ -110,6 +112,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         variableValues: variableValuesWithDefinitions,
         // Also include the raw variable values for editing
         rawVariableValues: chatbotVariableValues,
+        // Include settings for call configuration
+        settings: chatbot.settings ?? {},
       },
     });
   } catch (error) {
@@ -147,6 +151,12 @@ interface UpdateChatbotRequest {
   voiceConfig?: Record<string, unknown>;
   // Unified widget config
   widgetConfig?: { chat?: Record<string, unknown>; call?: Record<string, unknown> };
+  // Chatbot settings (includes call knowledge base config)
+  settings?: {
+    callKnowledgeBaseEnabled?: boolean;
+    callKnowledgeCategories?: string[];
+    callKnowledgeBaseThreshold?: number;
+  };
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -197,6 +207,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       updateData.widgetConfig = {
         chat: { ...existingWidgetConfig.chat, ...body.widgetConfig.chat },
         call: { ...existingWidgetConfig.call, ...body.widgetConfig.call },
+      };
+    }
+
+    // Chatbot settings - merge with existing settings
+    if (body.settings !== undefined) {
+      const existingSettings = (existingChatbot.settings as Record<string, unknown>) || {};
+      updateData.settings = {
+        ...existingSettings,
+        ...body.settings,
       };
     }
 

@@ -19,7 +19,7 @@ import {
 import { useState } from "react";
 
 import { PageHeader } from "@/components/layouts/page-header";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useCallAnalytics } from "@/hooks/company";
 import {
   Button,
@@ -164,7 +164,7 @@ function getSourceIcon(source: string) {
 }
 
 export default function CallAnalyticsPage() {
-  useSetPageTitle("Call Analytics");
+  useSetBreadcrumbs([{ label: "Analytics", href: "/analytics" }, { label: "Call Analytics" }]);
   const [days, setDays] = useState(30);
   const {
     summary,

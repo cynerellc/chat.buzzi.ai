@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Lock, Variable } from "lucide-react";
 
 import { Button, Input, Select, Card, CardHeader, CardBody, Textarea, addToast } from "@/components/ui";
 import { PackageSelector } from "@/components/company-admin/agents/package-selector";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useChatbotPackages, useCreateChatbot } from "@/hooks/company";
 
 type Step = "package" | "details" | "variables";
@@ -20,7 +20,10 @@ const TYPE_OPTIONS = [
 ];
 
 export default function NewChatbotPage() {
-  useSetPageTitle("New Chatbot");
+  useSetBreadcrumbs([
+    { label: "Chatbots", href: "/chatbots" },
+    { label: "New Chatbot" },
+  ]);
   const router = useRouter();
   const [step, setStep] = useState<Step>("package");
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);

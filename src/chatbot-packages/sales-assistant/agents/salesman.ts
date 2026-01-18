@@ -16,11 +16,17 @@
  * - Qualify leads (budget, timeline, needs)
  * - Collect contact information
  * - Highlight relevant features and benefits
+ *
+ * Authentication:
+ * - This agent requires authentication to access
+ * - User must log in before interacting with this agent
+ * - Demo credentials: Phone +911111111111, OTP 222222
  */
 
 import {
   createBuzziAgent,
   AgentTypes,
+  requireAuth,
   type BuzziAgentConfig,
 } from "@buzzi-ai/agent-sdk";
 import { saveLeadInfoTool } from "../tools";
@@ -33,6 +39,8 @@ export const salesmanConfig: BuzziAgentConfig = {
   type: AgentTypes.Worker,
   supervisor: "orchestrator",
   tools: [saveLeadInfoTool],
+  // Require authentication to use this agent
+  auth: requireAuth(),
 };
 
 /**

@@ -7,11 +7,11 @@ import { useState } from "react";
 import { PageHeader } from "@/components/layouts";
 import { PackagesFilters, PackagesGrid, CodeEditorModal } from "@/components/master-admin/packages";
 import { Button } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { usePackages, type PackageListItem } from "@/hooks/master-admin";
 
 export default function PackagesPage() {
-  useSetPageTitle("Chatbot Packages");
+  useSetBreadcrumbs([{ label: "Chatbot Packages" }]);
   const router = useRouter();
   const [category, setCategory] = useState("all");
   const [codeEditorPackage, setCodeEditorPackage] = useState<PackageListItem | null>(null);
@@ -36,11 +36,6 @@ export default function PackagesPage() {
       <PageHeader
         title="Chatbot Packages"
         description="Manage chatbot package templates for your customers"
-        showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Packages" },
-        ]}
         actions={
           <Button
             color="primary"

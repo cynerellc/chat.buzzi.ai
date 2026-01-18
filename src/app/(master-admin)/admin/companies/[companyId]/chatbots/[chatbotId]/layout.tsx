@@ -1,9 +1,9 @@
 "use client";
 
-import { use, type ReactNode } from "react";
+import { use, useMemo, type ReactNode } from "react";
 
 import { Card, Skeleton } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useCompanyChatbot } from "@/hooks/master-admin";
 
 import { useCompanyContext } from "../../company-context";
@@ -16,12 +16,18 @@ interface ChatbotDetailsLayoutProps {
 
 export default function ChatbotDetailsLayout({ children, params }: ChatbotDetailsLayoutProps) {
   const { companyId, chatbotId } = use(params);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { company } = useCompanyContext();
   const chatbotData = useCompanyChatbot(companyId, chatbotId);
   const { chatbot, isLoading } = chatbotData;
 
-  useSetPageTitle(chatbot?.name ?? "Chatbot Details");
+  const breadcrumbs = useMemo(() => [
+    { label: "Companies", href: "/admin/companies" },
+    { label: company?.name ?? "...", href: `/admin/companies/${companyId}/overview` },
+    { label: "Chatbots", href: `/admin/companies/${companyId}/chatbots` },
+    { label: chatbot?.name ?? "..." },
+  ], [company?.name, companyId, chatbot?.name]);
+
+  useSetBreadcrumbs(breadcrumbs);
 
   if (isLoading) {
     return (

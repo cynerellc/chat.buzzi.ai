@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 
 import { ConversationsPage } from "@/components/shared/conversations";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 
 export default function CompanyConversationsPage() {
-  useSetPageTitle("Conversations");
+  useSetBreadcrumbs([{ label: "Conversations" }]);
   const router = useRouter();
 
   const handleConversationClick = (conversationId: string) => {

@@ -250,6 +250,16 @@ export interface AgentContext {
   // Knowledge base configuration (for voice calls)
   knowledgeCategories?: string[];
   knowledgeThreshold?: number; // Min relevance score for RAG results (0.05-0.95)
+
+  // Auth session (populated when user is authenticated)
+  authSession?: {
+    userId: string;
+    email?: string;
+    name?: string;
+    roles?: string[];
+    expiresAt: number;
+    metadata?: Record<string, unknown>;
+  };
 }
 
 // ============================================================================
@@ -383,7 +393,14 @@ export type StreamEventType =
   | "error"
   | "notification"
   | "human_escalation"
-  | "human_handling";
+  | "human_handling"
+  // Auth events
+  | "auth_required"
+  | "auth_step"
+  | "auth_success"
+  | "auth_error"
+  | "permission_denied"
+  | "logout_success";
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -468,6 +485,118 @@ export interface HumanHandlingEvent extends StreamEvent {
   };
 }
 
+// ============================================================================
+// Auth Events
+// ============================================================================
+
+/**
+ * Auth required event - sent when user needs to authenticate
+ * Contains the login step fields and AI prompt
+ */
+export interface AuthRequiredEvent extends StreamEvent {
+  type: "auth_required";
+  data: {
+    /** Login step ID */
+    stepId: string;
+    /** Step display name */
+    stepName?: string;
+    /** Fields to collect */
+    fields: Array<{
+      name: string;
+      label: string;
+      type: string;
+      required: boolean;
+      placeholder?: string;
+      validation?: {
+        pattern?: string;
+        minLength?: number;
+        maxLength?: number;
+      };
+    }>;
+    /** AI prompt for conversational auth (WhatsApp) */
+    aiPrompt: string;
+    /** Communication channel */
+    channel: ChannelType;
+    /** Target agent ID (if auth required due to agent transfer) */
+    targetAgentId?: string;
+  };
+}
+
+/**
+ * Auth step event - sent when moving to next step in multi-step auth
+ */
+export interface AuthStepEvent extends StreamEvent {
+  type: "auth_step";
+  data: {
+    /** New step ID */
+    stepId: string;
+    /** Step display name */
+    stepName?: string;
+    /** Fields to collect */
+    fields: Array<{
+      name: string;
+      label: string;
+      type: string;
+      required: boolean;
+      placeholder?: string;
+    }>;
+    /** AI prompt for this step */
+    aiPrompt: string;
+  };
+}
+
+/**
+ * Auth success event - sent when authentication completes
+ */
+export interface AuthSuccessEvent extends StreamEvent {
+  type: "auth_success";
+  data: {
+    /** User's display name (if available) */
+    userName?: string;
+    /** Success message */
+    message: string;
+  };
+}
+
+/**
+ * Auth error event - sent when authentication fails
+ */
+export interface AuthErrorEvent extends StreamEvent {
+  type: "auth_error";
+  data: {
+    /** Error message */
+    error: string;
+    /** Whether user can retry */
+    retryable: boolean;
+    /** Step ID that failed (for retry) */
+    stepId?: string;
+  };
+}
+
+/**
+ * Permission denied event - sent when authenticated user lacks permissions
+ */
+export interface PermissionDeniedEvent extends StreamEvent {
+  type: "permission_denied";
+  data: {
+    /** Reason for denial */
+    reason: string;
+    /** Required roles (if applicable) */
+    requiredRoles?: string[];
+  };
+}
+
+/**
+ * Logout success event - sent when user successfully logs out
+ */
+export interface LogoutSuccessEvent extends StreamEvent {
+  type: "logout_success";
+  data: {
+    /** Confirmation message */
+    message: string;
+  };
+}
+
 export type AgentStreamEvent =
   | ThinkingEvent
   | ToolCallEvent
@@ -476,7 +605,13 @@ export type AgentStreamEvent =
   | ErrorEvent
   | NotificationEvent
   | HumanEscalationEvent
-  | HumanHandlingEvent;
+  | HumanHandlingEvent
+  | AuthRequiredEvent
+  | AuthStepEvent
+  | AuthSuccessEvent
+  | AuthErrorEvent
+  | PermissionDeniedEvent
+  | LogoutSuccessEvent;
 
 // ============================================================================
 // Error Types

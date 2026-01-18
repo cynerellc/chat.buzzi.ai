@@ -79,6 +79,193 @@ export interface FCMConfig {
 }
 
 // ============================================================================
+// Delivery History with Bounded Storage
+// ============================================================================
+
+interface DeliveryHistoryConfig {
+  maxEntriesPerSubscription: number;  // Max results to keep per subscription
+  maxTotalEntries: number;            // Max total entries across all subscriptions
+  ttlMs: number;                      // Time-to-live for entries
+  cleanupIntervalMs: number;          // How often to run cleanup
+}
+
+const DEFAULT_DELIVERY_HISTORY_CONFIG: DeliveryHistoryConfig = {
+  maxEntriesPerSubscription: 100,
+  maxTotalEntries: 10000,
+  ttlMs: 24 * 60 * 60 * 1000,  // 24 hours
+  cleanupIntervalMs: 15 * 60 * 1000,  // 15 minutes
+};
+
+class BoundedDeliveryHistory {
+  private history: Map<string, DeliveryResult[]> = new Map();
+  private config: DeliveryHistoryConfig;
+  private cleanupTimer: NodeJS.Timeout | null = null;
+  private totalEntries: number = 0;
+
+  constructor(config: Partial<DeliveryHistoryConfig> = {}) {
+    this.config = { ...DEFAULT_DELIVERY_HISTORY_CONFIG, ...config };
+    this.startCleanupTimer();
+  }
+
+  /**
+   * Record a delivery result
+   */
+  record(result: DeliveryResult): void {
+    const { subscriptionId } = result;
+
+    if (!this.history.has(subscriptionId)) {
+      this.history.set(subscriptionId, []);
+    }
+
+    const results = this.history.get(subscriptionId)!;
+    results.push(result);
+    this.totalEntries++;
+
+    // Enforce per-subscription limit (remove oldest)
+    while (results.length > this.config.maxEntriesPerSubscription) {
+      results.shift();
+      this.totalEntries--;
+    }
+
+    // Enforce total limit by removing oldest entries globally
+    if (this.totalEntries > this.config.maxTotalEntries) {
+      this.evictOldestEntries(this.totalEntries - this.config.maxTotalEntries);
+    }
+  }
+
+  /**
+   * Get results for a subscription
+   */
+  get(subscriptionId: string): DeliveryResult[] {
+    return this.history.get(subscriptionId) ?? [];
+  }
+
+  /**
+   * Get all results (for stats)
+   */
+  getAll(): Map<string, DeliveryResult[]> {
+    return this.history;
+  }
+
+  /**
+   * Clear history for a subscription
+   */
+  delete(subscriptionId: string): void {
+    const results = this.history.get(subscriptionId);
+    if (results) {
+      this.totalEntries -= results.length;
+      this.history.delete(subscriptionId);
+    }
+  }
+
+  /**
+   * Clear all history
+   */
+  clear(): void {
+    this.history.clear();
+    this.totalEntries = 0;
+  }
+
+  /**
+   * Shutdown and stop cleanup timer
+   */
+  shutdown(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    this.clear();
+  }
+
+  /**
+   * Get stats for monitoring
+   */
+  getStats(): { subscriptionCount: number; totalEntries: number; maxEntries: number } {
+    return {
+      subscriptionCount: this.history.size,
+      totalEntries: this.totalEntries,
+      maxEntries: this.config.maxTotalEntries,
+    };
+  }
+
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) return;
+
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupExpiredEntries();
+    }, this.config.cleanupIntervalMs);
+
+    // Don't prevent process exit
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
+    }
+  }
+
+  private cleanupExpiredEntries(): void {
+    const now = Date.now();
+    const cutoff = now - this.config.ttlMs;
+    let removed = 0;
+
+    for (const [subscriptionId, results] of this.history.entries()) {
+      // Remove expired entries from the beginning (oldest first)
+      let expiredCount = 0;
+      for (const result of results) {
+        if (result.timestamp.getTime() < cutoff) {
+          expiredCount++;
+        } else {
+          break; // Results are chronological, stop when we hit non-expired
+        }
+      }
+
+      if (expiredCount > 0) {
+        results.splice(0, expiredCount);
+        this.totalEntries -= expiredCount;
+        removed += expiredCount;
+      }
+
+      // Remove empty subscription entries
+      if (results.length === 0) {
+        this.history.delete(subscriptionId);
+      }
+    }
+
+    if (removed > 0) {
+      console.log(`[DeliveryHistory] Cleanup: removed ${removed} expired entries, remaining: ${this.totalEntries}`);
+    }
+  }
+
+  private evictOldestEntries(count: number): void {
+    let evicted = 0;
+
+    // Find and remove oldest entries across all subscriptions
+    while (evicted < count && this.history.size > 0) {
+      let oldestSub: string | null = null;
+      let oldestTime = Infinity;
+
+      for (const [subId, results] of this.history.entries()) {
+        if (results.length > 0 && results[0].timestamp.getTime() < oldestTime) {
+          oldestTime = results[0].timestamp.getTime();
+          oldestSub = subId;
+        }
+      }
+
+      if (oldestSub) {
+        const results = this.history.get(oldestSub)!;
+        results.shift();
+        this.totalEntries--;
+        evicted++;
+
+        if (results.length === 0) {
+          this.history.delete(oldestSub);
+        }
+      } else {
+        break;
+      }
+    }
+  }
+}
+
+// ============================================================================
 // Push Service Class
 // ============================================================================
 
@@ -87,7 +274,11 @@ export class PushService {
   private userSubscriptions: Map<string, Set<string>> = new Map();
   private vapidKeys?: VAPIDKeys;
   private fcmConfig?: FCMConfig;
-  private deliveryHistory: Map<string, DeliveryResult[]> = new Map();
+  private deliveryHistory: BoundedDeliveryHistory;
+
+  constructor() {
+    this.deliveryHistory = new BoundedDeliveryHistory();
+  }
 
   /**
    * Initialize VAPID keys for Web Push
@@ -170,6 +361,9 @@ export class PushService {
       userSubs.delete(subscriptionId);
     }
 
+    // Clean up delivery history for this subscription
+    this.deliveryHistory.delete(subscriptionId);
+
     this.subscriptions.delete(subscriptionId);
     return true;
   }
@@ -219,6 +413,9 @@ export class PushService {
     for (const subscription of subscriptions) {
       const result = await this.sendToSubscription(subscription, notification);
       results.push(result);
+
+      // Record delivery result for stats tracking
+      this.deliveryHistory.record(result);
 
       // Deactivate on permanent failure
       if (!result.success && this.isPermanentFailure(result.statusCode)) {
@@ -559,7 +756,7 @@ export class PushService {
     let totalSent = 0;
     let totalSuccess = 0;
 
-    for (const [subId, results] of this.deliveryHistory) {
+    for (const [subId, results] of this.deliveryHistory.getAll()) {
       if (userId) {
         const sub = this.subscriptions.get(subId);
         if (sub?.userId !== userId) continue;
@@ -586,6 +783,22 @@ export class PushService {
     this.subscriptions.clear();
     this.userSubscriptions.clear();
     this.deliveryHistory.clear();
+  }
+
+  /**
+   * Shutdown the service and release resources
+   */
+  shutdown(): void {
+    this.deliveryHistory.shutdown();
+    this.subscriptions.clear();
+    this.userSubscriptions.clear();
+  }
+
+  /**
+   * Get delivery history stats for monitoring
+   */
+  getDeliveryHistoryStats(): { subscriptionCount: number; totalEntries: number; maxEntries: number } {
+    return this.deliveryHistory.getStats();
   }
 }
 

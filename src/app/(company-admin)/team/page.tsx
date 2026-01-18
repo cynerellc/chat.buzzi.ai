@@ -1,10 +1,10 @@
 "use client";
 
 import { TeamManagementPage } from "@/components/shared/team";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 
 export default function TeamPage() {
-  useSetPageTitle("Team");
+  useSetBreadcrumbs([{ label: "Team" }]);
 
   return (
     <TeamManagementPage

@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 
 import { KnowledgeBasePage } from "@/components/shared/knowledge";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 
 export default function KnowledgePage() {
-  useSetPageTitle("Knowledge Base");
+  useSetBreadcrumbs([{ label: "Knowledge Base" }]);
   const router = useRouter();
 
   const handleAddSource = (categoryName?: string) => {

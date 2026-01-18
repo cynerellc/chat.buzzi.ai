@@ -55,6 +55,12 @@ export interface Message {
   escalationReason?: string;
   // Human agent message flag (for messages sent by support agents)
   isFromHumanAgent?: boolean;
+  // Auth-related fields
+  isAuthRequired?: boolean;
+  authStepId?: string;
+  authFields?: AuthField[];
+  authPrompt?: string;
+  // Note: targetAgentId and targetAgentName are already defined above for transfers
 }
 
 // ============================================================================
@@ -171,6 +177,38 @@ export interface CallTranscriptEntry {
   content: string;
   timestamp: number;
   isFinal?: boolean;
+}
+
+// ============================================================================
+// Auth Types
+// ============================================================================
+
+export interface AuthField {
+  name: string;
+  type: "text" | "email" | "password" | "phone" | "otp" | "select";
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  validation?: {
+    pattern?: string;
+    minLength?: number;
+    maxLength?: number;
+  };
+}
+
+export interface AuthState {
+  isRequired: boolean;
+  isAuthenticated: boolean;
+  currentStep?: {
+    stepId: string;
+    stepName?: string;
+    fields: AuthField[];
+    aiPrompt?: string;
+  };
+  targetAgentId?: string;
+  targetAgentName?: string;
+  error?: string;
+  isSubmitting?: boolean;
 }
 
 // ============================================================================

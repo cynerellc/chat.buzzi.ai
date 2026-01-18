@@ -7,11 +7,11 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/layouts";
 import { ModelsFilters, ModelsGrid, ModelEditorModal } from "@/components/master-admin/models";
 import { Button, ConfirmationDialog } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useModels, deleteModel, type ModelListItem } from "@/hooks/master-admin/useModels";
 
 export default function ModelsPage() {
-  useSetPageTitle("AI Models");
+  useSetBreadcrumbs([{ label: "AI Models" }]);
   const [provider, setProvider] = useState("all");
   const [editingModel, setEditingModel] = useState<ModelListItem | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -57,11 +57,6 @@ export default function ModelsPage() {
       <PageHeader
         title="AI Models"
         description="Manage AI models available for chatbot agents"
-        showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Models" },
-        ]}
         actions={
           <Button
             color="primary"

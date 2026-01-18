@@ -7,11 +7,11 @@
  * Usage:
  *   import { loadPackage, invalidatePackage } from "@/lib/packages";
  *
- *   // Load a package (uses cache if available)
- *   const pkg = await loadPackage("package-uuid");
+ *   // Load a package by slug (uses cache if available)
+ *   const pkg = await loadPackage("sales-assistant");
  *
  *   // Invalidate cache when package is updated
- *   await invalidatePackage("package-uuid");
+ *   await invalidatePackage("sales-assistant");
  */
 
 // Main loader functions
@@ -20,7 +20,7 @@ export {
   invalidatePackage,
   clearPackageCache,
   preloadPackages,
-  getCachedPackageIds,
+  getCachedPackageSlugs,
   getMemoryCacheSize,
   getLoaderStats,
   resetLoaderStats,

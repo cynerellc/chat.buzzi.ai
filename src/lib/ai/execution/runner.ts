@@ -112,6 +112,8 @@ class ExecutorCache {
       // Check if expired
       if (now - entry.lastActivity > this.config.inactivityTTL) {
         console.log(`[ExecutorCache] Executor ${chatbotId} expired after ${this.formatDuration(now - entry.lastActivity)} of inactivity`);
+        // Dispose the executor before removing from cache
+        entry.executor.dispose();
         this.cache.delete(chatbotId);
         return undefined;
       }
@@ -151,16 +153,23 @@ class ExecutorCache {
   }
 
   /**
-   * Remove an executor from cache
+   * Remove an executor from cache and dispose it
    */
   delete(chatbotId: string): void {
-    this.cache.delete(chatbotId);
+    const entry = this.cache.get(chatbotId);
+    if (entry) {
+      entry.executor.dispose();
+      this.cache.delete(chatbotId);
+    }
   }
 
   /**
-   * Clear all cached executors
+   * Clear all cached executors and dispose them
    */
   clear(): void {
+    for (const entry of this.cache.values()) {
+      entry.executor.dispose();
+    }
     this.cache.clear();
   }
 
@@ -198,7 +207,20 @@ class ExecutorCache {
   }
 
   /**
-   * Remove expired executors
+   * Shutdown the cache: stop timer and dispose all executors
+   */
+  shutdown(): void {
+    this.stopCleanupTimer();
+    // Dispose all executors before clearing
+    for (const entry of this.cache.values()) {
+      entry.executor.dispose();
+    }
+    this.cache.clear();
+    console.log("[ExecutorCache] Shutdown complete - all executors disposed");
+  }
+
+  /**
+   * Remove expired executors and dispose them
    */
   private cleanup(): void {
     const now = Date.now();
@@ -207,6 +229,8 @@ class ExecutorCache {
     for (const [chatbotId, entry] of this.cache.entries()) {
       const inactiveFor = now - entry.lastActivity;
       if (inactiveFor > this.config.inactivityTTL) {
+        // Dispose the executor before removing from cache
+        entry.executor.dispose();
         this.cache.delete(chatbotId);
         evicted++;
         console.log(`[ExecutorCache] Evicted ${chatbotId} after ${this.formatDuration(inactiveFor)} of inactivity`);
@@ -222,15 +246,17 @@ class ExecutorCache {
    * Evict the least recently used executor when at capacity
    */
   private evictLeastRecentlyUsed(): void {
-    let oldest: { chatbotId: string; lastActivity: number } | null = null;
+    let oldest: { chatbotId: string; lastActivity: number; executor: AdkExecutor } | null = null;
 
     for (const [chatbotId, entry] of this.cache.entries()) {
       if (!oldest || entry.lastActivity < oldest.lastActivity) {
-        oldest = { chatbotId, lastActivity: entry.lastActivity };
+        oldest = { chatbotId, lastActivity: entry.lastActivity, executor: entry.executor };
       }
     }
 
     if (oldest) {
+      // Dispose the executor before removing from cache
+      oldest.executor.dispose();
       this.cache.delete(oldest.chatbotId);
       console.log(`[ExecutorCache] Evicted LRU executor ${oldest.chatbotId} (cache at capacity: ${this.config.maxExecutors})`);
     }
@@ -357,7 +383,7 @@ export class AgentRunnerService {
     const executorOptions = {
       chatbotId: chatbot.id,
       companyId: chatbot.companyId,
-      packageId: chatbot.packageId || chatbot.id, // Use package UUID for registry lookup
+      packageSlug: chatbot.packageSlug || "", // Use package slug for registry/loader lookup
       agentConfig: {
         systemPrompt: primaryAgent.default_system_prompt,
         modelId: primaryAgent.default_model_id,
@@ -876,6 +902,13 @@ export class AgentRunnerService {
    */
   clearCache(): void {
     this.executorCache.clear();
+  }
+
+  /**
+   * Shutdown the runner and release all resources
+   */
+  shutdown(): void {
+    this.executorCache.shutdown();
   }
 }
 

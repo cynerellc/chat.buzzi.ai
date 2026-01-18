@@ -356,6 +356,59 @@ export const calculateTool: RegisteredTool = {
 };
 
 // ============================================================================
+// Logout Tool
+// ============================================================================
+
+/**
+ * Log out the current user and clear their session.
+ * Use this when the user explicitly requests to log out.
+ */
+export const logoutTool: RegisteredTool = {
+  name: BUILT_IN_TOOLS.LOGOUT,
+  description:
+    "Log out the current user and clear their authentication session. Use this when the user explicitly requests to log out, sign out, or end their authenticated session.",
+  category: "auth",
+  parameters: {
+    type: "object",
+    properties: {
+      confirmation: {
+        type: "string",
+        description: "Confirmation message to show the user after logout",
+        default: "You have been logged out successfully.",
+      },
+    },
+    required: [],
+  },
+  execute: async (
+    params: Record<string, unknown>,
+    context: AgentContext
+  ): Promise<ToolResult> => {
+    // Check if user is authenticated
+    if (!context.authSession) {
+      return {
+        success: false,
+        error: "You are not currently logged in.",
+      };
+    }
+
+    // The actual logout is handled by the executor after this tool returns
+    // This tool just signals the intent to logout
+    const confirmation = (params.confirmation as string) || "You have been logged out successfully.";
+    const userName = context.authSession.name;
+
+    return {
+      success: true,
+      data: {
+        action: "logout",
+        confirmation,
+        userName,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  },
+};
+
+// ============================================================================
 // Tool Registry
 // ============================================================================
 
@@ -367,6 +420,7 @@ export const builtInTools: RegisteredTool[] = [
   requestHumanHandoverTool,
   getCurrentTimeTool,
   calculateTool,
+  logoutTool,
 ];
 
 /**

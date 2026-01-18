@@ -8,17 +8,11 @@ import { type ReactNode } from "react";
 import { fadeInUp, smoothTransition } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 
-import { Breadcrumbs, IconButton } from "../ui";
-
-export interface BreadcrumbLink {
-  label: string;
-  href?: string;
-}
+import { IconButton } from "../ui";
 
 export interface PageHeaderProps {
   title: string;
   description?: string;
-  breadcrumbs?: BreadcrumbLink[];
   showBack?: boolean;
   onBack?: () => void;
   actions?: ReactNode;
@@ -29,7 +23,6 @@ export interface PageHeaderProps {
 export function PageHeader({
   title,
   description,
-  breadcrumbs,
   showBack = false,
   onBack,
   actions,
@@ -54,18 +47,6 @@ export function PageHeader({
       animate="animate"
       transition={smoothTransition}
     >
-      {/* Breadcrumbs */}
-      {breadcrumbs && breadcrumbs.length > 0 && (
-        <Breadcrumbs
-          className="mb-4"
-          items={breadcrumbs.map((crumb, index) => ({
-            label: crumb.label,
-            href: crumb.href,
-            isCurrent: index === breadcrumbs.length - 1,
-          }))}
-        />
-      )}
-
       {/* Header content */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex items-start gap-4">

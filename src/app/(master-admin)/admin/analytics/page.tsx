@@ -10,7 +10,7 @@ import {
   UsageByCompany,
   ChannelBreakdown,
 } from "@/components/master-admin/analytics";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   useAnalyticsOverview,
   useConversationsAnalytics,
@@ -18,7 +18,7 @@ import {
 } from "@/hooks/master-admin";
 
 export default function AnalyticsPage() {
-  useSetPageTitle("Analytics");
+  useSetBreadcrumbs([{ label: "Analytics" }]);
   const [days, setDays] = useState(30);
 
   const { overview, isLoading: isOverviewLoading } = useAnalyticsOverview();
@@ -39,11 +39,6 @@ export default function AnalyticsPage() {
       <PageHeader
         title="Platform Analytics"
         description="Monitor platform-wide metrics and performance"
-        showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Analytics" },
-        ]}
       />
 
       <AnalyticsHeader

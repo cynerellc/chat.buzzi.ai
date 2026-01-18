@@ -22,11 +22,14 @@ import { ThinkingBubble, type ToolCallState } from "./ThinkingBubble";
 import { VoiceMessageBubble } from "./VoiceMessageBubble";
 import { HumanWaitingBubble } from "./HumanWaitingBubble";
 import { HumanJoinedBubble, HumanExitedBubble } from "./HumanJoinedBubble";
+import { AuthFormBubble } from "./AuthFormBubble";
 import { CallDialog } from "./CallDialog";
 import { CallHistory } from "./CallHistory";
 import { useCallSession } from "../hooks/useCallSession";
 import type {
   AgentInfo,
+  AuthField,
+  AuthState,
   ChatWindowConfig,
   ChatWindowProps,
   Message,
@@ -91,6 +94,14 @@ export function ChatWindow({
     name: string;
     avatarUrl?: string;
   } | null>(null);
+
+  // Authentication state
+  const [authState, setAuthState] = useState<AuthState>({
+    isRequired: false,
+    isAuthenticated: false,
+  });
+  // Pending message that triggered auth - will be auto-resent after login
+  const [pendingAuthMessage, setPendingAuthMessage] = useState<string | null>(null);
 
   // Call dialog state
   const [isCallDialogOpen, setIsCallDialogOpen] = useState(false);
@@ -1801,6 +1812,161 @@ export function ChatWindow({
                     setStreamingMessageId(null);
                     setThinkingState(null);
                     break;
+
+                  case "auth_required":
+                    // Authentication required for agent/tool access
+                    console.log("[Auth] Authentication required:", data);
+                    _setIsTyping(false);
+                    setIsSending(false);
+                    setThinkingState(null);
+
+                    // Update auth state
+                    setAuthState({
+                      isRequired: true,
+                      isAuthenticated: false,
+                      currentStep: {
+                        stepId: data.stepId,
+                        stepName: data.stepName,
+                        fields: data.fields || [],
+                        aiPrompt: data.aiPrompt,
+                      },
+                      targetAgentId: data.targetAgentId,
+                      targetAgentName: data.targetAgentName,
+                    });
+
+                    // Store the last user message for auto-resend after auth
+                    setMessages((prev) => {
+                      // Find the last user message (the one that triggered auth)
+                      const lastUserMessage = [...prev].reverse().find((m) => m.role === "user");
+                      if (lastUserMessage?.content) {
+                        setPendingAuthMessage(lastUserMessage.content);
+                      }
+
+                      const streamingIdx = prev.findIndex((m) => m.id === responseId);
+                      const filteredMessages = streamingIdx !== -1
+                        ? [...prev.slice(0, streamingIdx), ...prev.slice(streamingIdx + 1)]
+                        : prev;
+
+                      return [
+                        ...filteredMessages,
+                        {
+                          id: `auth-required-${Date.now()}`,
+                          role: "system" as const,
+                          content: data.aiPrompt || "Please log in to continue.",
+                          timestamp: new Date(),
+                          isAuthRequired: true,
+                          authStepId: data.stepId,
+                          authFields: data.fields || [],
+                          authPrompt: data.aiPrompt,
+                          targetAgentId: data.targetAgentId,
+                          targetAgentName: data.targetAgentName,
+                        },
+                      ];
+                    });
+                    break;
+
+                  case "auth_success":
+                    // Authentication successful
+                    console.log("[Auth] Authentication successful:", data);
+                    setAuthState((prev) => ({
+                      ...prev,
+                      isRequired: false,
+                      isAuthenticated: true,
+                      currentStep: undefined,
+                      error: undefined,
+                      isSubmitting: false,
+                    }));
+
+                    // Add success message
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `auth-success-${Date.now()}`,
+                        role: "system" as const,
+                        content: data.message || `Welcome${data.userName ? `, ${data.userName}` : ""}! You're now logged in.`,
+                        timestamp: new Date(),
+                      },
+                    ]);
+                    break;
+
+                  case "auth_error":
+                    // Authentication failed
+                    console.error("[Auth] Authentication error:", data);
+                    setAuthState((prev) => ({
+                      ...prev,
+                      error: data.error || "Authentication failed",
+                      isSubmitting: false,
+                    }));
+                    break;
+
+                  case "auth_step":
+                    // Move to next auth step (multi-step auth)
+                    console.log("[Auth] Next auth step:", data);
+                    setAuthState((prev) => ({
+                      ...prev,
+                      currentStep: {
+                        stepId: data.stepId,
+                        stepName: data.stepName,
+                        fields: data.fields || [],
+                        aiPrompt: data.aiPrompt,
+                      },
+                      error: undefined,
+                      isSubmitting: false,
+                    }));
+
+                    // Update the auth message
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `auth-step-${Date.now()}`,
+                        role: "system" as const,
+                        content: data.aiPrompt || "Please continue with verification.",
+                        timestamp: new Date(),
+                        isAuthRequired: true,
+                        authStepId: data.stepId,
+                        authFields: data.fields || [],
+                        authPrompt: data.aiPrompt,
+                      },
+                    ]);
+                    break;
+
+                  case "permission_denied":
+                    // Permission denied (role-based access)
+                    console.warn("[Auth] Permission denied:", data);
+                    _setIsTyping(false);
+                    setIsSending(false);
+                    setThinkingState(null);
+
+                    // Replace streaming placeholder with permission denied message
+                    setMessages((prev) => {
+                      const streamingIdx = prev.findIndex((m) => m.id === responseId);
+                      const filteredMessages = streamingIdx !== -1
+                        ? [...prev.slice(0, streamingIdx), ...prev.slice(streamingIdx + 1)]
+                        : prev;
+
+                      return [
+                        ...filteredMessages,
+                        {
+                          id: `permission-denied-${Date.now()}`,
+                          role: "system" as const,
+                          content: data.reason || "You don't have permission to access this feature.",
+                          timestamp: new Date(),
+                        },
+                      ];
+                    });
+                    break;
+
+                  case "logout_success":
+                    // User logged out successfully
+                    console.log("[Auth] Logout successful:", data);
+                    // Clear auth state
+                    setAuthState({
+                      isRequired: false,
+                      isAuthenticated: false,
+                    });
+                    // Clear any pending auth message
+                    setPendingAuthMessage(null);
+                    break;
                 }
               } catch {
                 // Ignore parse errors
@@ -3155,6 +3321,71 @@ export function ChatWindow({
                 isDark={isDark}
                 accentColor={accentColor}
                 onCancelEscalation={handleCancelEscalation}
+              />
+            );
+          }
+
+          // Render auth required bubble with login form
+          if (message.isAuthRequired && authState.isRequired && session) {
+            return (
+              <AuthFormBubble
+                key={message.id}
+                authState={authState}
+                sessionId={session.sessionId}
+                primaryColor={config?.primaryColor}
+                onAuthSuccess={() => {
+                  // Clear auth state on success
+                  setAuthState({
+                    isRequired: false,
+                    isAuthenticated: true,
+                  });
+                  // Remove auth form message
+                  setMessages((prev) => prev.filter((m) => !m.isAuthRequired));
+
+                  // Auto-resend the pending message that triggered auth
+                  if (pendingAuthMessage) {
+                    const messageToSend = pendingAuthMessage;
+                    setPendingAuthMessage(null);
+                    // Small delay to ensure auth state is cleared first
+                    setTimeout(() => {
+                      sendMessageRef.current(messageToSend);
+                    }, 100);
+                  }
+                }}
+                onAuthError={(error) => {
+                  setAuthState((prev) => ({
+                    ...prev,
+                    error,
+                    isSubmitting: false,
+                  }));
+                }}
+                onNextStep={(step) => {
+                  // Move to next auth step
+                  setAuthState((prev) => ({
+                    ...prev,
+                    currentStep: {
+                      stepId: step.stepId,
+                      stepName: step.stepName,
+                      fields: step.fields,
+                      aiPrompt: step.aiPrompt,
+                    },
+                    error: undefined,
+                    isSubmitting: false,
+                  }));
+                  // Update the auth message with new step prompt
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.isAuthRequired
+                        ? {
+                            ...m,
+                            authStepId: step.stepId,
+                            authFields: step.fields,
+                            authPrompt: step.aiPrompt,
+                          }
+                        : m
+                    )
+                  );
+                }}
               />
             );
           }

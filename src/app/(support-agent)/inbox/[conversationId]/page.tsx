@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { ConversationDetailPage } from "@/components/shared/conversations";
 
 interface PageProps {
@@ -11,7 +11,7 @@ interface PageProps {
 }
 
 export default function LiveChatPage({ params }: PageProps) {
-  useSetPageTitle("Live Chat");
+  useSetBreadcrumbs([{ label: "Inbox", href: "/inbox" }, { label: "Conversation" }]);
   const router = useRouter();
   const { conversationId } = use(params);
 

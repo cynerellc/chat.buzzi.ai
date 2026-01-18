@@ -14,11 +14,11 @@ import {
   ActivityFeed,
 } from "@/components/master-admin/dashboard";
 import { Button } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import { useDashboardStats } from "@/hooks/master-admin";
 
 export default function MasterAdminDashboard() {
-  useSetPageTitle("Dashboard");
+  useSetBreadcrumbs([{ label: "Dashboard" }]);
   const { refresh, isLoading } = useDashboardStats();
 
   const handleRefresh = useCallback(() => {

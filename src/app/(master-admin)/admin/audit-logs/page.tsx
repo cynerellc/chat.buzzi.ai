@@ -10,7 +10,7 @@ import {
   LogDetailModal,
 } from "@/components/master-admin/audit-logs";
 import { Button, Pagination } from "@/components/ui";
-import { useSetPageTitle } from "@/contexts/page-context";
+import { useSetBreadcrumbs } from "@/contexts/page-context";
 import {
   useAuditLogs,
   useAuditLog,
@@ -18,7 +18,7 @@ import {
 } from "@/hooks/master-admin";
 
 export default function AuditLogsPage() {
-  useSetPageTitle("Audit Logs");
+  useSetBreadcrumbs([{ label: "Audit Logs" }]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [action, setAction] = useState("");
@@ -53,11 +53,6 @@ export default function AuditLogsPage() {
       <PageHeader
         title="Audit Logs"
         description="Track all system actions and changes"
-        showBack
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/dashboard" },
-          { label: "Audit Logs" },
-        ]}
         actions={
           <Button
             variant="secondary"
